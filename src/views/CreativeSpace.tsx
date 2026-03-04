@@ -86,12 +86,22 @@ export default function CreativeSpace() {
                 "INSERT INTO creative_projects (name, prompt, cycle_mode) VALUES ($1, $2, 'manual')",
                 [newName, newPrompt]
             );
+            // Fetch the newly created project to get its ID
+            const newProjects: Project[] = await db.select(
+                "SELECT * FROM creative_projects WHERE name = $1 AND prompt = $2 ORDER BY id DESC LIMIT 1",
+                [newName, newPrompt]
+            );
             setNewName("");
             setNewPrompt("");
             toast({ title: "Project created" });
+            if (newProjects.length > 0) {
+                // Navigate directly into the new project
+                setActiveProject(newProjects[0]);
+                setCards([]);
+            }
             loadProjects();
         } catch (err: any) {
-            toast({ title: "Error", description: err.message, variant: "destructive" });
+            toast({ title: "Error", description: String(err), variant: "destructive" });
         }
     }
 
@@ -167,7 +177,7 @@ export default function CreativeSpace() {
             toast({ title: "Success! Card Generated." });
             loadCards(project.id);
         } catch (err: any) {
-            toast({ title: "Generation failed", description: err.message, variant: "destructive" });
+            toast({ title: "Generation failed", description: String(err), variant: "destructive" });
         } finally {
             setIsGenerating(false);
         }

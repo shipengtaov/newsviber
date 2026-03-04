@@ -6,7 +6,7 @@ pub fn get_migrations() -> Vec<Migration> {
             version: 1,
             description: "create_initial_tables",
             sql: "
-                CREATE TABLE sources (
+                CREATE TABLE IF NOT EXISTS sources (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     name TEXT NOT NULL,
                     source_type TEXT NOT NULL, /* 'rss', 'jina_url', 'jina_search', 'twitter', 'custom' */
@@ -17,7 +17,7 @@ pub fn get_migrations() -> Vec<Migration> {
                     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
                 );
 
-                CREATE TABLE articles (
+                CREATE TABLE IF NOT EXISTS articles (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     source_id INTEGER NOT NULL,
                     guid TEXT NOT NULL UNIQUE, /* url or rss guid */
@@ -31,22 +31,28 @@ pub fn get_migrations() -> Vec<Migration> {
                     FOREIGN KEY(source_id) REFERENCES sources(id) ON DELETE CASCADE
                 );
 
-                CREATE VIRTUAL TABLE articles_fts USING fts5(
+                CREATE VIRTUAL TABLE IF NOT EXISTS articles_fts USING fts5(
                     title, content, summary, content='articles', content_rowid='id'
                 );
 
-                CREATE TRIGGER articles_ai AFTER INSERT ON articles BEGIN
+                CREATE TRIGGER IF NOT EXISTS articles_ai AFTER INSERT ON articles BEGIN
                     INSERT INTO articles_fts(rowid, title, content, summary) VALUES (new.id, new.title, new.content, new.summary);
                 END;
-                CREATE TRIGGER articles_ad AFTER DELETE ON articles BEGIN
+                CREATE TRIGGER IF NOT EXISTS articles_ad AFTER DELETE ON articles BEGIN
                     INSERT INTO articles_fts(articles_fts, rowid, title, content, summary) VALUES('delete', old.id, old.title, old.content, old.summary);
                 END;
-                CREATE TRIGGER articles_au AFTER UPDATE ON articles BEGIN
+                CREATE TRIGGER IF NOT EXISTS articles_au AFTER UPDATE ON articles BEGIN
                     INSERT INTO articles_fts(articles_fts, rowid, title, content, summary) VALUES('delete', old.id, old.title, old.content, old.summary);
                     INSERT INTO articles_fts(rowid, title, content, summary) VALUES (new.id, new.title, new.content, new.summary);
                 END;
-
-                CREATE TABLE creative_projects (
+            ",
+            kind: MigrationKind::Up,
+        },
+        Migration {
+            version: 2,
+            description: "add_creative_space",
+            sql: "
+                CREATE TABLE IF NOT EXISTS creative_projects (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     name TEXT NOT NULL,
                     prompt TEXT NOT NULL,
@@ -55,7 +61,7 @@ pub fn get_migrations() -> Vec<Migration> {
                     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
                 );
 
-                CREATE TABLE creative_cards (
+                CREATE TABLE IF NOT EXISTS creative_cards (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     project_id INTEGER NOT NULL,
                     title TEXT NOT NULL,
