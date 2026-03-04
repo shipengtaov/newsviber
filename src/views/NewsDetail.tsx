@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useParams, Link } from "react-router-dom";
 import Database from "@tauri-apps/plugin-sql";
+import { openUrl } from "@tauri-apps/plugin-opener";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ArrowLeft, ExternalLink, Send, Bot, User } from "lucide-react";
@@ -14,6 +15,7 @@ type FullArticle = {
     source_url: string;
     guid: string;
     title: string;
+    summary: string;
     content: string;
     published_at: string;
 };
@@ -148,11 +150,30 @@ Answer the user's questions based primarily on the current article. Use related 
                     <div className="flex items-center space-x-4 text-sm text-muted-foreground">
                         <span className="bg-primary/10 text-primary px-2 py-0.5 font-medium rounded-md">{article.source_name}</span>
                         <span>{new Date(article.published_at).toLocaleString()}</span>
-                        <a href={article.guid} target="_blank" rel="noreferrer" className="flex items-center hover:text-primary transition-colors hover:underline">
+                        <a
+                            href={article.guid}
+                            className="flex items-center hover:text-primary transition-colors hover:underline cursor-pointer"
+                            onClick={(e) => { e.preventDefault(); openUrl(article.guid); }}
+                        >
                             <ExternalLink className="w-3.5 h-3.5 mr-1" /> Original Source
                         </a>
                     </div>
                 </div>
+
+                {article.summary && (
+                    <div
+                        className="mb-6 text-sm text-muted-foreground"
+                        dangerouslySetInnerHTML={{ __html: article.summary }}
+                        onClick={(e) => {
+                            const target = e.target as HTMLElement;
+                            const anchor = target.closest('a');
+                            if (anchor && anchor.href) {
+                                e.preventDefault();
+                                openUrl(anchor.href);
+                            }
+                        }}
+                    />
+                )}
 
                 <div className="prose prose-neutral dark:prose-invert max-w-none w-full leading-relaxed text-foreground/90">
                     <ReactMarkdown>

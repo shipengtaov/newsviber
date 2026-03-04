@@ -1,15 +1,17 @@
 import { useState, useEffect } from "react";
 import Database from "@tauri-apps/plugin-sql";
+import { openUrl } from "@tauri-apps/plugin-opener";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Link } from "react-router-dom";
-import { Search } from "lucide-react";
+import { Search, ExternalLink } from "lucide-react";
 
 type Article = {
     id: number;
     source_id: number;
     source_name: string;
+    guid: string;
     title: string;
     summary: string;
     published_at: string;
@@ -37,7 +39,7 @@ export default function NewsList() {
         try {
             const db = await getDb();
             let query = `
-        SELECT a.id, a.source_id, s.name as source_name, a.title, a.summary, a.published_at, a.is_read
+        SELECT a.id, a.source_id, s.name as source_name, a.guid, a.title, a.summary, a.published_at, a.is_read
         FROM articles a
         JOIN sources s ON a.source_id = s.id
       `;
@@ -65,6 +67,22 @@ export default function NewsList() {
     function handleSearch(e: React.FormEvent) {
         e.preventDefault();
         loadArticles(0, search);
+    }
+
+    function handleExternalLink(e: React.MouseEvent, url: string) {
+        e.preventDefault();
+        e.stopPropagation();
+        openUrl(url);
+    }
+
+    function handleHtmlLinkClick(e: React.MouseEvent) {
+        const target = e.target as HTMLElement;
+        const anchor = target.closest('a');
+        if (anchor && anchor.href) {
+            e.preventDefault();
+            e.stopPropagation();
+            openUrl(anchor.href);
+        }
     }
 
     return (
@@ -96,7 +114,23 @@ export default function NewsList() {
                                     {!article.is_read && <span className="bg-blue-500 w-2 h-2 rounded-full inline-block"></span>}
                                 </div>
                                 <CardTitle className="text-xl leading-tight">{article.title}</CardTitle>
-                                <CardDescription className="line-clamp-2 mt-2 text-sm">{article.summary || "No summary available."}</CardDescription>
+                                <div className="flex items-center gap-3 mt-2">
+                                    {article.summary ? (
+                                        <CardDescription className="line-clamp-1 text-sm flex-1 min-w-0" dangerouslySetInnerHTML={{ __html: article.summary }} onClick={handleHtmlLinkClick} />
+                                    ) : (
+                                        <CardDescription className="line-clamp-1 text-sm flex-1 min-w-0">No summary available.</CardDescription>
+                                    )}
+                                    {article.guid && (
+                                        <a
+                                            href={article.guid}
+                                            className="inline-flex items-center text-xs text-muted-foreground hover:text-primary transition-colors shrink-0"
+                                            onClick={(e) => handleExternalLink(e, article.guid)}
+                                        >
+                                            <ExternalLink className="w-3 h-3 mr-1" />
+                                            Original
+                                        </a>
+                                    )}
+                                </div>
                             </CardHeader>
                         </Card>
                     </Link>
