@@ -4,7 +4,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { useNavigate, useParams } from "react-router-dom";
 import { ChevronLeft } from "lucide-react";
@@ -83,7 +82,7 @@ export default function SourceForm() {
     }
 
     return (
-        <div className="p-8 max-w-2xl mx-auto space-y-6">
+        <div className="p-8 max-w-4xl mx-auto space-y-8">
             <Button variant="ghost" onClick={() => navigate("/sources")} className="mb-4 -ml-4">
                 <ChevronLeft className="h-4 w-4 mr-2" />
                 Back to Sources
@@ -96,21 +95,17 @@ export default function SourceForm() {
                 </p>
             </div>
 
-            <Card>
-                <form onSubmit={handleSubmit}>
-                    <CardHeader>
-                        <CardTitle>Configuration</CardTitle>
-                        <CardDescription>Enter the details for this content source.</CardDescription>
-                    </CardHeader>
-                    <CardContent className="grid gap-4 md:grid-cols-2">
-                        <div className="space-y-2">
-                            <Label>Source Name</Label>
-                            <Input placeholder="e.g. Hacker News" value={name} onChange={e => setName(e.target.value)} required />
+            <div className="mt-8">
+                <form onSubmit={handleSubmit} className="space-y-8">
+                    <div className="grid gap-6 md:grid-cols-2">
+                        <div className="space-y-3">
+                            <Label className="text-sm font-medium">Source Name</Label>
+                            <Input placeholder="e.g. Hacker News" value={name} onChange={e => setName(e.target.value)} required className="bg-background/50" />
                         </div>
-                        <div className="space-y-2">
-                            <Label>Type</Label>
+                        <div className="space-y-3">
+                            <Label className="text-sm font-medium">Type</Label>
                             <Select value={type} onValueChange={setType}>
-                                <SelectTrigger><SelectValue /></SelectTrigger>
+                                <SelectTrigger className="bg-background/50"><SelectValue /></SelectTrigger>
                                 <SelectContent>
                                     <SelectItem value="rss">RSS Feed</SelectItem>
                                     <SelectItem value="jina_url">Jina URL Scrape</SelectItem>
@@ -118,23 +113,24 @@ export default function SourceForm() {
                                 </SelectContent>
                             </Select>
                         </div>
-                        <div className="space-y-2 md:col-span-2">
-                            <Label>Target URL</Label>
-                            <Input placeholder="https://..." value={url} onChange={e => setUrl(e.target.value)} required />
+                        <div className="space-y-3 md:col-span-2">
+                            <Label className="text-sm font-medium">Target URL</Label>
+                            <Input placeholder="https://..." value={url} onChange={e => setUrl(e.target.value)} required className="bg-background/50" />
                         </div>
-                        <div className="space-y-2">
-                            <Label>Fetch Interval (minutes)</Label>
-                            <Input type="number" value={interval} inline-block="true" onChange={e => setInterval(e.target.value)} />
+                        <div className="space-y-3">
+                            <Label className="text-sm font-medium">Fetch Interval (minutes)</Label>
+                            <Input type="number" value={interval} inline-block="true" onChange={e => setInterval(e.target.value)} className="bg-background/50" />
                         </div>
-                    </CardContent>
-                    <CardFooter className="flex justify-end gap-2">
+                    </div>
+
+                    <div className="flex justify-end gap-3 pt-6 border-t border-border/50">
                         <Button type="button" variant="outline" onClick={() => navigate("/sources")}>Cancel</Button>
                         <Button type="submit" disabled={loading}>
                             {isEditing ? "Save Changes" : "Add Source"}
                         </Button>
-                    </CardFooter>
+                    </div>
                 </form>
-            </Card>
+            </div>
         </div>
     );
 }
