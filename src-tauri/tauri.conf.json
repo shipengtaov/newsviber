@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "tauri-app",
+  "productName": "GetNews",
   "version": "0.1.0",
   "identifier": "com.thebrain.tauri-app",
   "build": {
@@ -12,7 +12,13 @@
   "app": {
     "windows": [
       {
-        "title": "tauri-app",
+        "title": "GetNews",
+        "titleBarStyle": "Overlay",
+        "hiddenTitle": true,
+        "trafficLightPosition": {
+          "x": 14,
+          "y": 22
+        },
         "width": 1180,
         "height": 800,
         "center": true
