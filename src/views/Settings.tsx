@@ -20,7 +20,7 @@ const PROVIDERS = [
     { id: 'minimax', name: 'MiniMax', url: 'https://api.minimaxi.com/anthropic', models: ['minimax-text-01', 'minimax-text-01v', 'abab6.5s-chat'], iconUrl: getFaviconUrl('minimaxi.com') },
     { id: 'openrouter', name: 'OpenRouter', url: 'https://openrouter.ai/api/v1', models: [], iconUrl: getFaviconUrl('openrouter.ai') },
     { id: 'siliconflow', name: 'SiliconFlow', url: 'https://api.siliconflow.cn/v1', models: ['deepseek-ai/DeepSeek-V3', 'Qwen/Qwen2.5-72B-Instruct'], iconUrl: getFaviconUrl('siliconflow.cn') },
-    { id: 'vercel', name: 'Vercel AI Gateway', url: 'https://api.vercel.com/v1', models: [], iconUrl: getFaviconUrl('vercel.com') },
+    { id: 'vercel', name: 'Vercel AI Gateway', url: 'https://ai-gateway.vercel.sh', models: [], iconUrl: getFaviconUrl('vercel.com') },
     { id: 'azure', name: 'Azure OpenAI', url: 'https://YOUR_RESOURCE_NAME.openai.azure.com/openai/deployments/YOUR_DEPLOYMENT_NAME', models: ['gpt-4o', 'gpt-4o-mini'], iconUrl: getFaviconUrl('azure.microsoft.com') },
     { id: 'ollama', name: 'Ollama (Local)', url: 'http://127.0.0.1:11434/v1', models: ['llama3', 'qwen2', 'mistral'], iconUrl: getFaviconUrl('ollama.com') },
     { id: 'custom', name: 'Custom', url: '', models: [], iconUrl: 'https://api.iconify.design/lucide:globe.svg?color=%23888888' }
