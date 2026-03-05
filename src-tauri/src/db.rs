@@ -76,6 +76,14 @@ pub fn get_migrations() -> Vec<Migration> {
                 );
             ",
             kind: MigrationKind::Up,
+        },
+        Migration {
+            version: 3,
+            description: "add_active_to_sources",
+            sql: "
+                ALTER TABLE sources ADD COLUMN active BOOLEAN NOT NULL DEFAULT 1;
+            ",
+            kind: MigrationKind::Up,
         }
     ]
 }

@@ -1,13 +1,11 @@
 import { useState, useEffect } from "react";
 import Database from "@tauri-apps/plugin-sql";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { RefreshCcw, Trash2 } from "lucide-react";
+import { RefreshCcw, Trash2, Edit, Plus, Power, PowerOff } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
+import { useNavigate } from "react-router-dom";
 
 type Source = {
     id: number;
@@ -16,6 +14,7 @@ type Source = {
     url: string;
     config: string | null;
     fetch_interval: number;
+    active: number;
 };
 
 let db: Database | null = null;
@@ -28,11 +27,8 @@ async function getDb() {
 
 export default function SourceManager() {
     const { toast } = useToast();
+    const navigate = useNavigate();
     const [sources, setSources] = useState<Source[]>([]);
-    const [name, setName] = useState("");
-    const [type, setType] = useState("rss");
-    const [url, setUrl] = useState("");
-    const [interval, setInterval] = useState("60");
 
     useEffect(() => {
         loadSources();
@@ -48,18 +44,12 @@ export default function SourceManager() {
         }
     }
 
-    async function addSource(e: React.FormEvent) {
-        e.preventDefault();
-        if (!name || !url) return;
+    async function toggleActive(source: Source) {
         try {
+            const newActive = source.active ? 0 : 1;
             const db = await getDb();
-            await db.execute(
-                "INSERT INTO sources (name, source_type, url, fetch_interval) VALUES ($1, $2, $3, $4)",
-                [name, type, url, parseInt(interval) || 60]
-            );
-            setName("");
-            setUrl("");
-            toast({ title: "Source added successfully" });
+            await db.execute("UPDATE sources SET active = $1 WHERE id = $2", [newActive, source.id]);
+            toast({ title: newActive ? "Source activated" : "Source deactivated" });
             loadSources();
         } catch (err: any) {
             toast({ title: "Error", description: String(err), variant: "destructive" });
@@ -121,64 +111,42 @@ export default function SourceManager() {
 
     return (
         <div className="p-8 max-w-4xl mx-auto space-y-8">
-            <div>
-                <h1 className="text-3xl font-bold tracking-tight">Source Manager</h1>
-                <p className="text-muted-foreground mt-2">Manage your RSS feeds, Twitter accounts, and URL monitors.</p>
+            <div className="flex justify-between items-center">
+                <div>
+                    <h1 className="text-3xl font-bold tracking-tight">Source Manager</h1>
+                    <p className="text-muted-foreground mt-2">Manage your RSS feeds, Twitter accounts, and URL monitors.</p>
+                </div>
+                <Button onClick={() => navigate("/sources/add")}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Source
+                </Button>
             </div>
-
-            <Card>
-                <CardHeader>
-                    <CardTitle>Add New Source</CardTitle>
-                    <CardDescription>Add a new data source to track automatically.</CardDescription>
-                </CardHeader>
-                <CardContent>
-                    <form onSubmit={addSource} className="grid gap-4 md:grid-cols-2">
-                        <div className="space-y-2">
-                            <Label>Source Name</Label>
-                            <Input placeholder="e.g. HN RSS" value={name} onChange={e => setName(e.target.value)} required />
-                        </div>
-                        <div className="space-y-2">
-                            <Label>Type</Label>
-                            <Select value={type} onValueChange={setType}>
-                                <SelectTrigger><SelectValue /></SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="rss">RSS Feed</SelectItem>
-                                    <SelectItem value="jina_url">Jina URL Scrape</SelectItem>
-                                    <SelectItem value="twitter">Twitter (/X)</SelectItem>
-                                </SelectContent>
-                            </Select>
-                        </div>
-                        <div className="space-y-2 md:col-span-2">
-                            <Label>Target URL</Label>
-                            <Input placeholder="https://..." value={url} onChange={e => setUrl(e.target.value)} required />
-                        </div>
-                        <div className="space-y-2">
-                            <Label>Fetch Interval (minutes)</Label>
-                            <Input type="number" value={interval} inline-block="true" onChange={e => setInterval(e.target.value)} />
-                        </div>
-                        <div className="md:col-span-2 mt-2">
-                            <Button type="submit">Add Source</Button>
-                        </div>
-                    </form>
-                </CardContent>
-            </Card>
 
             <div className="space-y-4">
                 <h2 className="text-2xl font-semibold">Active Sources</h2>
                 <div className="grid gap-4 md:grid-cols-2">
                     {sources.map(s => (
-                        <Card key={s.id} className="relative overflow-hidden">
+                        <Card key={s.id} className={`relative overflow-hidden ${!s.active ? 'opacity-75 bg-muted/50' : ''}`}>
                             <div className="p-5">
                                 <div className="flex justify-between items-start mb-2">
-                                    <h3 className="font-semibold">{s.name}</h3>
+                                    <div className="flex items-center gap-2">
+                                        <h3 className="font-semibold">{s.name}</h3>
+                                        {!s.active && <span className="text-xs bg-destructive/10 text-destructive px-2 py-0.5 rounded-full">Inactive</span>}
+                                    </div>
                                     <span className="text-xs uppercase bg-muted text-muted-foreground px-2 py-1 rounded-md">{s.source_type}</span>
                                 </div>
                                 <p className="text-sm text-muted-foreground truncate" title={s.url}>{s.url}</p>
-                                <div className="mt-4 flex gap-2">
-                                    <Button variant="outline" size="sm" onClick={() => fetchNow(s)}>
-                                        <RefreshCcw className="h-4 w-4 mr-2" /> Fetch Now
+                                <div className="mt-4 flex flex-wrap gap-2">
+                                    <Button variant="outline" size="sm" onClick={() => fetchNow(s)} disabled={!s.active}>
+                                        <RefreshCcw className="h-4 w-4 mr-2" /> Fetch
                                     </Button>
-                                    <Button variant="ghost" size="sm" onClick={() => deleteSource(s.id)} className="text-destructive">
+                                    <Button variant="outline" size="sm" onClick={() => navigate(`/sources/edit/${s.id}`)}>
+                                        <Edit className="h-4 w-4 mr-2" /> Edit
+                                    </Button>
+                                    <Button variant="outline" size="sm" onClick={() => toggleActive(s)}>
+                                        {s.active ? <PowerOff className="h-4 w-4" /> : <Power className="h-4 w-4" />}
+                                    </Button>
+                                    <Button variant="ghost" size="sm" onClick={() => deleteSource(s.id)} className="text-destructive ml-auto">
                                         <Trash2 className="h-4 w-4" />
                                     </Button>
                                 </div>
