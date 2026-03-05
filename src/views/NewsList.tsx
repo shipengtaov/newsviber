@@ -18,6 +18,10 @@ type Article = {
     is_read: boolean;
 };
 
+const NEWS_LIST_SCROLL_KEY = "newsList_scrollTop";
+const MAX_RESTORE_ATTEMPTS = 6;
+const RESTORE_TOLERANCE_PX = 2;
+
 let db: Database | null = null;
 async function getDb() {
     if (!db) {
@@ -26,38 +30,80 @@ async function getDb() {
     return db;
 }
 
+function getMainScrollContainer(): HTMLElement | null {
+    const main = document.querySelector("main");
+    return main instanceof HTMLElement ? main : null;
+}
+
+function saveScrollTop(value: number) {
+    if (!Number.isFinite(value)) return;
+    sessionStorage.setItem(NEWS_LIST_SCROLL_KEY, String(Math.max(0, Math.floor(value))));
+}
+
 export default function NewsList() {
     const [articles, setArticles] = useState<Article[]>([]);
     const [searchParams, setSearchParams] = useSearchParams();
     const page = parseInt(searchParams.get("page") || "0");
     const search = searchParams.get("q") || "";
     const [searchInput, setSearchInput] = useState(search);
-    const shouldRestoreScroll = useRef(true);
+    const hasRestoredRef = useRef(false);
+    const isNavigatingToDetailRef = useRef(false);
+    const lastKnownScrollTopRef = useRef(0);
 
     useEffect(() => {
         loadArticles(page, search);
     }, [page, search]);
 
     useEffect(() => {
-        if (articles.length === 0 || !shouldRestoreScroll.current) return;
-        shouldRestoreScroll.current = false;
-        const saved = sessionStorage.getItem("newsList_scrollTop");
-        if (saved) {
-            const main = document.querySelector("main");
-            if (main) {
-                requestAnimationFrame(() => { main.scrollTop = parseInt(saved); });
-            }
-        }
+        if (articles.length === 0 || hasRestoredRef.current) return;
+        hasRestoredRef.current = true;
+
+        const saved = sessionStorage.getItem(NEWS_LIST_SCROLL_KEY);
+        if (!saved) return;
+
+        const savedTop = Number.parseInt(saved, 10);
+        if (!Number.isFinite(savedTop) || savedTop < 0) return;
+
+        const main = getMainScrollContainer();
+        if (!main) return;
+
+        let attempts = 0;
+        const restore = () => {
+            attempts += 1;
+            main.scrollTop = savedTop;
+            lastKnownScrollTopRef.current = main.scrollTop;
+
+            if (Math.abs(main.scrollTop - savedTop) <= RESTORE_TOLERANCE_PX) return;
+            if (attempts >= MAX_RESTORE_ATTEMPTS) return;
+
+            requestAnimationFrame(restore);
+        };
+
+        requestAnimationFrame(restore);
     }, [articles]);
 
     useEffect(() => {
-        const main = document.querySelector("main");
+        const main = getMainScrollContainer();
         if (!main) return;
+
+        lastKnownScrollTopRef.current = main.scrollTop;
+
         const onScroll = () => {
-            sessionStorage.setItem("newsList_scrollTop", String(main.scrollTop));
+            if (!hasRestoredRef.current) return;
+            if (isNavigatingToDetailRef.current) return;
+
+            const currentTop = main.scrollTop;
+            lastKnownScrollTopRef.current = currentTop;
+            saveScrollTop(currentTop);
         };
+
         main.addEventListener("scroll", onScroll, { passive: true });
-        return () => main.removeEventListener("scroll", onScroll);
+
+        return () => {
+            main.removeEventListener("scroll", onScroll);
+            if (!hasRestoredRef.current) return;
+            saveScrollTop(lastKnownScrollTopRef.current);
+        };
     }, []);
 
     async function loadArticles(p: number, q: string) {
@@ -115,6 +161,16 @@ export default function NewsList() {
         }
     }
 
+    function handleArticleClick() {
+        isNavigatingToDetailRef.current = true;
+
+        const main = getMainScrollContainer();
+        if (!main) return;
+
+        lastKnownScrollTopRef.current = main.scrollTop;
+        saveScrollTop(main.scrollTop);
+    }
+
     return (
         <div className="p-8 max-w-5xl mx-auto space-y-6">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -135,7 +191,7 @@ export default function NewsList() {
 
             <div className="space-y-4">
                 {articles.map(article => (
-                    <Link to={`/news/${article.id}`} key={article.id} className="block">
+                    <Link to={`/news/${article.id}`} key={article.id} className="block" onClick={handleArticleClick}>
                         <Card className="hover:border-primary/50 transition-colors">
                             <CardHeader className="py-4">
                                 <div className="flex items-center space-x-2 text-xs text-muted-foreground mb-1">
