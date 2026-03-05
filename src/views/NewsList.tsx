@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import Database from "@tauri-apps/plugin-sql";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -18,9 +18,7 @@ type Article = {
     is_read: boolean;
 };
 
-const NEWS_LIST_SCROLL_KEY = "newsList_scrollTop";
-const MAX_RESTORE_ATTEMPTS = 6;
-const RESTORE_TOLERANCE_PX = 2;
+const MAIN_MENU_SCROLL_STORAGE_KEY = "mainMenuScrollPositions_v1";
 
 let db: Database | null = null;
 async function getDb() {
@@ -30,81 +28,16 @@ async function getDb() {
     return db;
 }
 
-function getMainScrollContainer(): HTMLElement | null {
-    const main = document.querySelector("main");
-    return main instanceof HTMLElement ? main : null;
-}
-
-function saveScrollTop(value: number) {
-    if (!Number.isFinite(value)) return;
-    sessionStorage.setItem(NEWS_LIST_SCROLL_KEY, String(Math.max(0, Math.floor(value))));
-}
-
 export default function NewsList() {
     const [articles, setArticles] = useState<Article[]>([]);
     const [searchParams, setSearchParams] = useSearchParams();
     const page = parseInt(searchParams.get("page") || "0");
     const search = searchParams.get("q") || "";
     const [searchInput, setSearchInput] = useState(search);
-    const hasRestoredRef = useRef(false);
-    const isNavigatingToDetailRef = useRef(false);
-    const lastKnownScrollTopRef = useRef(0);
 
     useEffect(() => {
         loadArticles(page, search);
     }, [page, search]);
-
-    useEffect(() => {
-        if (articles.length === 0 || hasRestoredRef.current) return;
-        hasRestoredRef.current = true;
-
-        const saved = sessionStorage.getItem(NEWS_LIST_SCROLL_KEY);
-        if (!saved) return;
-
-        const savedTop = Number.parseInt(saved, 10);
-        if (!Number.isFinite(savedTop) || savedTop < 0) return;
-
-        const main = getMainScrollContainer();
-        if (!main) return;
-
-        let attempts = 0;
-        const restore = () => {
-            attempts += 1;
-            main.scrollTop = savedTop;
-            lastKnownScrollTopRef.current = main.scrollTop;
-
-            if (Math.abs(main.scrollTop - savedTop) <= RESTORE_TOLERANCE_PX) return;
-            if (attempts >= MAX_RESTORE_ATTEMPTS) return;
-
-            requestAnimationFrame(restore);
-        };
-
-        requestAnimationFrame(restore);
-    }, [articles]);
-
-    useEffect(() => {
-        const main = getMainScrollContainer();
-        if (!main) return;
-
-        lastKnownScrollTopRef.current = main.scrollTop;
-
-        const onScroll = () => {
-            if (!hasRestoredRef.current) return;
-            if (isNavigatingToDetailRef.current) return;
-
-            const currentTop = main.scrollTop;
-            lastKnownScrollTopRef.current = currentTop;
-            saveScrollTop(currentTop);
-        };
-
-        main.addEventListener("scroll", onScroll, { passive: true });
-
-        return () => {
-            main.removeEventListener("scroll", onScroll);
-            if (!hasRestoredRef.current) return;
-            saveScrollTop(lastKnownScrollTopRef.current);
-        };
-    }, []);
 
     async function loadArticles(p: number, q: string) {
         try {
@@ -162,13 +95,24 @@ export default function NewsList() {
     }
 
     function handleArticleClick() {
-        isNavigatingToDetailRef.current = true;
+        const main = document.querySelector("main");
+        if (!(main instanceof HTMLElement)) return;
 
-        const main = getMainScrollContainer();
-        if (!main) return;
+        let scrollMap: Record<string, number> = {};
+        const raw = sessionStorage.getItem(MAIN_MENU_SCROLL_STORAGE_KEY);
+        if (raw) {
+            try {
+                const parsed = JSON.parse(raw);
+                if (parsed && typeof parsed === "object") {
+                    scrollMap = parsed as Record<string, number>;
+                }
+            } catch {
+                scrollMap = {};
+            }
+        }
 
-        lastKnownScrollTopRef.current = main.scrollTop;
-        saveScrollTop(main.scrollTop);
+        scrollMap["/"] = Math.max(0, Math.floor(main.scrollTop));
+        sessionStorage.setItem(MAIN_MENU_SCROLL_STORAGE_KEY, JSON.stringify(scrollMap));
     }
 
     return (
