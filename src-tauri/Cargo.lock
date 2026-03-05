@@ -1475,6 +1475,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "get-news"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "reqwest",
+ "rss",
+ "scraper",
+ "serde",
+ "serde_json",
+ "tauri",
+ "tauri-build",
+ "tauri-plugin-opener",
+ "tauri-plugin-sql",
+ "tokio",
+ "url",
+]
+
+[[package]]
 name = "getopts"
 version = "0.2.24"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4775,24 +4793,6 @@ dependencies = [
  "webview2-com",
  "window-vibrancy",
  "windows",
-]
-
-[[package]]
-name = "tauri-app"
-version = "0.1.0"
-dependencies = [
- "chrono",
- "reqwest",
- "rss",
- "scraper",
- "serde",
- "serde_json",
- "tauri",
- "tauri-build",
- "tauri-plugin-opener",
- "tauri-plugin-sql",
- "tokio",
- "url",
 ]
 
 [[package]]

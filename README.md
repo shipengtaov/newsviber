@@ -1,6 +1,6 @@
-# Tauri + React + Typescript
+# GetNews
 
-This template should help get you started developing with Tauri, React and Typescript in Vite.
+GetNews is a desktop news reader built with Tauri, React, and TypeScript using Vite.
 
 ## Recommended IDE Setup
 
