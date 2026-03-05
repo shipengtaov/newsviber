@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import Database from "@tauri-apps/plugin-sql";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { Button } from "@/components/ui/button";
@@ -30,6 +30,7 @@ async function getDb() {
 
 export default function NewsDetail() {
     const { id } = useParams();
+    const navigate = useNavigate();
     const [article, setArticle] = useState<FullArticle | null>(null);
 
     const [messages, setMessages] = useState<Message[]>([]);
@@ -139,10 +140,8 @@ Answer the user's questions based primarily on the current article. Use related 
     return (
         <div className="flex h-full w-full">
             <div className="flex-1 overflow-y-auto p-8 max-w-4xl mx-auto custom-scrollbar">
-                <Button variant="ghost" asChild className="mb-6 -ml-4 text-muted-foreground hover:bg-muted/50 transition-colors">
-                    <Link to="/">
-                        <ArrowLeft className="w-4 h-4 mr-2" /> Back to Timeline
-                    </Link>
+                <Button variant="ghost" className="mb-6 -ml-4 text-muted-foreground hover:bg-muted/50 transition-colors" onClick={() => window.history.length > 1 ? navigate(-1) : navigate("/")}>
+                    <ArrowLeft className="w-4 h-4 mr-2" /> Back to Timeline
                 </Button>
 
                 <div className="mb-8">

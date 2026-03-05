@@ -1,10 +1,10 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Database from "@tauri-apps/plugin-sql";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { Search, ExternalLink } from "lucide-react";
 
 type Article = {
@@ -28,11 +28,36 @@ async function getDb() {
 
 export default function NewsList() {
     const [articles, setArticles] = useState<Article[]>([]);
-    const [search, setSearch] = useState("");
-    const [page, setPage] = useState(0);
+    const [searchParams, setSearchParams] = useSearchParams();
+    const page = parseInt(searchParams.get("page") || "0");
+    const search = searchParams.get("q") || "";
+    const [searchInput, setSearchInput] = useState(search);
+    const shouldRestoreScroll = useRef(true);
 
     useEffect(() => {
-        loadArticles(0, search);
+        loadArticles(page, search);
+    }, [page, search]);
+
+    useEffect(() => {
+        if (articles.length === 0 || !shouldRestoreScroll.current) return;
+        shouldRestoreScroll.current = false;
+        const saved = sessionStorage.getItem("newsList_scrollTop");
+        if (saved) {
+            const main = document.querySelector("main");
+            if (main) {
+                requestAnimationFrame(() => { main.scrollTop = parseInt(saved); });
+            }
+        }
+    }, [articles]);
+
+    useEffect(() => {
+        const main = document.querySelector("main");
+        if (!main) return;
+        const onScroll = () => {
+            sessionStorage.setItem("newsList_scrollTop", String(main.scrollTop));
+        };
+        main.addEventListener("scroll", onScroll, { passive: true });
+        return () => main.removeEventListener("scroll", onScroll);
     }, []);
 
     async function loadArticles(p: number, q: string) {
@@ -58,7 +83,6 @@ export default function NewsList() {
 
             const result: Article[] = await db.select(query, params);
             setArticles(result);
-            setPage(p);
         } catch (err) {
             console.error(err);
         }
@@ -66,7 +90,13 @@ export default function NewsList() {
 
     function handleSearch(e: React.FormEvent) {
         e.preventDefault();
-        loadArticles(0, search);
+        setSearchParams({ q: searchInput, page: "0" });
+    }
+
+    function goToPage(p: number) {
+        const params: Record<string, string> = { page: String(p) };
+        if (search) params.q = search;
+        setSearchParams(params);
     }
 
     function handleExternalLink(e: React.MouseEvent, url: string) {
@@ -97,8 +127,8 @@ export default function NewsList() {
                     <Input
                         placeholder="Search articles..."
                         className="pl-9"
-                        value={search}
-                        onChange={e => setSearch(e.target.value)}
+                        value={searchInput}
+                        onChange={e => setSearchInput(e.target.value)}
                     />
                 </form>
             </div>
@@ -143,11 +173,11 @@ export default function NewsList() {
             </div>
 
             <div className="flex items-center justify-between pt-4">
-                <Button variant="outline" onClick={() => loadArticles(Math.max(0, page - 1), search)} disabled={page === 0}>
+                <Button variant="outline" onClick={() => goToPage(Math.max(0, page - 1))} disabled={page === 0}>
                     Previous
                 </Button>
                 <span className="text-sm text-muted-foreground">Page {page + 1}</span>
-                <Button variant="outline" onClick={() => loadArticles(page + 1, search)} disabled={articles.length < 20}>
+                <Button variant="outline" onClick={() => goToPage(page + 1)} disabled={articles.length < 20}>
                     Next
                 </Button>
             </div>
