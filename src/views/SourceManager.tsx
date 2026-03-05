@@ -29,6 +29,7 @@ export default function SourceManager() {
     const { toast } = useToast();
     const navigate = useNavigate();
     const [sources, setSources] = useState<Source[]>([]);
+    const [isFetchingAll, setIsFetchingAll] = useState(false);
 
     useEffect(() => {
         loadSources();
@@ -65,6 +66,69 @@ export default function SourceManager() {
         } catch (err: any) {
             toast({ title: "Error", description: String(err), variant: "destructive" });
         }
+    }
+
+    async function fetchAll() {
+        const activeSources = sources.filter(s => s.active);
+        if (activeSources.length === 0) {
+            toast({ title: "No active sources to fetch" });
+            return;
+        }
+
+        setIsFetchingAll(true);
+        let totalArticles = 0;
+        let successCount = 0;
+        let failCount = 0;
+
+        toast({ title: `Fetching ${activeSources.length} active sources...` });
+
+        for (const source of activeSources) {
+            try {
+                const db = await getDb();
+                let articles: any[] = [];
+
+                if (source.source_type === "rss") {
+                    articles = await invoke("fetch_rss_cmd", { url: source.url });
+                } else {
+                    const jinaData: any = await invoke("fetch_jina_cmd", { url: source.url, apiKey: null });
+                    if (jinaData) {
+                        articles.push({
+                            title: jinaData.title || "Untitled",
+                            link: jinaData.url || source.url,
+                            content: jinaData.content || "",
+                            description: jinaData.description || "",
+                            pub_date: new Date().toISOString(),
+                            author: "",
+                        });
+                    }
+                }
+
+                for (const a of articles) {
+                    try {
+                        await db.execute(
+                            "INSERT INTO articles (source_id, guid, title, content, summary, author, published_at) VALUES ($1, $2, $3, $4, $5, $6, $7)",
+                            [source.id, a.link, a.title, a.content, a.description, a.author, a.pub_date]
+                        );
+                        totalArticles++;
+                    } catch (e: any) {
+                        // ignore duplicate constraint
+                        if (!String(e).includes("UNIQUE constraint")) {
+                            console.error("Insert error:", e);
+                        }
+                    }
+                }
+                successCount++;
+            } catch (err) {
+                console.error(`Failed to fetch ${source.name}:`, err);
+                failCount++;
+            }
+        }
+
+        setIsFetchingAll(false);
+        toast({
+            title: "Fetch All Complete",
+            description: `Fetched ${totalArticles} new articles. ${successCount} succeeded${failCount > 0 ? `, ${failCount} failed` : ''}.`
+        });
     }
 
     async function fetchNow(source: Source) {
@@ -116,10 +180,16 @@ export default function SourceManager() {
                     <h1 className="text-3xl font-bold tracking-tight">Source Manager</h1>
                     <p className="text-muted-foreground mt-2">Manage your RSS feeds, Twitter accounts, and URL monitors.</p>
                 </div>
-                <Button onClick={() => navigate("/sources/add")}>
-                    <Plus className="h-4 w-4 mr-2" />
-                    Add Source
-                </Button>
+                <div className="flex gap-2">
+                    <Button variant="outline" onClick={fetchAll} disabled={isFetchingAll || sources.filter(s => s.active).length === 0}>
+                        <RefreshCcw className={`h-4 w-4 mr-2 ${isFetchingAll ? 'animate-spin' : ''}`} />
+                        {isFetchingAll ? 'Fetching All...' : 'Fetch All'}
+                    </Button>
+                    <Button onClick={() => navigate("/sources/add")}>
+                        <Plus className="h-4 w-4 mr-2" />
+                        Add Source
+                    </Button>
+                </div>
             </div>
 
             <div className="space-y-4">
