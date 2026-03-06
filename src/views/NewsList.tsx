@@ -16,6 +16,7 @@ type Article = {
     title: string;
     summary: string;
     published_at: string;
+    inserted_at: string;
     is_read: boolean;
 };
 
@@ -146,7 +147,7 @@ export default function NewsList() {
             const db = await getDb();
             const normalizedQuery = q.trim();
             let query = `
-                SELECT a.id, a.source_id, s.name as source_name, a.guid, a.title, a.summary, a.published_at, a.is_read
+                SELECT a.id, a.source_id, s.name as source_name, a.guid, a.title, a.summary, a.published_at, a.created_at as inserted_at, a.is_read
                 FROM articles a
                 JOIN sources s ON a.source_id = s.id
             `;
@@ -167,7 +168,7 @@ export default function NewsList() {
             }
 
             query += ` WHERE ${conditions.join(" AND ")}`;
-            query += ` ORDER BY a.published_at DESC LIMIT ${PAGE_SIZE} OFFSET $${params.length + 1}`;
+            query += ` ORDER BY a.created_at DESC LIMIT ${PAGE_SIZE} OFFSET $${params.length + 1}`;
             params.push(p * PAGE_SIZE);
 
             const result: Article[] = await db.select(query, params);
@@ -308,9 +309,10 @@ export default function NewsList() {
                             <Link to={`/news/${article.id}`} key={article.id} className="block" onClick={handleArticleClick}>
                                 <Card className="border-0 shadow-none bg-transparent hover:bg-cyan-500/10 transition-colors duration-150">
                                     <CardHeader className="px-3 py-3">
-                                        <div className="flex items-center space-x-2 text-xs text-muted-foreground mb-1">
+                                        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground mb-1">
                                             <span className="text-cyan-700 dark:text-cyan-300">{article.source_name}</span>
-                                            <span>{new Date(article.published_at).toLocaleString()}</span>
+                                            <span>Published {new Date(article.published_at).toLocaleString()}</span>
+                                            <span>Inserted {new Date(article.inserted_at).toLocaleString()}</span>
                                             {!article.is_read && <span className="bg-blue-500 w-2 h-2 rounded-full inline-block"></span>}
                                         </div>
                                         <CardTitle className="text-xl leading-tight">{article.title}</CardTitle>
