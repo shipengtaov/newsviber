@@ -4,17 +4,13 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { RefreshCcw, Trash2, Edit, Plus, Power, PowerOff } from "lucide-react";
-import { invoke } from "@tauri-apps/api/core";
 import { useNavigate } from "react-router-dom";
+import { fetchSource, fetchSources, type FetchableSource } from "@/lib/source-fetch";
 
-type Source = {
-    id: number;
+type Source = FetchableSource & {
     name: string;
-    source_type: string;
-    url: string;
     config: string | null;
     fetch_interval: number;
-    active: number;
 };
 
 let db: Database | null = null;
@@ -30,6 +26,10 @@ export default function SourceManager() {
     const navigate = useNavigate();
     const [sources, setSources] = useState<Source[]>([]);
     const [isFetchingAll, setIsFetchingAll] = useState(false);
+    const [fetchingSourceId, setFetchingSourceId] = useState<number | null>(null);
+
+    const activeSourceCount = sources.filter((source) => Boolean(source.active)).length;
+    const isAnyFetchInProgress = isFetchingAll || fetchingSourceId !== null;
 
     useEffect(() => {
         loadSources();
@@ -69,107 +69,45 @@ export default function SourceManager() {
     }
 
     async function fetchAll() {
-        const activeSources = sources.filter(s => s.active);
+        const activeSources = sources.filter((source) => Boolean(source.active));
         if (activeSources.length === 0) {
             toast({ title: "No active sources to fetch" });
             return;
         }
 
         setIsFetchingAll(true);
-        let totalArticles = 0;
-        let successCount = 0;
-        let failCount = 0;
-
         toast({ title: `Fetching ${activeSources.length} active sources...` });
 
-        for (const source of activeSources) {
-            try {
-                const db = await getDb();
-                let articles: any[] = [];
-
-                if (source.source_type === "rss") {
-                    articles = await invoke("fetch_rss_cmd", { url: source.url });
-                } else {
-                    const jinaData: any = await invoke("fetch_jina_cmd", { url: source.url, apiKey: null });
-                    if (jinaData) {
-                        articles.push({
-                            title: jinaData.title || "Untitled",
-                            link: jinaData.url || source.url,
-                            content: jinaData.content || "",
-                            description: jinaData.description || "",
-                            pub_date: new Date().toISOString(),
-                            author: "",
-                        });
-                    }
-                }
-
-                for (const a of articles) {
-                    try {
-                        await db.execute(
-                            "INSERT INTO articles (source_id, guid, title, content, summary, author, published_at) VALUES ($1, $2, $3, $4, $5, $6, $7)",
-                            [source.id, a.link, a.title, a.content, a.description, a.author, a.pub_date]
-                        );
-                        totalArticles++;
-                    } catch (e: any) {
-                        // ignore duplicate constraint
-                        if (!String(e).includes("UNIQUE constraint")) {
-                            console.error("Insert error:", e);
-                        }
-                    }
-                }
-                successCount++;
-            } catch (err) {
-                console.error(`Failed to fetch ${source.name}:`, err);
-                failCount++;
-            }
+        try {
+            const result = await fetchSources(activeSources);
+            toast({
+                title: "Fetch All Complete",
+                description: `Fetched ${result.insertedCount} new articles. ${result.successCount} succeeded${result.failCount > 0 ? `, ${result.failCount} failed` : ""}.`,
+            });
+        } catch (err: any) {
+            toast({ title: "Fetch failed", description: String(err), variant: "destructive" });
+        } finally {
+            setIsFetchingAll(false);
         }
-
-        setIsFetchingAll(false);
-        toast({
-            title: "Fetch All Complete",
-            description: `Fetched ${totalArticles} new articles. ${successCount} succeeded${failCount > 0 ? `, ${failCount} failed` : ''}.`
-        });
     }
 
     async function fetchNow(source: Source) {
+        if (!source.active) {
+            return;
+        }
+
+        setFetchingSourceId(source.id);
         try {
-            toast({ title: "Fetching data..." });
-            const db = await getDb();
-            let articles: any[] = [];
-
-            if (source.source_type === "rss") {
-                articles = await invoke("fetch_rss_cmd", { url: source.url });
-            } else {
-                const jinaData: any = await invoke("fetch_jina_cmd", { url: source.url, apiKey: null });
-                if (jinaData) {
-                    articles.push({
-                        title: jinaData.title || "Untitled",
-                        link: jinaData.url || source.url,
-                        content: jinaData.content || "",
-                        description: jinaData.description || "",
-                        pub_date: new Date().toISOString(),
-                        author: "",
-                    });
-                }
-            }
-
-            console.log(`Fetched ${articles.length} articles`);
-            for (const a of articles) {
-                try {
-                    await db.execute(
-                        "INSERT INTO articles (source_id, guid, title, content, summary, author, published_at) VALUES ($1, $2, $3, $4, $5, $6, $7)",
-                        [source.id, a.link, a.title, a.content, a.description, a.author, a.pub_date]
-                    );
-                } catch (e: any) {
-                    // ignore duplicate constraint
-                    if (!String(e).includes("UNIQUE constraint")) {
-                        console.error("Insert error:", e);
-                    }
-                }
-            }
-            toast({ title: `Fetched and saved ${articles.length} articles` });
+            toast({ title: `Fetching ${source.name}...` });
+            const result = await fetchSource(source);
+            toast({
+                title: "Fetch complete",
+                description: `Fetched ${result.fetchedCount} articles, saved ${result.insertedCount} new.`,
+            });
         } catch (err: any) {
             toast({ title: "Fetch failed", description: String(err), variant: "destructive" });
+        } finally {
+            setFetchingSourceId(null);
         }
     }
 
@@ -181,7 +119,7 @@ export default function SourceManager() {
                     <p className="text-muted-foreground mt-2">Manage your RSS feeds, Twitter accounts, and URL monitors.</p>
                 </div>
                 <div className="flex gap-2">
-                    <Button variant="outline" onClick={fetchAll} disabled={isFetchingAll || sources.filter(s => s.active).length === 0}>
+                    <Button variant="outline" onClick={fetchAll} disabled={isAnyFetchInProgress || activeSourceCount === 0}>
                         <RefreshCcw className={`h-4 w-4 mr-2 ${isFetchingAll ? 'animate-spin' : ''}`} />
                         {isFetchingAll ? 'Fetching All...' : 'Fetch All'}
                     </Button>
@@ -207,8 +145,8 @@ export default function SourceManager() {
                                 </div>
                                 <p className="text-sm text-muted-foreground truncate" title={s.url}>{s.url}</p>
                                 <div className="mt-4 flex flex-wrap gap-2">
-                                    <Button variant="outline" size="sm" onClick={() => fetchNow(s)} disabled={!s.active}>
-                                        <RefreshCcw className="h-4 w-4 mr-2" /> Fetch
+                                    <Button variant="outline" size="sm" onClick={() => fetchNow(s)} disabled={!s.active || isAnyFetchInProgress}>
+                                        <RefreshCcw className={`h-4 w-4 mr-2 ${fetchingSourceId === s.id ? 'animate-spin' : ''}`} /> Fetch
                                     </Button>
                                     <Button variant="outline" size="sm" onClick={() => navigate(`/sources/edit/${s.id}`)}>
                                         <Edit className="h-4 w-4 mr-2" /> Edit
