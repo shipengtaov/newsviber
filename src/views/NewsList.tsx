@@ -433,8 +433,8 @@ export default function NewsList() {
     } as React.CSSProperties;
 
     return (
-        <div className="pt-0 px-4 md:px-6 pb-4 md:pb-6 max-w-7xl mx-auto flex flex-col gap-4 lg:h-full lg:overflow-hidden">
-            <div className="flex justify-end">
+        <div className="w-full min-w-0 pt-0 pb-4 md:pb-6 flex flex-col gap-4 lg:h-full lg:overflow-hidden">
+            <div className="flex justify-end px-4 md:px-6">
                 <form onSubmit={handleSearch} className="flex items-center space-x-2 relative w-full md:w-80">
                     <Search className="w-4 h-4 absolute left-3 text-muted-foreground" />
                     <Input
@@ -451,7 +451,7 @@ export default function NewsList() {
                 style={newsLayoutStyle}
             >
                 <div className="relative min-w-0">
-                    <div className="space-y-2 lg:pr-4 lg:border-r lg:border-r-sky-200/70 dark:lg:border-r-sky-900/60 lg:min-h-0 lg:flex lg:flex-col">
+                    <div className="space-y-2 px-4 lg:border-r lg:border-r-sky-200/70 dark:lg:border-r-sky-900/60 lg:min-h-0 lg:flex lg:flex-col">
                         <div>
                             <h2 className="text-sm font-semibold text-sky-700/90 dark:text-sky-300/90 uppercase tracking-wide">Sources</h2>
                         </div>
