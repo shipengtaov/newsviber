@@ -5,7 +5,7 @@ import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/ca
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Link, useSearchParams } from "react-router-dom";
-import { Search, ExternalLink, RefreshCcw } from "lucide-react";
+import { Search, ExternalLink, RefreshCcw, ChevronLeft, ChevronRight, MoreHorizontal } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { fetchSource, fetchSources, type FetchableSource } from "@/lib/source-fetch";
@@ -31,8 +31,16 @@ type ParsedSourceParam = {
     isWellFormed: boolean;
 };
 
+type PaginationItem =
+    | { type: "page"; page: number }
+    | { type: "ellipsis"; key: string };
+
 const MAIN_MENU_SCROLL_STORAGE_KEY = "mainMenuScrollPositions_v1";
 const SOURCES_PANEL_WIDTH_STORAGE_KEY = "newsSourcesPanelWidth_v1";
+const NEWS_PATHNAME = "/";
+const DESKTOP_LAYOUT_MEDIA_QUERY = "(min-width: 1024px)";
+const NEWS_SCROLL_RESTORE_TOLERANCE_PX = 2;
+const NEWS_SCROLL_MAX_RESTORE_ATTEMPTS = 180;
 const PAGE_SIZE = 20;
 const DEFAULT_SOURCES_PANEL_WIDTH = 240;
 const MIN_SOURCES_PANEL_WIDTH = 200;
@@ -90,6 +98,103 @@ function readStoredSourcesPanelWidth(): number {
     } catch {
         return DEFAULT_SOURCES_PANEL_WIDTH;
     }
+}
+
+function normalizeStoredScrollTop(value: number): number {
+    if (!Number.isFinite(value)) return 0;
+    return Math.max(0, Math.floor(value));
+}
+
+function parseStoredMainMenuScrollMap(raw: string | null): Record<string, number> {
+    if (!raw) return {};
+
+    try {
+        const parsed = JSON.parse(raw);
+        if (!parsed || typeof parsed !== "object") return {};
+
+        return Object.fromEntries(
+            Object.entries(parsed).flatMap(([key, value]) => (
+                typeof value === "number" ? [[key, normalizeStoredScrollTop(value)]] : []
+            )),
+        );
+    } catch {
+        return {};
+    }
+}
+
+function readStoredMainMenuScroll(pathname: string): number {
+    try {
+        const map = parseStoredMainMenuScrollMap(sessionStorage.getItem(MAIN_MENU_SCROLL_STORAGE_KEY));
+        return normalizeStoredScrollTop(map[pathname] ?? 0);
+    } catch {
+        return 0;
+    }
+}
+
+function persistMainMenuScroll(pathname: string, scrollTop: number): void {
+    try {
+        const map = parseStoredMainMenuScrollMap(sessionStorage.getItem(MAIN_MENU_SCROLL_STORAGE_KEY));
+        map[pathname] = normalizeStoredScrollTop(scrollTop);
+        sessionStorage.setItem(MAIN_MENU_SCROLL_STORAGE_KEY, JSON.stringify(map));
+    } catch {
+        // Ignore persistence failures (e.g. storage restrictions).
+    }
+}
+
+function buildArticleQueryParts(query: string, sourceId: number | null) {
+    const normalizedQuery = query.trim();
+    const params: Array<number | string> = [];
+    const conditions: string[] = ["s.active = 1"];
+    let joins = "";
+
+    if (normalizedQuery) {
+        joins += `
+            JOIN articles_fts ON a.id = articles_fts.rowid
+        `;
+        conditions.push(`articles_fts MATCH $${params.length + 1}`);
+        params.push(normalizedQuery);
+    }
+
+    if (sourceId !== null) {
+        conditions.push(`a.source_id = $${params.length + 1}`);
+        params.push(sourceId);
+    }
+
+    return {
+        joins,
+        conditions,
+        params,
+    };
+}
+
+function buildPaginationItems(currentPage: number, totalPages: number): PaginationItem[] {
+    if (totalPages <= 1) return [];
+
+    const candidatePages = new Set(
+        [0, totalPages - 1, currentPage - 1, currentPage, currentPage + 1]
+            .filter((page) => page >= 0 && page < totalPages),
+    );
+
+    const sortedPages = Array.from(candidatePages).sort((left, right) => left - right);
+    const items: PaginationItem[] = [];
+
+    let previousPage: number | null = null;
+    for (const page of sortedPages) {
+        if (previousPage !== null) {
+            const gap = page - previousPage;
+
+            if (gap === 2) {
+                items.push({ type: "page", page: previousPage + 1 });
+            } else if (gap > 2) {
+                items.push({ type: "ellipsis", key: `ellipsis-${previousPage}-${page}` });
+            }
+        }
+
+        items.push({ type: "page", page });
+        previousPage = page;
+    }
+
+    return items;
 }
 
 type SourceFilterRowProps = {
@@ -154,12 +259,17 @@ function SourceFilterRow({
 export default function NewsList() {
     const { toast } = useToast();
     const [articles, setArticles] = useState<Article[]>([]);
+    const [totalArticleCount, setTotalArticleCount] = useState<number | null>(null);
     const [sources, setSources] = useState<SourceFilterItem[]>([]);
     const [sourcesLoaded, setSourcesLoaded] = useState(false);
     const [isFetchingAll, setIsFetchingAll] = useState(false);
     const [fetchingSourceId, setFetchingSourceId] = useState<number | null>(null);
     const [sourcesPanelWidth, setSourcesPanelWidth] = useState<number>(() => readStoredSourcesPanelWidth());
     const [isResizingSourcesPanel, setIsResizingSourcesPanel] = useState(false);
+    const [isDesktopLayout, setIsDesktopLayout] = useState<boolean>(() => {
+        if (typeof window === "undefined") return false;
+        return window.matchMedia(DESKTOP_LAYOUT_MEDIA_QUERY).matches;
+    });
     const [searchParams, setSearchParams] = useSearchParams();
     const page = parsePageParam(searchParams.get("page"));
     const search = searchParams.get("q") || "";
@@ -167,6 +277,7 @@ export default function NewsList() {
     const [searchInput, setSearchInput] = useState(search);
     const resizeStartXRef = useRef(0);
     const resizeStartWidthRef = useRef(DEFAULT_SOURCES_PANEL_WIDTH);
+    const articlesScrollRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
         setSearchInput(search);
@@ -179,6 +290,20 @@ export default function NewsList() {
             // Ignore persistence failures (e.g. storage restrictions).
         }
     }, [sourcesPanelWidth]);
+
+    useEffect(() => {
+        const mediaQueryList = window.matchMedia(DESKTOP_LAYOUT_MEDIA_QUERY);
+        const handleChange = (event: MediaQueryListEvent) => {
+            setIsDesktopLayout(event.matches);
+        };
+
+        setIsDesktopLayout(mediaQueryList.matches);
+        mediaQueryList.addEventListener("change", handleChange);
+
+        return () => {
+            mediaQueryList.removeEventListener("change", handleChange);
+        };
+    }, []);
 
     useEffect(() => {
         if (!isResizingSourcesPanel) return;
@@ -219,7 +344,75 @@ export default function NewsList() {
         () => sources.reduce((total, source) => total + source.article_count, 0),
         [sources],
     );
+    const hasActiveSources = sources.length > 0;
+    const isAllSelected = selectedSourceId === null;
     const isAnyFetchInProgress = isFetchingAll || fetchingSourceId !== null;
+    const totalPages = totalArticleCount === null ? null : Math.ceil(totalArticleCount / PAGE_SIZE);
+    const paginationItems = useMemo(
+        () => (totalPages && totalPages > 1 ? buildPaginationItems(page, totalPages) : []),
+        [page, totalPages],
+    );
+    const hasPaginationPages = totalPages !== null && totalPages > 0;
+    const canGoToPreviousPage = hasActiveSources && page > 0;
+    const canGoToNextPage = hasActiveSources && (
+        totalPages !== null
+            ? page < totalPages - 1
+            : articles.length === PAGE_SIZE
+    );
+    const compactPaginationLabel = totalPages === null
+        ? "Loading pages..."
+        : hasPaginationPages
+            ? `Page ${Math.min(page + 1, totalPages)} / ${totalPages}`
+            : "No more pages";
+
+    useEffect(() => {
+        if (!isDesktopLayout) return;
+
+        const container = articlesScrollRef.current;
+        if (!container) return;
+
+        const handleScroll = () => {
+            persistMainMenuScroll(NEWS_PATHNAME, container.scrollTop);
+        };
+
+        container.addEventListener("scroll", handleScroll, { passive: true });
+
+        return () => {
+            persistMainMenuScroll(NEWS_PATHNAME, container.scrollTop);
+            container.removeEventListener("scroll", handleScroll);
+        };
+    }, [isDesktopLayout]);
+
+    useEffect(() => {
+        if (!isDesktopLayout) return;
+
+        const targetScrollTop = readStoredMainMenuScroll(NEWS_PATHNAME);
+        let animationFrame: number | null = null;
+        let restoreAttempts = 0;
+
+        const restoreScrollPosition = () => {
+            const container = articlesScrollRef.current;
+            if (!container) return;
+
+            container.scrollTop = targetScrollTop;
+
+            const reachedTarget = Math.abs(container.scrollTop - targetScrollTop) <= NEWS_SCROLL_RESTORE_TOLERANCE_PX;
+            if (reachedTarget || restoreAttempts >= NEWS_SCROLL_MAX_RESTORE_ATTEMPTS) {
+                return;
+            }
+
+            restoreAttempts += 1;
+            animationFrame = window.requestAnimationFrame(restoreScrollPosition);
+        };
+
+        animationFrame = window.requestAnimationFrame(restoreScrollPosition);
+
+        return () => {
+            if (animationFrame !== null) {
+                window.cancelAnimationFrame(animationFrame);
+            }
+        };
+    }, [articles.length, isDesktopLayout, page, search, selectedSourceId]);
 
     useEffect(() => {
         loadSources();
@@ -228,6 +421,10 @@ export default function NewsList() {
     useEffect(() => {
         loadArticles(page, search, selectedSourceId);
     }, [page, search, selectedSourceId]);
+
+    useEffect(() => {
+        loadTotalArticleCount(search, selectedSourceId);
+    }, [search, selectedSourceId]);
 
     useEffect(() => {
         if (parsedSource.isWellFormed) return;
@@ -241,6 +438,15 @@ export default function NewsList() {
 
         setSearchParams(buildListParams(page, search, null), { replace: true });
     }, [activeSourceIds, page, parsedSource.sourceId, search, setSearchParams, sourcesLoaded]);
+
+    useEffect(() => {
+        if (totalPages === null) return;
+
+        const lastValidPage = totalPages > 0 ? totalPages - 1 : 0;
+        if (page <= lastValidPage) return;
+
+        setSearchParams(buildListParams(lastValidPage, search, selectedSourceId), { replace: true });
+    }, [page, search, selectedSourceId, setSearchParams, totalPages]);
 
     async function loadSources() {
         try {
@@ -269,36 +475,42 @@ export default function NewsList() {
     async function loadArticles(p: number, q: string, sourceId: number | null) {
         try {
             const db = await getDb();
-            const normalizedQuery = q.trim();
-            let query = `
+            const { joins, conditions, params } = buildArticleQueryParts(q, sourceId);
+            const query = `
                 SELECT a.id, a.source_id, s.name as source_name, a.guid, a.title, a.summary, a.published_at, a.created_at as inserted_at, a.is_read
                 FROM articles a
                 JOIN sources s ON a.source_id = s.id
+                ${joins}
+                WHERE ${conditions.join(" AND ")}
+                ORDER BY a.created_at DESC LIMIT ${PAGE_SIZE} OFFSET $${params.length + 1}
             `;
-            const params: Array<number | string> = [];
-            const conditions: string[] = ["s.active = 1"];
+            const listParams = [...params, p * PAGE_SIZE];
 
-            if (normalizedQuery) {
-                query += `
-                    JOIN articles_fts ON a.id = articles_fts.rowid
-                `;
-                conditions.push(`articles_fts MATCH $${params.length + 1}`);
-                params.push(normalizedQuery);
-            }
-
-            if (sourceId !== null) {
-                conditions.push(`a.source_id = $${params.length + 1}`);
-                params.push(sourceId);
-            }
-
-            query += ` WHERE ${conditions.join(" AND ")}`;
-            query += ` ORDER BY a.created_at DESC LIMIT ${PAGE_SIZE} OFFSET $${params.length + 1}`;
-            params.push(p * PAGE_SIZE);
-
-            const result: Article[] = await db.select(query, params);
+            const result: Article[] = await db.select(query, listParams);
             setArticles(result);
         } catch (err) {
             console.error(err);
+        }
+    }
+
+    async function loadTotalArticleCount(q: string, sourceId: number | null) {
+        setTotalArticleCount(null);
+
+        try {
+            const db = await getDb();
+            const { joins, conditions, params } = buildArticleQueryParts(q, sourceId);
+            const result: Array<{ total_count: number }> = await db.select(`
+                SELECT COUNT(DISTINCT a.id) as total_count
+                FROM articles a
+                JOIN sources s ON a.source_id = s.id
+                ${joins}
+                WHERE ${conditions.join(" AND ")}
+            `, params);
+
+            setTotalArticleCount(Number(result[0]?.total_count ?? 0));
+        } catch (err) {
+            console.error(err);
+            setTotalArticleCount(0);
         }
     }
 
@@ -306,6 +518,7 @@ export default function NewsList() {
         await Promise.all([
             loadSources(),
             loadArticles(page, search, selectedSourceId),
+            loadTotalArticleCount(search, selectedSourceId),
         ]);
     }
 
@@ -339,24 +552,15 @@ export default function NewsList() {
     }
 
     function handleArticleClick() {
-        const main = document.querySelector("main");
-        if (!(main instanceof HTMLElement)) return;
-
-        let scrollMap: Record<string, number> = {};
-        const raw = sessionStorage.getItem(MAIN_MENU_SCROLL_STORAGE_KEY);
-        if (raw) {
-            try {
-                const parsed = JSON.parse(raw);
-                if (parsed && typeof parsed === "object") {
-                    scrollMap = parsed as Record<string, number>;
-                }
-            } catch {
-                scrollMap = {};
-            }
+        if (isDesktopLayout && articlesScrollRef.current) {
+            persistMainMenuScroll(NEWS_PATHNAME, articlesScrollRef.current.scrollTop);
+            return;
         }
 
-        scrollMap["/"] = Math.max(0, Math.floor(main.scrollTop));
-        sessionStorage.setItem(MAIN_MENU_SCROLL_STORAGE_KEY, JSON.stringify(scrollMap));
+        const main = document.querySelector("main");
+        if (main instanceof HTMLElement) {
+            persistMainMenuScroll(NEWS_PATHNAME, main.scrollTop);
+        }
     }
 
     function handleSourcesResizeStart(event: React.PointerEvent<HTMLDivElement>) {
@@ -418,9 +622,6 @@ export default function NewsList() {
         }
     }
 
-    const hasActiveSources = sources.length > 0;
-    const isAllSelected = selectedSourceId === null;
-
     let emptyStateMessage = "No articles found.";
     if (!hasActiveSources) {
         emptyStateMessage = "No active sources.";
@@ -428,142 +629,225 @@ export default function NewsList() {
         emptyStateMessage = "This source has no articles yet.";
     }
 
-    const newsLayoutStyle = {
-        "--news-sources-panel-width": `${sourcesPanelWidth}px`,
-    } as React.CSSProperties;
-
     return (
-        <div className="w-full min-w-0 pt-0 pb-4 md:pb-6 flex flex-col gap-4 lg:h-full lg:overflow-hidden">
-            <div className="flex justify-end px-4 md:px-6">
-                <form onSubmit={handleSearch} className="flex items-center space-x-2 relative w-full md:w-80">
-                    <Search className="w-4 h-4 absolute left-3 text-muted-foreground" />
-                    <Input
-                        placeholder="Search articles..."
-                        className="pl-9 border-sky-200/70 focus-visible:ring-sky-400/50 focus-visible:border-sky-300 dark:border-sky-900/60"
-                        value={searchInput}
-                        onChange={e => setSearchInput(e.target.value)}
+        <div className="flex w-full min-w-0 flex-col gap-4 p-4 pb-4 md:p-6 md:pb-6 lg:h-full lg:flex-row lg:gap-0 lg:overflow-hidden lg:p-0">
+            <div
+                className="relative min-w-0 lg:h-full lg:shrink-0"
+                style={isDesktopLayout ? { width: sourcesPanelWidth } : undefined}
+            >
+                <div className="flex flex-col gap-2 rounded-xl border border-border bg-background/60 p-4 lg:h-full lg:min-h-0 lg:rounded-none lg:border-0 lg:bg-transparent lg:px-4 lg:py-4 lg:pr-4">
+                    <div>
+                        <h2 className="text-sm font-semibold uppercase tracking-wide text-sky-700/90 dark:text-sky-300/90">Sources</h2>
+                    </div>
+
+                    <div className="space-y-1 pr-1 lg:flex-1 lg:min-h-0 lg:overflow-y-auto">
+                        <SourceFilterRow
+                            label="All Articles"
+                            title={`All Articles (${allArticleCount})`}
+                            count={allArticleCount}
+                            isSelected={isAllSelected}
+                            isFetching={isFetchingAll}
+                            isDisabled={isAnyFetchInProgress || !hasActiveSources}
+                            fetchAriaLabel="Fetch all active sources"
+                            onSelect={() => selectSource(null)}
+                            onFetch={handleFetchAll}
+                        />
+
+                        {sources.map((source) => {
+                            const isSelected = selectedSourceId === source.id;
+                            return (
+                                <SourceFilterRow
+                                    key={source.id}
+                                    label={source.name}
+                                    title={`${source.name} (${source.article_count})`}
+                                    count={source.article_count}
+                                    isSelected={isSelected}
+                                    isFetching={fetchingSourceId === source.id}
+                                    isDisabled={isAnyFetchInProgress}
+                                    fetchAriaLabel={`Fetch ${source.name}`}
+                                    onSelect={() => selectSource(source.id)}
+                                    onFetch={(event) => void handleFetchSource(event, source)}
+                                />
+                            );
+                        })}
+
+                        {sourcesLoaded && sources.length === 0 && (
+                            <div className="rounded-md border border-dashed p-2 text-xs text-muted-foreground">
+                                No active sources.
+                            </div>
+                        )}
+                    </div>
+                </div>
+                <div
+                    role="separator"
+                    aria-label="Resize sources panel"
+                    aria-orientation="vertical"
+                    aria-valuemin={MIN_SOURCES_PANEL_WIDTH}
+                    aria-valuemax={MAX_SOURCES_PANEL_WIDTH}
+                    aria-valuenow={sourcesPanelWidth}
+                    data-no-window-drag
+                    onPointerDown={handleSourcesResizeStart}
+                    className="absolute inset-y-0 -right-2 z-10 hidden w-4 touch-none cursor-col-resize lg:block"
+                >
+                    <div
+                        className={cn(
+                            "absolute inset-y-0 left-1/2 w-px -translate-x-1/2 transition-colors",
+                            isResizingSourcesPanel
+                                ? "bg-muted-foreground/60"
+                                : "bg-border",
+                        )}
                     />
-                </form>
+                </div>
             </div>
 
-            <div
-                className="grid gap-4 lg:gap-0 lg:grid-cols-[var(--news-sources-panel-width)_minmax(0,1fr)] lg:flex-1 lg:min-h-0"
-                style={newsLayoutStyle}
-            >
-                <div className="relative min-w-0">
-                    <div className="space-y-2 px-4 lg:border-r lg:border-r-sky-200/70 dark:lg:border-r-sky-900/60 lg:min-h-0 lg:flex lg:flex-col">
-                        <div>
-                            <h2 className="text-sm font-semibold text-sky-700/90 dark:text-sky-300/90 uppercase tracking-wide">Sources</h2>
-                        </div>
-
-                        <div className="space-y-1 pr-1 lg:flex-1 lg:min-h-0 lg:overflow-y-auto">
-                            <SourceFilterRow
-                                label="All Articles"
-                                title={`All Articles (${allArticleCount})`}
-                                count={allArticleCount}
-                                isSelected={isAllSelected}
-                                isFetching={isFetchingAll}
-                                isDisabled={isAnyFetchInProgress || !hasActiveSources}
-                                fetchAriaLabel="Fetch all active sources"
-                                onSelect={() => selectSource(null)}
-                                onFetch={handleFetchAll}
+            <div className="min-w-0 lg:flex lg:h-full lg:flex-1 lg:overflow-hidden">
+                <div className="flex w-full min-w-0 flex-col rounded-xl border border-border bg-card/30 lg:mx-auto lg:h-full lg:max-w-4xl lg:rounded-none lg:border-b-0 lg:border-l-0 lg:border-r lg:border-t-0">
+                    <div className="border-b border-border bg-background/80 px-4 py-4 backdrop-blur-sm md:px-6">
+                        <form onSubmit={handleSearch} className="relative flex w-full max-w-md items-center">
+                            <Search className="absolute left-3 h-4 w-4 text-muted-foreground" />
+                            <Input
+                                placeholder="Search articles..."
+                                className="pl-9 border-input focus-visible:border-ring focus-visible:ring-ring/30"
+                                value={searchInput}
+                                onChange={e => setSearchInput(e.target.value)}
                             />
+                        </form>
+                    </div>
 
-                            {sources.map((source) => {
-                                const isSelected = selectedSourceId === source.id;
-                                return (
-                                    <SourceFilterRow
-                                        key={source.id}
-                                        label={source.name}
-                                        title={`${source.name} (${source.article_count})`}
-                                        count={source.article_count}
-                                        isSelected={isSelected}
-                                        isFetching={fetchingSourceId === source.id}
-                                        isDisabled={isAnyFetchInProgress}
-                                        fetchAriaLabel={`Fetch ${source.name}`}
-                                        onSelect={() => selectSource(source.id)}
-                                        onFetch={(event) => void handleFetchSource(event, source)}
-                                    />
-                                );
-                            })}
+                    <div ref={articlesScrollRef} className="px-4 py-4 md:px-6 md:py-6 lg:min-h-0 lg:flex-1 lg:overflow-y-auto">
+                        <div className="space-y-3">
+                            {articles.map(article => (
+                                <Link to={`/news/${article.id}`} key={article.id} className="block" onClick={handleArticleClick}>
+                                    <Card className="border-0 bg-transparent shadow-none transition-colors duration-150 hover:bg-cyan-500/10">
+                                        <CardHeader className="px-3 py-3">
+                                            <div className="mb-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+                                                <span className="text-cyan-700 dark:text-cyan-300">{article.source_name}</span>
+                                                <span>Published {new Date(article.published_at).toLocaleString()}</span>
+                                                <span>Inserted {new Date(article.inserted_at).toLocaleString()}</span>
+                                                {!article.is_read && <span className="inline-block h-2 w-2 rounded-full bg-blue-500"></span>}
+                                            </div>
+                                            <CardTitle className="text-xl leading-tight">{article.title}</CardTitle>
+                                            <div className="mt-2 flex items-center gap-3">
+                                                {article.summary && (
+                                                    <CardDescription className="min-w-0 flex-1 line-clamp-1 text-sm" dangerouslySetInnerHTML={{ __html: article.summary }} onClick={handleHtmlLinkClick} />
+                                                )}
+                                                {article.guid && (
+                                                    <a
+                                                        href={article.guid}
+                                                        className="inline-flex shrink-0 items-center text-xs text-muted-foreground transition-colors hover:text-cyan-700 dark:hover:text-cyan-300"
+                                                        onClick={(e) => handleExternalLink(e, article.guid)}
+                                                    >
+                                                        <ExternalLink className="mr-1 h-3 w-3" />
+                                                        Original
+                                                    </a>
+                                                )}
+                                            </div>
+                                        </CardHeader>
+                                    </Card>
+                                </Link>
+                            ))}
 
-                            {sourcesLoaded && sources.length === 0 && (
-                                <div className="text-xs text-muted-foreground border border-dashed rounded-md p-2">
-                                    No active sources.
+                            {articles.length === 0 && (
+                                <div className="py-10 text-center text-muted-foreground">
+                                    {emptyStateMessage}
                                 </div>
                             )}
                         </div>
                     </div>
-                    <div
-                        role="separator"
-                        aria-label="Resize sources panel"
-                        aria-orientation="vertical"
-                        aria-valuemin={MIN_SOURCES_PANEL_WIDTH}
-                        aria-valuemax={MAX_SOURCES_PANEL_WIDTH}
-                        aria-valuenow={sourcesPanelWidth}
-                        data-no-window-drag
-                        onPointerDown={handleSourcesResizeStart}
-                        className="absolute inset-y-0 -right-2 z-10 hidden w-4 touch-none cursor-col-resize lg:block"
-                    >
-                        <div
-                            className={cn(
-                                "absolute inset-y-0 left-1/2 w-px -translate-x-1/2 rounded-full transition-colors",
-                                isResizingSourcesPanel
-                                    ? "bg-sky-400/90 dark:bg-sky-500/90"
-                                    : "bg-sky-200/80 dark:bg-sky-900/60",
-                            )}
-                        />
-                    </div>
-                </div>
 
-                <div className="min-w-0 lg:pl-4 lg:min-h-0 flex flex-col gap-3">
-                    <div className="space-y-3 lg:flex-1 lg:min-h-0 lg:overflow-y-auto lg:pr-1">
-                        {articles.map(article => (
-                            <Link to={`/news/${article.id}`} key={article.id} className="block" onClick={handleArticleClick}>
-                                <Card className="border-0 shadow-none bg-transparent hover:bg-cyan-500/10 transition-colors duration-150">
-                                    <CardHeader className="px-3 py-3">
-                                        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground mb-1">
-                                            <span className="text-cyan-700 dark:text-cyan-300">{article.source_name}</span>
-                                            <span>Published {new Date(article.published_at).toLocaleString()}</span>
-                                            <span>Inserted {new Date(article.inserted_at).toLocaleString()}</span>
-                                            {!article.is_read && <span className="bg-blue-500 w-2 h-2 rounded-full inline-block"></span>}
-                                        </div>
-                                        <CardTitle className="text-xl leading-tight">{article.title}</CardTitle>
-                                        <div className="flex items-center gap-3 mt-2">
-                                            {article.summary && (
-                                                <CardDescription className="line-clamp-1 text-sm flex-1 min-w-0" dangerouslySetInnerHTML={{ __html: article.summary }} onClick={handleHtmlLinkClick} />
-                                            )}
-                                            {article.guid && (
-                                                <a
-                                                    href={article.guid}
-                                                    className="inline-flex items-center text-xs text-muted-foreground hover:text-cyan-700 dark:hover:text-cyan-300 transition-colors shrink-0"
-                                                    onClick={(e) => handleExternalLink(e, article.guid)}
+                    <div className="bg-background/80 px-4 py-3 backdrop-blur-sm md:px-6">
+                        <div className="flex items-center justify-between gap-2 sm:hidden">
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => goToPage(Math.max(0, page - 1))}
+                                disabled={!canGoToPreviousPage}
+                                className="h-9 rounded-md border border-border bg-background px-3 text-foreground shadow-sm hover:bg-accent/60"
+                            >
+                                <ChevronLeft className="h-4 w-4" />
+                                <span className="sr-only">Previous page</span>
+                            </Button>
+                            <span className="min-w-0 flex-1 text-center text-sm font-medium text-muted-foreground">
+                                {compactPaginationLabel}
+                            </span>
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => goToPage(page + 1)}
+                                disabled={!canGoToNextPage}
+                                className="h-9 rounded-md border border-border bg-background px-3 text-foreground shadow-sm hover:bg-accent/60"
+                            >
+                                <span className="sr-only">Next page</span>
+                                <ChevronRight className="h-4 w-4" />
+                            </Button>
+                        </div>
+
+                        <div className="hidden items-center justify-center gap-3 sm:flex">
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => goToPage(Math.max(0, page - 1))}
+                                disabled={!canGoToPreviousPage}
+                                className="h-9 rounded-md border border-border bg-background px-3 text-foreground shadow-sm hover:bg-accent/60"
+                            >
+                                <ChevronLeft className="h-4 w-4" />
+                                Previous
+                            </Button>
+
+                            {totalPages !== null && totalPages > 1 ? (
+                                <nav aria-label="Pagination" className="flex items-center gap-1">
+                                    {paginationItems.map((item) => {
+                                        if (item.type === "ellipsis") {
+                                            return (
+                                                <span
+                                                    key={item.key}
+                                                    className="flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground"
+                                                    aria-hidden="true"
                                                 >
-                                                    <ExternalLink className="w-3 h-3 mr-1" />
-                                                    Original
-                                                </a>
-                                            )}
-                                        </div>
-                                    </CardHeader>
-                                </Card>
-                            </Link>
-                        ))}
+                                                    <MoreHorizontal className="h-4 w-4" />
+                                                </span>
+                                            );
+                                        }
 
-                        {articles.length === 0 && (
-                            <div className="text-center py-10 text-muted-foreground">
-                                {emptyStateMessage}
-                            </div>
-                        )}
-                    </div>
+                                        const isCurrentPage = item.page === page;
 
-                    <div className="flex items-center justify-between pt-1">
-                        <Button variant="outline" onClick={() => goToPage(Math.max(0, page - 1))} disabled={page === 0 || !hasActiveSources}>
-                            Previous
-                        </Button>
-                        <span className="text-sm text-muted-foreground">Page {page + 1}</span>
-                        <Button variant="outline" onClick={() => goToPage(page + 1)} disabled={articles.length < PAGE_SIZE || !hasActiveSources}>
-                            Next
-                        </Button>
+                                        return (
+                                            <Button
+                                                key={item.page}
+                                                type="button"
+                                                variant="ghost"
+                                                size="sm"
+                                                aria-current={isCurrentPage ? "page" : undefined}
+                                                onClick={isCurrentPage ? undefined : () => goToPage(item.page)}
+                                                className={cn(
+                                                    "h-9 min-w-9 rounded-md border px-3 text-sm shadow-sm",
+                                                    isCurrentPage
+                                                        ? "pointer-events-none border-foreground bg-foreground text-background"
+                                                        : "border-border bg-background text-foreground hover:bg-accent/60",
+                                                )}
+                                            >
+                                                {item.page + 1}
+                                            </Button>
+                                        );
+                                    })}
+                                </nav>
+                            ) : (
+                                <span className="text-sm font-medium text-muted-foreground">
+                                    {compactPaginationLabel}
+                                </span>
+                            )}
+
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => goToPage(page + 1)}
+                                disabled={!canGoToNextPage}
+                                className="h-9 rounded-md border border-border bg-background px-3 text-foreground shadow-sm hover:bg-accent/60"
+                            >
+                                Next
+                                <ChevronRight className="h-4 w-4" />
+                            </Button>
+                        </div>
                     </div>
                 </div>
             </div>
