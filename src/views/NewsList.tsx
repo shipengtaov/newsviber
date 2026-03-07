@@ -657,12 +657,12 @@ export default function NewsList() {
                 className="relative min-w-0 lg:h-full lg:shrink-0"
                 style={isDesktopLayout ? { width: sourcesPanelWidth } : undefined}
             >
-                <div className="flex flex-col gap-2 rounded-xl border border-border bg-background/60 p-4 lg:h-full lg:min-h-0 lg:rounded-none lg:border-0 lg:bg-transparent lg:px-4 lg:py-4 lg:pr-4">
-                    <div>
+                <div className="flex flex-col gap-2 rounded-xl border border-border bg-background/60 p-4 lg:h-full lg:min-h-0 lg:rounded-none lg:border-0 lg:bg-transparent lg:p-0 lg:pl-4 lg:py-4">
+                    <div className="lg:pr-4">
                         <h2 className="text-sm font-semibold uppercase tracking-wide text-sky-700/90 dark:text-sky-300/90">Sources</h2>
                     </div>
 
-                    <div className="space-y-1 pr-1 lg:flex-1 lg:min-h-0 lg:overflow-y-auto">
+                    <div className="space-y-1 pr-1 lg:pr-[5px] lg:flex-1 lg:min-h-0 lg:overflow-y-auto">
                         <SourceFilterRow
                             label="All Articles"
                             title={`All Articles (${allArticleCount})`}
