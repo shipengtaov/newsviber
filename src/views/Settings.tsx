@@ -1,6 +1,6 @@
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import Database from "@tauri-apps/plugin-sql";
-import { Check } from "lucide-react";
+import { Check, Eye, EyeOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -30,22 +30,52 @@ async function getDb() {
     return db;
 }
 
+function normalizeProviderConfigs(providerConfigs: AIProviderConfigs): AIProviderConfigs {
+    return PROVIDERS.reduce<AIProviderConfigs>((configs, provider) => {
+        configs[provider.id] = normalizeProviderConfig(provider.id, providerConfigs[provider.id]);
+        return configs;
+    }, {});
+}
+
+function getAiSettingsSnapshot(providerId: string, providerConfigs: AIProviderConfigs) {
+    return JSON.stringify({
+        currentProviderId: providerId,
+        providerConfigs: normalizeProviderConfigs(providerConfigs),
+    });
+}
+
 export default function Settings() {
     const { toast } = useToast();
     const [jinaKey, setJinaKey] = useState("");
+    const [savedJinaKey, setSavedJinaKey] = useState("");
     const [selectedProviderId, setSelectedProviderId] = useState(DEFAULT_AI_PROVIDER_ID);
+    const [savedProviderId, setSavedProviderId] = useState(DEFAULT_AI_PROVIDER_ID);
     const [providerDrafts, setProviderDrafts] = useState<AIProviderConfigs>(getDefaultProviderConfigs);
+    const [savedProviderDrafts, setSavedProviderDrafts] = useState<AIProviderConfigs>(getDefaultProviderConfigs);
+    const [showAiApiKey, setShowAiApiKey] = useState(false);
+    const [showJinaApiKey, setShowJinaApiKey] = useState(false);
 
     useEffect(() => {
         // In a real app, these should be securely stored in tauri-plugin-store or OS keyring.
         // For this prototype, we'll use localStorage or standard db.
-        setJinaKey(localStorage.getItem("JINA_API_KEY") || "");
-        setSelectedProviderId(readCurrentProviderId());
-        setProviderDrafts(readStoredProviderConfigs());
+        const storedJinaKey = localStorage.getItem("JINA_API_KEY") || "";
+        const storedProviderId = readCurrentProviderId();
+        const storedProviderConfigs = readStoredProviderConfigs();
+
+        setJinaKey(storedJinaKey);
+        setSavedJinaKey(storedJinaKey);
+        setSelectedProviderId(storedProviderId);
+        setSavedProviderId(storedProviderId);
+        setProviderDrafts(storedProviderConfigs);
+        setSavedProviderDrafts(storedProviderConfigs);
     }, []);
 
     const selectedProvider = getProviderById(selectedProviderId);
     const selectedConfig = providerDrafts[selectedProviderId] || getDefaultProviderConfig(selectedProviderId);
+    const aiSettingsSnapshot = getAiSettingsSnapshot(selectedProviderId, providerDrafts);
+    const savedAiSettingsSnapshot = getAiSettingsSnapshot(savedProviderId, savedProviderDrafts);
+    const isAiDirty = aiSettingsSnapshot !== savedAiSettingsSnapshot;
+    const isJinaDirty = jinaKey !== savedJinaKey;
 
     function updateSelectedProviderConfig(updates: Partial<AIProviderConfig>) {
         setProviderDrafts((prev) => ({
@@ -57,15 +87,22 @@ export default function Settings() {
         }));
     }
 
-    function persistSettings() {
-        localStorage.setItem("JINA_API_KEY", jinaKey);
+    function persistAiSettings() {
         saveAIProviderSettings(selectedProviderId, providerDrafts);
-        toast({ title: "Settings Saved", description: "API configurations have been updated." });
+        setSavedProviderId(selectedProviderId);
+        setSavedProviderDrafts(normalizeProviderConfigs(providerDrafts));
+        toast({ title: "Settings Saved", description: "AI provider configuration has been updated." });
+    }
+
+    function persistJinaSettings() {
+        localStorage.setItem("JINA_API_KEY", jinaKey);
+        setSavedJinaKey(jinaKey);
+        toast({ title: "Settings Saved", description: "Jina configuration has been updated." });
     }
 
     function handleSaveAiSettings(e: React.FormEvent) {
         e.preventDefault();
-        persistSettings();
+        persistAiSettings();
     }
 
     async function cleanupData(days: number) {
@@ -150,12 +187,24 @@ export default function Settings() {
 
                             <div className="space-y-2">
                                 <Label>AI API Key</Label>
-                                <Input
-                                    type="password"
-                                    value={selectedConfig.apiKey}
-                                    onChange={e => updateSelectedProviderConfig({ apiKey: e.target.value })}
-                                    placeholder="sk-..."
-                                />
+                                <div className="relative">
+                                    <Input
+                                        type={showAiApiKey ? "text" : "password"}
+                                        value={selectedConfig.apiKey}
+                                        onChange={e => updateSelectedProviderConfig({ apiKey: e.target.value })}
+                                        placeholder="sk-..."
+                                        className="pr-10"
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowAiApiKey((prev) => !prev)}
+                                        aria-label={showAiApiKey ? "Hide API key" : "Show API key"}
+                                        aria-pressed={showAiApiKey}
+                                        className="absolute inset-y-0 right-0 flex w-10 items-center justify-center text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                                    >
+                                        {showAiApiKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                                    </button>
+                                </div>
                             </div>
                             <div className="space-y-2">
                                 <Label>Model Name</Label>
@@ -173,7 +222,13 @@ export default function Settings() {
                             </div>
                         </div>
 
-                        <Button type="submit">Save AI Settings</Button>
+                        <Button
+                            type="submit"
+                            disabled={!isAiDirty}
+                            className="disabled:border disabled:border-input disabled:bg-muted disabled:text-muted-foreground disabled:opacity-100 disabled:shadow-none"
+                        >
+                            Save
+                        </Button>
                     </form>
                 </CardContent>
             </Card>
@@ -187,9 +242,32 @@ export default function Settings() {
                     <div className="space-y-4 max-w-lg">
                         <div className="space-y-2">
                             <Label>Jina AI API Key (r.jina.ai / s.jina.ai)</Label>
-                            <Input type="password" value={jinaKey} onChange={e => setJinaKey(e.target.value)} placeholder="jina_..." />
+                            <div className="relative">
+                                <Input
+                                    type={showJinaApiKey ? "text" : "password"}
+                                    value={jinaKey}
+                                    onChange={e => setJinaKey(e.target.value)}
+                                    placeholder="jina_..."
+                                    className="pr-10"
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => setShowJinaApiKey((prev) => !prev)}
+                                    aria-label={showJinaApiKey ? "Hide API key" : "Show API key"}
+                                    aria-pressed={showJinaApiKey}
+                                    className="absolute inset-y-0 right-0 flex w-10 items-center justify-center text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                                >
+                                    {showJinaApiKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                                </button>
+                            </div>
                         </div>
-                        <Button onClick={persistSettings}>Save Jina Settings</Button>
+                        <Button
+                            onClick={persistJinaSettings}
+                            disabled={!isJinaDirty}
+                            className="disabled:border disabled:border-input disabled:bg-muted disabled:text-muted-foreground disabled:opacity-100 disabled:shadow-none"
+                        >
+                            Save
+                        </Button>
                     </div>
                 </CardContent>
             </Card>
