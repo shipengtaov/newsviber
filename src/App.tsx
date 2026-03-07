@@ -9,24 +9,67 @@ import CreativeSpace from "@/views/CreativeSpace";
 import Settings from "@/views/Settings";
 import { useEffect } from "react";
 import Database from "@tauri-apps/plugin-sql";
+import { dispatchSourceFetchSyncEvent } from "@/lib/source-events";
+import { fetchSources, isSourceDueForFetch, type SchedulableSource } from "@/lib/source-fetch";
+import { normalizeFetchInterval } from "@/lib/source-utils";
+
+let db: Database | null = null;
+
+async function getDb() {
+  if (!db) {
+    db = await Database.load("sqlite:getnews.db");
+  }
+
+  return db;
+}
 
 function App() {
   useEffect(() => {
-    // Basic startup checks / auto generation hooks could go here.
-    // E.g. setInterval to check sources and creative spaces.
+    let isBackgroundCheckRunning = false;
+
     async function backgroundCheck() {
-      // Basic skeleton for periodic tasks in frontend
+      if (isBackgroundCheckRunning) {
+        return;
+      }
+
+      isBackgroundCheckRunning = true;
+
       try {
-        await Database.load("sqlite:getnews.db");
-        // Auto generation logic goes here for daily/weekly modes.
-        // It should track "last_generated_at" locally to avoid spam.
+        const db = await getDb();
+        const result: SchedulableSource[] = await db.select(`
+          SELECT id, name, source_type, url, active, fetch_interval, last_fetch
+          FROM sources
+          WHERE active = 1
+        `);
+        const dueSources = result
+          .map((source) => ({
+            ...source,
+            fetch_interval: normalizeFetchInterval(source.fetch_interval),
+            last_fetch: source.last_fetch ?? null,
+          }))
+          .filter((source) => isSourceDueForFetch(source));
+
+        if (dueSources.length === 0) {
+          return;
+        }
+
+        const fetchResult = await fetchSources(dueSources);
+        if (fetchResult.successCount > 0) {
+          dispatchSourceFetchSyncEvent();
+        }
       } catch (err) {
         console.error("BG task err", err);
+      } finally {
+        isBackgroundCheckRunning = false;
       }
     }
-    backgroundCheck();
-    const interval = setInterval(backgroundCheck, 15 * 60 * 1000); // 15 mins
-    return () => clearInterval(interval);
+
+    void backgroundCheck();
+    const interval = window.setInterval(() => {
+      void backgroundCheck();
+    }, 60 * 1000);
+
+    return () => window.clearInterval(interval);
   }, []);
 
   return (

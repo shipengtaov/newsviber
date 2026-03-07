@@ -7,6 +7,11 @@ export type FetchableSource = {
     source_type: string;
     url: string;
     active: number | boolean;
+    last_fetch: string | null;
+};
+
+export type SchedulableSource = FetchableSource & {
+    fetch_interval: number;
 };
 
 export type FetchResult = {
@@ -33,6 +38,7 @@ type JinaResponse = {
 };
 
 let db: Database | null = null;
+const inFlightSourceFetches = new Map<number, Promise<FetchResult>>();
 
 async function getDb() {
     if (!db) {
@@ -93,9 +99,36 @@ async function insertArticles(sourceId: number, articles: RemoteArticle[]) {
     return insertedCount;
 }
 
-export async function fetchSource(source: FetchableSource): Promise<FetchResult> {
+async function updateSourceLastFetch(sourceId: number, fetchedAt: string) {
+    const db = await getDb();
+    await db.execute("UPDATE sources SET last_fetch = $1 WHERE id = $2", [fetchedAt, sourceId]);
+}
+
+export function isSourceDueForFetch(
+    source: Pick<SchedulableSource, "fetch_interval" | "last_fetch">,
+    now: Date = new Date(),
+): boolean {
+    const intervalMinutes = Number(source.fetch_interval);
+    if (!Number.isFinite(intervalMinutes) || intervalMinutes <= 0) {
+        return false;
+    }
+
+    if (!source.last_fetch) {
+        return true;
+    }
+
+    const lastFetchTime = new Date(source.last_fetch).getTime();
+    if (!Number.isFinite(lastFetchTime)) {
+        return true;
+    }
+
+    return now.getTime() >= lastFetchTime + intervalMinutes * 60 * 1000;
+}
+
+async function performSourceFetch(source: FetchableSource): Promise<FetchResult> {
     const articles = await loadRemoteArticles(source);
     const insertedCount = await insertArticles(source.id, articles);
+    await updateSourceLastFetch(source.id, new Date().toISOString());
 
     return {
         insertedCount,
@@ -103,6 +136,24 @@ export async function fetchSource(source: FetchableSource): Promise<FetchResult>
         successCount: 1,
         failCount: 0,
     };
+}
+
+export async function fetchSource(source: FetchableSource): Promise<FetchResult> {
+    const existingFetch = inFlightSourceFetches.get(source.id);
+    if (existingFetch) {
+        return existingFetch;
+    }
+
+    const fetchPromise = performSourceFetch(source);
+    inFlightSourceFetches.set(source.id, fetchPromise);
+
+    try {
+        return await fetchPromise;
+    } finally {
+        if (inFlightSourceFetches.get(source.id) === fetchPromise) {
+            inFlightSourceFetches.delete(source.id);
+        }
+    }
 }
 
 export async function fetchSources(sources: FetchableSource[]): Promise<FetchResult> {

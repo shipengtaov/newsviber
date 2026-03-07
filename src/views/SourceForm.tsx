@@ -16,6 +16,11 @@ async function getDb() {
     return db;
 }
 
+function parseFetchInterval(value: string): number {
+    const parsed = Number.parseInt(value, 10);
+    return Number.isFinite(parsed) ? parsed : 60;
+}
+
 export default function SourceForm() {
     const { toast } = useToast();
     const navigate = useNavigate();
@@ -63,13 +68,13 @@ export default function SourceForm() {
             if (isEditing) {
                 await db.execute(
                     "UPDATE sources SET name = $1, source_type = $2, url = $3, fetch_interval = $4 WHERE id = $5",
-                    [name, type, url, parseInt(interval) || 60, parseInt(id as string)]
+                    [name, type, url, parseFetchInterval(interval), parseInt(id as string)]
                 );
                 toast({ title: "Source updated successfully" });
             } else {
                 await db.execute(
                     "INSERT INTO sources (name, source_type, url, fetch_interval, active) VALUES ($1, $2, $3, $4, 1)",
-                    [name, type, url, parseInt(interval) || 60]
+                    [name, type, url, parseFetchInterval(interval)]
                 );
                 toast({ title: "Source added successfully" });
             }
@@ -119,7 +124,8 @@ export default function SourceForm() {
                         </div>
                         <div className="space-y-3">
                             <Label className="text-sm font-medium">Fetch Interval (minutes)</Label>
-                            <Input type="number" value={interval} inline-block="true" onChange={e => setInterval(e.target.value)} className="bg-background/50" />
+                            <Input type="number" min="0" value={interval} inline-block="true" onChange={e => setInterval(e.target.value)} className="bg-background/50" />
+                            <p className="text-xs text-muted-foreground">Set to 0 for manual refresh only.</p>
                         </div>
                     </div>
 

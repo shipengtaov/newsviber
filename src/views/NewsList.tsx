@@ -9,6 +9,8 @@ import { Search, ExternalLink, RefreshCcw, ChevronLeft, ChevronRight, MoreHorizo
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { fetchSource, fetchSources, type FetchableSource } from "@/lib/source-fetch";
+import { addSourceFetchSyncListener } from "@/lib/source-events";
+import { formatFetchInterval, formatLastFetchSummary, normalizeFetchInterval } from "@/lib/source-utils";
 
 type Article = {
     id: number;
@@ -196,17 +198,6 @@ function buildPaginationItems(currentPage: number, totalPages: number): Paginati
     }
 
     return items;
-}
-
-function formatFetchInterval(minutes: number): string {
-    if (!Number.isFinite(minutes) || minutes <= 0) return "Manual refresh";
-    if (minutes < 60) return `Every ${minutes} min`;
-    if (minutes % 60 === 0) {
-        const hours = minutes / 60;
-        return `Every ${hours} hr${hours === 1 ? "" : "s"}`;
-    }
-
-    return `Every ${minutes} min`;
 }
 
 type SourceFilterRowProps = {
@@ -436,8 +427,14 @@ export default function NewsList() {
     }, [articles.length, isDesktopLayout, page, search, selectedSourceId]);
 
     useEffect(() => {
-        loadSources();
+        void loadSources();
     }, []);
+
+    useEffect(() => (
+        addSourceFetchSyncListener(() => {
+            void refreshCurrentView();
+        })
+    ), [page, search, selectedSourceId]);
 
     useEffect(() => {
         loadArticles(page, search, selectedSourceId);
@@ -473,17 +470,18 @@ export default function NewsList() {
         try {
             const db = await getDb();
             const result: SourceFilterItem[] = await db.select(`
-                SELECT s.id, s.name, s.source_type, s.url, s.active, s.fetch_interval, COUNT(a.id) as article_count
+                SELECT s.id, s.name, s.source_type, s.url, s.active, s.fetch_interval, s.last_fetch, COUNT(a.id) as article_count
                 FROM sources s
                 LEFT JOIN articles a ON a.source_id = s.id
                 WHERE s.active = 1
-                GROUP BY s.id, s.name, s.source_type, s.url, s.active, s.fetch_interval
+                GROUP BY s.id, s.name, s.source_type, s.url, s.active, s.fetch_interval, s.last_fetch
                 ORDER BY LOWER(s.name) ASC
             `);
             setSources(
                 result.map((source) => ({
                     ...source,
-                    fetch_interval: Number(source.fetch_interval) || 60,
+                    fetch_interval: normalizeFetchInterval(source.fetch_interval),
+                    last_fetch: source.last_fetch ?? null,
                     article_count: Number(source.article_count) || 0,
                 })),
             );
@@ -742,6 +740,8 @@ export default function NewsList() {
                                         </a>
                                         <span className="shrink-0" aria-hidden="true">•</span>
                                         <span className="shrink-0">{formatFetchInterval(selectedSource.fetch_interval)}</span>
+                                        <span className="shrink-0" aria-hidden="true">•</span>
+                                        <span className="shrink-0">{formatLastFetchSummary(selectedSource.last_fetch)}</span>
                                         <span className="shrink-0" aria-hidden="true">•</span>
                                         <span className="shrink-0">{resultSummaryLabel}</span>
                                     </div>

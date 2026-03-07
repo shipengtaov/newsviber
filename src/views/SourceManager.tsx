@@ -6,9 +6,10 @@ import { useToast } from "@/hooks/use-toast";
 import { RefreshCcw, Trash2, Edit, Plus, Power, PowerOff } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { fetchSource, fetchSources, type FetchableSource } from "@/lib/source-fetch";
+import { addSourceFetchSyncListener } from "@/lib/source-events";
+import { formatFetchInterval, formatLastFetchSummary, normalizeFetchInterval } from "@/lib/source-utils";
 
 type Source = FetchableSource & {
-    name: string;
     config: string | null;
     fetch_interval: number;
 };
@@ -32,14 +33,21 @@ export default function SourceManager() {
     const isAnyFetchInProgress = isFetchingAll || fetchingSourceId !== null;
 
     useEffect(() => {
-        loadSources();
+        void loadSources();
+        return addSourceFetchSyncListener(() => {
+            void loadSources();
+        });
     }, []);
 
     async function loadSources() {
         try {
             const db = await getDb();
             const result: Source[] = await db.select("SELECT * FROM sources ORDER BY id DESC");
-            setSources(result);
+            setSources(result.map((source) => ({
+                ...source,
+                fetch_interval: normalizeFetchInterval(source.fetch_interval),
+                last_fetch: source.last_fetch ?? null,
+            })));
         } catch (err) {
             console.error(err);
         }
@@ -87,6 +95,7 @@ export default function SourceManager() {
         } catch (err: any) {
             toast({ title: "Fetch failed", description: String(err), variant: "destructive" });
         } finally {
+            await loadSources();
             setIsFetchingAll(false);
         }
     }
@@ -107,6 +116,7 @@ export default function SourceManager() {
         } catch (err: any) {
             toast({ title: "Fetch failed", description: String(err), variant: "destructive" });
         } finally {
+            await loadSources();
             setFetchingSourceId(null);
         }
     }
@@ -144,6 +154,10 @@ export default function SourceManager() {
                                     <span className="text-xs uppercase bg-muted text-muted-foreground px-2 py-1 rounded-md">{s.source_type}</span>
                                 </div>
                                 <p className="text-sm text-muted-foreground truncate" title={s.url}>{s.url}</p>
+                                <div className="mt-3 space-y-1 text-xs text-muted-foreground">
+                                    <p>{formatFetchInterval(s.fetch_interval)}</p>
+                                    <p>{formatLastFetchSummary(s.last_fetch)}</p>
+                                </div>
                                 <div className="mt-4 flex flex-wrap gap-2">
                                     <Button variant="outline" size="sm" onClick={() => fetchNow(s)} disabled={!s.active || isAnyFetchInProgress}>
                                         <RefreshCcw className={`h-4 w-4 mr-2 ${fetchingSourceId === s.id ? 'animate-spin' : ''}`} /> Fetch
