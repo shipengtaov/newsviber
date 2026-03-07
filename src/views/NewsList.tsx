@@ -767,22 +767,26 @@ export default function NewsList() {
                     </div>
 
                     <div ref={articlesScrollRef} className="px-4 py-4 md:px-6 md:py-6 lg:min-h-0 lg:flex-1 lg:overflow-y-auto">
-                        <div className="space-y-3">
+                        <div className="space-y-2">
                             {articles.map(article => (
                                 <Link to={`/news/${article.id}`} key={article.id} className="block" onClick={handleArticleClick}>
                                     <Card className="border-0 bg-transparent shadow-none transition-colors duration-150 hover:bg-cyan-500/10">
-                                        <CardHeader className="px-3 py-3">
-                                            <div className="mb-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+                                        <CardHeader className="space-y-1 px-3 py-2.5">
+                                            <div className="flex items-start gap-2">
+                                                {!article.is_read && <span className="inline-block h-2 w-2 shrink-0 self-center rounded-full bg-blue-500"></span>}
+                                                <CardTitle className="min-w-0 flex-1 text-lg leading-snug">{article.title}</CardTitle>
+                                            </div>
+                                            {article.summary && (
+                                                <CardDescription
+                                                    className="min-w-0 line-clamp-1 text-sm"
+                                                    dangerouslySetInnerHTML={{ __html: article.summary }}
+                                                    onClick={handleHtmlLinkClick}
+                                                />
+                                            )}
+                                            <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
                                                 <span className="text-cyan-700 dark:text-cyan-300">{article.source_name}</span>
                                                 <span>Published {new Date(article.published_at).toLocaleString()}</span>
                                                 <span>Inserted {new Date(article.inserted_at).toLocaleString()}</span>
-                                                {!article.is_read && <span className="inline-block h-2 w-2 rounded-full bg-blue-500"></span>}
-                                            </div>
-                                            <CardTitle className="text-xl leading-tight">{article.title}</CardTitle>
-                                            <div className="mt-2 flex items-center gap-3">
-                                                {article.summary && (
-                                                    <CardDescription className="min-w-0 flex-1 line-clamp-1 text-sm" dangerouslySetInnerHTML={{ __html: article.summary }} onClick={handleHtmlLinkClick} />
-                                                )}
                                                 {article.guid && (
                                                     <a
                                                         href={article.guid}
