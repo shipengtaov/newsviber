@@ -1,3 +1,4 @@
+mod creative;
 mod db;
 pub mod fetchers;
 
@@ -16,7 +17,12 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_sql::Builder::new().add_migrations("sqlite:getnews.db", db::get_migrations()).build())
         .plugin(tauri_plugin_opener::init())
-        .invoke_handler(tauri::generate_handler![fetch_rss_cmd, fetch_jina_cmd])
+        .invoke_handler(tauri::generate_handler![
+            fetch_rss_cmd,
+            fetch_jina_cmd,
+            creative::save_creative_project_cmd,
+            creative::persist_creative_card_cmd
+        ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

@@ -9,7 +9,7 @@ import { Search, ExternalLink, RefreshCcw, ChevronLeft, ChevronRight, MoreHorizo
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { fetchSource, fetchSources, type FetchableSource } from "@/lib/source-fetch";
-import { addSourceFetchSyncListener } from "@/lib/source-events";
+import { addSourceFetchSyncListener, dispatchSourceFetchSyncEvent } from "@/lib/source-events";
 import { formatFetchInterval, formatLastFetchSummary, normalizeFetchInterval } from "@/lib/source-utils";
 import { ArticleDetailView } from "@/views/NewsDetail";
 
@@ -663,6 +663,9 @@ export default function NewsList() {
 
         try {
             const result = await fetchSources(sources);
+            if (result.insertedCount > 0) {
+                dispatchSourceFetchSyncEvent();
+            }
             toast({
                 title: "Fetch All Complete",
                 description: `Fetched ${result.insertedCount} new articles. ${result.successCount} succeeded${result.failCount > 0 ? `, ${result.failCount} failed` : ""}.`,
@@ -686,6 +689,9 @@ export default function NewsList() {
 
         try {
             const result = await fetchSource(source);
+            if (result.insertedCount > 0) {
+                dispatchSourceFetchSyncEvent();
+            }
             toast({
                 title: "Fetch complete",
                 description: `Fetched ${result.fetchedCount} articles, saved ${result.insertedCount} new.`,

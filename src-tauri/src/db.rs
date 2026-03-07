@@ -84,6 +84,51 @@ pub fn get_migrations() -> Vec<Migration> {
                 ALTER TABLE sources ADD COLUMN active BOOLEAN NOT NULL DEFAULT 1;
             ",
             kind: MigrationKind::Up,
+        },
+        Migration {
+            version: 4,
+            description: "extend_creative_projects_and_card_sources",
+            sql: "
+                ALTER TABLE creative_projects ADD COLUMN auto_enabled BOOLEAN NOT NULL DEFAULT 0;
+                ALTER TABLE creative_projects ADD COLUMN auto_interval_minutes INTEGER NOT NULL DEFAULT 60;
+                ALTER TABLE creative_projects ADD COLUMN max_articles_per_card INTEGER NOT NULL DEFAULT 12;
+                ALTER TABLE creative_projects ADD COLUMN last_auto_checked_at DATETIME;
+                ALTER TABLE creative_projects ADD COLUMN last_auto_generated_at DATETIME;
+
+                CREATE TABLE IF NOT EXISTS creative_project_sources (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    project_id INTEGER NOT NULL,
+                    source_id INTEGER NOT NULL,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY(project_id) REFERENCES creative_projects(id) ON DELETE CASCADE,
+                    FOREIGN KEY(source_id) REFERENCES sources(id) ON DELETE CASCADE
+                );
+
+                CREATE UNIQUE INDEX IF NOT EXISTS idx_creative_project_sources_unique
+                    ON creative_project_sources(project_id, source_id);
+                CREATE INDEX IF NOT EXISTS idx_creative_project_sources_project
+                    ON creative_project_sources(project_id);
+
+                ALTER TABLE creative_cards ADD COLUMN generation_mode TEXT NOT NULL DEFAULT 'manual';
+                ALTER TABLE creative_cards ADD COLUMN used_article_count INTEGER NOT NULL DEFAULT 0;
+
+                CREATE TABLE IF NOT EXISTS creative_card_articles (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    card_id INTEGER NOT NULL,
+                    article_id INTEGER NOT NULL,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY(card_id) REFERENCES creative_cards(id) ON DELETE CASCADE,
+                    FOREIGN KEY(article_id) REFERENCES articles(id) ON DELETE CASCADE
+                );
+
+                CREATE UNIQUE INDEX IF NOT EXISTS idx_creative_card_articles_unique
+                    ON creative_card_articles(card_id, article_id);
+                CREATE INDEX IF NOT EXISTS idx_creative_card_articles_article
+                    ON creative_card_articles(article_id);
+                CREATE INDEX IF NOT EXISTS idx_creative_cards_project_created
+                    ON creative_cards(project_id, created_at DESC);
+            ",
+            kind: MigrationKind::Up,
         }
     ]
 }

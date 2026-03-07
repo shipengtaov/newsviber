@@ -6,7 +6,7 @@ import { useToast } from "@/hooks/use-toast";
 import { RefreshCcw, Trash2, Edit, Plus, Power, PowerOff } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { fetchSource, fetchSources, type FetchableSource } from "@/lib/source-fetch";
-import { addSourceFetchSyncListener } from "@/lib/source-events";
+import { addSourceFetchSyncListener, dispatchSourceFetchSyncEvent } from "@/lib/source-events";
 import { formatFetchInterval, formatLastFetchSummary, normalizeFetchInterval } from "@/lib/source-utils";
 import { PageShell } from "@/components/layout/PageShell";
 
@@ -89,6 +89,9 @@ export default function SourceManager() {
 
         try {
             const result = await fetchSources(activeSources);
+            if (result.insertedCount > 0) {
+                dispatchSourceFetchSyncEvent();
+            }
             toast({
                 title: "Fetch All Complete",
                 description: `Fetched ${result.insertedCount} new articles. ${result.successCount} succeeded${result.failCount > 0 ? `, ${result.failCount} failed` : ""}.`,
@@ -110,6 +113,9 @@ export default function SourceManager() {
         try {
             toast({ title: `Fetching ${source.name}...` });
             const result = await fetchSource(source);
+            if (result.insertedCount > 0) {
+                dispatchSourceFetchSyncEvent();
+            }
             toast({
                 title: "Fetch complete",
                 description: `Fetched ${result.fetchedCount} articles, saved ${result.insertedCount} new.`,

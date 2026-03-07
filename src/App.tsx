@@ -7,24 +7,31 @@ import GlobalChat from "@/views/GlobalChat";
 import CreativeSpace from "@/views/CreativeSpace";
 import Settings from "@/views/Settings";
 import { useEffect } from "react";
-import Database from "@tauri-apps/plugin-sql";
-import { dispatchSourceFetchSyncEvent } from "@/lib/source-events";
+import { runDueAutoCreativeProjects } from "@/lib/creative-service";
+import { getDb } from "@/lib/db";
+import { addSourceFetchSyncListener, dispatchSourceFetchSyncEvent } from "@/lib/source-events";
 import { fetchSources, isSourceDueForFetch, type SchedulableSource } from "@/lib/source-fetch";
 import { normalizeFetchInterval } from "@/lib/source-utils";
-
-let db: Database | null = null;
-
-async function getDb() {
-  if (!db) {
-    db = await Database.load("sqlite:getnews.db");
-  }
-
-  return db;
-}
 
 function App() {
   useEffect(() => {
     let isBackgroundCheckRunning = false;
+    let isCreativeCheckRunning = false;
+
+    async function runCreativeCheck() {
+      if (isCreativeCheckRunning) {
+        return;
+      }
+
+      isCreativeCheckRunning = true;
+      try {
+        await runDueAutoCreativeProjects();
+      } catch (err) {
+        console.error("Creative auto task err", err);
+      } finally {
+        isCreativeCheckRunning = false;
+      }
+    }
 
     async function backgroundCheck() {
       if (isBackgroundCheckRunning) {
@@ -49,13 +56,15 @@ function App() {
           .filter((source) => isSourceDueForFetch(source));
 
         if (dueSources.length === 0) {
+          await runCreativeCheck();
           return;
         }
 
         const fetchResult = await fetchSources(dueSources);
-        if (fetchResult.successCount > 0) {
+        if (fetchResult.insertedCount > 0) {
           dispatchSourceFetchSyncEvent();
         }
+        await runCreativeCheck();
       } catch (err) {
         console.error("BG task err", err);
       } finally {
@@ -67,8 +76,14 @@ function App() {
     const interval = window.setInterval(() => {
       void backgroundCheck();
     }, 60 * 1000);
+    const removeSourceSyncListener = addSourceFetchSyncListener(() => {
+      void runCreativeCheck();
+    });
 
-    return () => window.clearInterval(interval);
+    return () => {
+      window.clearInterval(interval);
+      removeSourceSyncListener();
+    };
   }, []);
 
   return (
