@@ -23,6 +23,7 @@ type Article = {
 };
 
 type SourceFilterItem = FetchableSource & {
+    fetch_interval: number;
     article_count: number;
 };
 
@@ -197,6 +198,17 @@ function buildPaginationItems(currentPage: number, totalPages: number): Paginati
     return items;
 }
 
+function formatFetchInterval(minutes: number): string {
+    if (!Number.isFinite(minutes) || minutes <= 0) return "Manual refresh";
+    if (minutes < 60) return `Every ${minutes} min`;
+    if (minutes % 60 === 0) {
+        const hours = minutes / 60;
+        return `Every ${hours} hr${hours === 1 ? "" : "s"}`;
+    }
+
+    return `Every ${minutes} min`;
+}
+
 type SourceFilterRowProps = {
     label: string;
     title: string;
@@ -344,6 +356,11 @@ export default function NewsList() {
         () => sources.reduce((total, source) => total + source.article_count, 0),
         [sources],
     );
+    const selectedSource = useMemo(() => {
+        if (selectedSourceId === null) return null;
+
+        return sources.find((source) => source.id === selectedSourceId) ?? null;
+    }, [selectedSourceId, sources]);
     const hasActiveSources = sources.length > 0;
     const isAllSelected = selectedSourceId === null;
     const isAnyFetchInProgress = isFetchingAll || fetchingSourceId !== null;
@@ -364,6 +381,10 @@ export default function NewsList() {
         : hasPaginationPages
             ? `Page ${Math.min(page + 1, totalPages)} / ${totalPages}`
             : "No more pages";
+    const resultSummaryLabel = totalArticleCount === null
+        ? "Loading article count..."
+        : `${totalArticleCount} article${totalArticleCount === 1 ? "" : "s"} in this view`;
+    const activeSourceSummaryLabel = `${sources.length} active source${sources.length === 1 ? "" : "s"}`;
 
     useEffect(() => {
         if (!isDesktopLayout) return;
@@ -452,16 +473,17 @@ export default function NewsList() {
         try {
             const db = await getDb();
             const result: SourceFilterItem[] = await db.select(`
-                SELECT s.id, s.name, s.source_type, s.url, s.active, COUNT(a.id) as article_count
+                SELECT s.id, s.name, s.source_type, s.url, s.active, s.fetch_interval, COUNT(a.id) as article_count
                 FROM sources s
                 LEFT JOIN articles a ON a.source_id = s.id
                 WHERE s.active = 1
-                GROUP BY s.id, s.name, s.source_type, s.url, s.active
+                GROUP BY s.id, s.name, s.source_type, s.url, s.active, s.fetch_interval
                 ORDER BY LOWER(s.name) ASC
             `);
             setSources(
                 result.map((source) => ({
                     ...source,
+                    fetch_interval: Number(source.fetch_interval) || 60,
                     article_count: Number(source.article_count) || 0,
                 })),
             );
@@ -702,16 +724,46 @@ export default function NewsList() {
 
             <div className="min-w-0 lg:flex lg:h-full lg:flex-1 lg:overflow-hidden">
                 <div className="flex w-full min-w-0 flex-col rounded-xl border border-border bg-card/30 lg:mx-auto lg:h-full lg:max-w-4xl lg:rounded-none lg:border-b-0 lg:border-l-0 lg:border-r lg:border-t-0">
-                    <div className="border-b border-border bg-background/80 px-4 py-4 backdrop-blur-sm md:px-6">
-                        <form onSubmit={handleSearch} className="relative flex w-full max-w-md items-center">
-                            <Search className="absolute left-3 h-4 w-4 text-muted-foreground" />
-                            <Input
-                                placeholder="Search articles..."
-                                className="pl-9 border-input focus-visible:border-ring focus-visible:ring-ring/30"
-                                value={searchInput}
-                                onChange={e => setSearchInput(e.target.value)}
-                            />
-                        </form>
+                    <div className="border-b border-border bg-background/80 px-4 py-4 backdrop-blur-sm md:px-6 lg:py-3">
+                        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between lg:gap-4">
+                            <div className="hidden min-w-0 lg:block">
+                                <p className="truncate text-sm font-medium text-foreground">
+                                    {selectedSource?.name ?? "All Articles"}
+                                </p>
+                                {selectedSource ? (
+                                    <div className="mt-1 flex min-w-0 items-center gap-2 text-xs text-muted-foreground/75">
+                                        <a
+                                            href={selectedSource.url}
+                                            title={selectedSource.url}
+                                            className="min-w-0 truncate transition-colors hover:text-muted-foreground"
+                                            onClick={(event) => handleExternalLink(event, selectedSource.url)}
+                                        >
+                                            {selectedSource.url}
+                                        </a>
+                                        <span className="shrink-0" aria-hidden="true">•</span>
+                                        <span className="shrink-0">{formatFetchInterval(selectedSource.fetch_interval)}</span>
+                                        <span className="shrink-0" aria-hidden="true">•</span>
+                                        <span className="shrink-0">{resultSummaryLabel}</span>
+                                    </div>
+                                ) : (
+                                    <div className="mt-1 flex min-w-0 items-center gap-2 text-xs text-muted-foreground/75">
+                                        <span className="shrink-0">{activeSourceSummaryLabel}</span>
+                                        <span className="shrink-0" aria-hidden="true">•</span>
+                                        <span className="truncate">{resultSummaryLabel}</span>
+                                    </div>
+                                )}
+                            </div>
+
+                            <form onSubmit={handleSearch} className="relative flex w-full items-center lg:w-auto lg:flex-none">
+                                <Search className="absolute left-3 h-4 w-4 text-muted-foreground" />
+                                <Input
+                                    placeholder="Search articles..."
+                                    className="pl-9 border-input focus-visible:border-ring focus-visible:ring-ring/30 lg:w-56 lg:transition-[width] lg:duration-200 lg:focus:w-72"
+                                    value={searchInput}
+                                    onChange={e => setSearchInput(e.target.value)}
+                                />
+                            </form>
+                        </div>
                     </div>
 
                     <div ref={articlesScrollRef} className="px-4 py-4 md:px-6 md:py-6 lg:min-h-0 lg:flex-1 lg:overflow-y-auto">
