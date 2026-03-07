@@ -373,8 +373,8 @@ export default function NewsList() {
             ? `Page ${Math.min(page + 1, totalPages)} / ${totalPages}`
             : "No more pages";
     const resultSummaryLabel = totalArticleCount === null
-        ? "Loading article count..."
-        : `${totalArticleCount} article${totalArticleCount === 1 ? "" : "s"} in this view`;
+        ? "Loading results..."
+        : `${totalArticleCount} result${totalArticleCount === 1 ? "" : "s"}`;
     const activeSourceSummaryLabel = `${sources.length} active source${sources.length === 1 ? "" : "s"}`;
 
     useEffect(() => {
@@ -730,6 +730,12 @@ export default function NewsList() {
                                 </p>
                                 {selectedSource ? (
                                     <div className="mt-1 flex min-w-0 items-center gap-2 text-xs text-muted-foreground/75">
+                                        <span className="shrink-0">{resultSummaryLabel}</span>
+                                        <span className="shrink-0" aria-hidden="true">•</span>
+                                        <span className="shrink-0">{formatLastFetchSummary(selectedSource.last_fetch)}</span>
+                                        <span className="shrink-0" aria-hidden="true">•</span>
+                                        <span className="shrink-0">{formatFetchInterval(selectedSource.fetch_interval)}</span>
+                                        <span className="shrink-0" aria-hidden="true">•</span>
                                         <a
                                             href={selectedSource.url}
                                             title={selectedSource.url}
@@ -738,12 +744,6 @@ export default function NewsList() {
                                         >
                                             {selectedSource.url}
                                         </a>
-                                        <span className="shrink-0" aria-hidden="true">•</span>
-                                        <span className="shrink-0">{formatFetchInterval(selectedSource.fetch_interval)}</span>
-                                        <span className="shrink-0" aria-hidden="true">•</span>
-                                        <span className="shrink-0">{formatLastFetchSummary(selectedSource.last_fetch)}</span>
-                                        <span className="shrink-0" aria-hidden="true">•</span>
-                                        <span className="shrink-0">{resultSummaryLabel}</span>
                                     </div>
                                 ) : (
                                     <div className="mt-1 flex min-w-0 items-center gap-2 text-xs text-muted-foreground/75">
