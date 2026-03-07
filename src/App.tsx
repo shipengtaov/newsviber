@@ -1,7 +1,6 @@
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { MainLayout } from "@/components/layout/MainLayout";
 import NewsList from "@/views/NewsList";
-import NewsDetail from "@/views/NewsDetail";
 import SourceManager from "@/views/SourceManager";
 import SourceForm from "@/views/SourceForm";
 import GlobalChat from "@/views/GlobalChat";
@@ -77,7 +76,7 @@ function App() {
       <Routes>
         <Route element={<MainLayout />}>
           <Route path="/" element={<NewsList />} />
-          <Route path="/news/:id" element={<NewsDetail />} />
+          <Route path="/news/:id" element={<NewsList />} />
           <Route path="/sources" element={<SourceManager />} />
           <Route path="/sources/add" element={<SourceForm />} />
           <Route path="/sources/edit/:id" element={<SourceForm />} />

@@ -38,7 +38,9 @@ export function Sidebar({ collapsed }: SidebarProps) {
             </div>
             <nav className="mt-3 flex-1 space-y-1 px-3">
                 {navItems.map((item) => {
-                    const isActive = location.pathname === item.path || (item.path !== "/" && location.pathname.startsWith(item.path));
+                    const isActive = item.path === "/"
+                        ? location.pathname === "/" || location.pathname.startsWith("/news/")
+                        : location.pathname === item.path || location.pathname.startsWith(`${item.path}/`);
                     return (
                         <Link
                             key={item.name}

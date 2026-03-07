@@ -4,13 +4,14 @@ import { openUrl } from "@tauri-apps/plugin-opener";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { Search, ExternalLink, RefreshCcw, ChevronLeft, ChevronRight, MoreHorizontal } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { fetchSource, fetchSources, type FetchableSource } from "@/lib/source-fetch";
 import { addSourceFetchSyncListener } from "@/lib/source-events";
 import { formatFetchInterval, formatLastFetchSummary, normalizeFetchInterval } from "@/lib/source-utils";
+import { ArticleDetailView } from "@/views/NewsDetail";
 
 type Article = {
     id: number;
@@ -38,7 +39,7 @@ type PaginationItem =
     | { type: "page"; page: number }
     | { type: "ellipsis"; key: string };
 
-const MAIN_MENU_SCROLL_STORAGE_KEY = "mainMenuScrollPositions_v1";
+const NEWS_LIST_SCROLL_STORAGE_KEY = "newsListScrollPositions_v1";
 const SOURCES_PANEL_WIDTH_STORAGE_KEY = "newsSourcesPanelWidth_v1";
 const NEWS_PATHNAME = "/";
 const DESKTOP_LAYOUT_MEDIA_QUERY = "(min-width: 1024px)";
@@ -85,6 +86,11 @@ function buildListParams(page: number, query: string, sourceId: number | null): 
     return params;
 }
 
+function buildSearchString(params: Record<string, string>): string {
+    const query = new URLSearchParams(params).toString();
+    return query ? `?${query}` : "";
+}
+
 function clampSourcesPanelWidth(width: number): number {
     return Math.min(MAX_SOURCES_PANEL_WIDTH, Math.max(MIN_SOURCES_PANEL_WIDTH, width));
 }
@@ -108,7 +114,7 @@ function normalizeStoredScrollTop(value: number): number {
     return Math.max(0, Math.floor(value));
 }
 
-function parseStoredMainMenuScrollMap(raw: string | null): Record<string, number> {
+function parseStoredNewsListScrollMap(raw: string | null): Record<string, number> {
     if (!raw) return {};
 
     try {
@@ -125,20 +131,24 @@ function parseStoredMainMenuScrollMap(raw: string | null): Record<string, number
     }
 }
 
-function readStoredMainMenuScroll(pathname: string): number {
+function buildNewsListScrollKey(page: number, query: string, sourceId: number | null): string {
+    return `${NEWS_PATHNAME}${buildSearchString(buildListParams(page, query, sourceId))}`;
+}
+
+function readStoredNewsListScroll(listKey: string): number {
     try {
-        const map = parseStoredMainMenuScrollMap(sessionStorage.getItem(MAIN_MENU_SCROLL_STORAGE_KEY));
-        return normalizeStoredScrollTop(map[pathname] ?? 0);
+        const map = parseStoredNewsListScrollMap(sessionStorage.getItem(NEWS_LIST_SCROLL_STORAGE_KEY));
+        return normalizeStoredScrollTop(map[listKey] ?? 0);
     } catch {
         return 0;
     }
 }
 
-function persistMainMenuScroll(pathname: string, scrollTop: number): void {
+function persistNewsListScroll(listKey: string, scrollTop: number): void {
     try {
-        const map = parseStoredMainMenuScrollMap(sessionStorage.getItem(MAIN_MENU_SCROLL_STORAGE_KEY));
-        map[pathname] = normalizeStoredScrollTop(scrollTop);
-        sessionStorage.setItem(MAIN_MENU_SCROLL_STORAGE_KEY, JSON.stringify(map));
+        const map = parseStoredNewsListScrollMap(sessionStorage.getItem(NEWS_LIST_SCROLL_STORAGE_KEY));
+        map[listKey] = normalizeStoredScrollTop(scrollTop);
+        sessionStorage.setItem(NEWS_LIST_SCROLL_STORAGE_KEY, JSON.stringify(map));
     } catch {
         // Ignore persistence failures (e.g. storage restrictions).
     }
@@ -261,6 +271,8 @@ function SourceFilterRow({
 
 export default function NewsList() {
     const { toast } = useToast();
+    const navigate = useNavigate();
+    const { id: articleIdParam } = useParams();
     const [articles, setArticles] = useState<Article[]>([]);
     const [totalArticleCount, setTotalArticleCount] = useState<number | null>(null);
     const [sources, setSources] = useState<SourceFilterItem[]>([]);
@@ -277,6 +289,15 @@ export default function NewsList() {
     const page = parsePageParam(searchParams.get("page"));
     const search = searchParams.get("q") || "";
     const parsedSource = parseSourceParam(searchParams.get("source"));
+    const selectedArticleId = useMemo(() => {
+        if (!articleIdParam) return null;
+
+        const parsed = Number.parseInt(articleIdParam, 10);
+        if (!Number.isFinite(parsed) || parsed <= 0) return null;
+
+        return parsed;
+    }, [articleIdParam]);
+    const hasSelectedArticle = selectedArticleId !== null;
     const [searchInput, setSearchInput] = useState(search);
     const resizeStartXRef = useRef(0);
     const resizeStartWidthRef = useRef(DEFAULT_SOURCES_PANEL_WIDTH);
@@ -376,29 +397,35 @@ export default function NewsList() {
         ? "Loading results..."
         : `${totalArticleCount} result${totalArticleCount === 1 ? "" : "s"}`;
     const activeSourceSummaryLabel = `${sources.length} active source${sources.length === 1 ? "" : "s"}`;
+    const shouldRenderDetailOverlay = isDesktopLayout && selectedArticleId !== null;
+    const shouldRenderStandaloneDetail = !isDesktopLayout && selectedArticleId !== null;
+    const newsListScrollKey = useMemo(
+        () => buildNewsListScrollKey(page, search, selectedSourceId),
+        [page, search, selectedSourceId],
+    );
 
     useEffect(() => {
-        if (!isDesktopLayout) return;
+        if (!isDesktopLayout || hasSelectedArticle) return;
 
         const container = articlesScrollRef.current;
         if (!container) return;
 
         const handleScroll = () => {
-            persistMainMenuScroll(NEWS_PATHNAME, container.scrollTop);
+            persistNewsListScroll(newsListScrollKey, container.scrollTop);
         };
 
         container.addEventListener("scroll", handleScroll, { passive: true });
 
         return () => {
-            persistMainMenuScroll(NEWS_PATHNAME, container.scrollTop);
+            persistNewsListScroll(newsListScrollKey, container.scrollTop);
             container.removeEventListener("scroll", handleScroll);
         };
-    }, [isDesktopLayout]);
+    }, [hasSelectedArticle, isDesktopLayout, newsListScrollKey]);
 
     useEffect(() => {
-        if (!isDesktopLayout) return;
+        if (!isDesktopLayout || hasSelectedArticle) return;
 
-        const targetScrollTop = readStoredMainMenuScroll(NEWS_PATHNAME);
+        const targetScrollTop = readStoredNewsListScroll(newsListScrollKey);
         let animationFrame: number | null = null;
         let restoreAttempts = 0;
 
@@ -424,7 +451,7 @@ export default function NewsList() {
                 window.cancelAnimationFrame(animationFrame);
             }
         };
-    }, [articles.length, isDesktopLayout, page, search, selectedSourceId]);
+    }, [articles.length, hasSelectedArticle, isDesktopLayout, newsListScrollKey]);
 
     useEffect(() => {
         void loadSources();
@@ -448,6 +475,14 @@ export default function NewsList() {
         if (parsedSource.isWellFormed) return;
         setSearchParams(buildListParams(page, search, null), { replace: true });
     }, [page, parsedSource.isWellFormed, search, setSearchParams]);
+
+    useEffect(() => {
+        if (articleIdParam === undefined || selectedArticleId !== null) return;
+        navigate({
+            pathname: "/",
+            search: searchParams.toString() ? `?${searchParams.toString()}` : "",
+        }, { replace: true });
+    }, [articleIdParam, navigate, searchParams, selectedArticleId]);
 
     useEffect(() => {
         if (!sourcesLoaded) return;
@@ -552,7 +587,17 @@ export default function NewsList() {
     }
 
     function selectSource(sourceId: number | null) {
-        setSearchParams(buildListParams(0, search, sourceId));
+        const nextParams = buildListParams(0, search, sourceId);
+
+        if (hasSelectedArticle) {
+            navigate({
+                pathname: "/",
+                search: buildSearchString(nextParams),
+            });
+            return;
+        }
+
+        setSearchParams(nextParams);
     }
 
     function handleExternalLink(e: React.MouseEvent, url: string) {
@@ -573,14 +618,25 @@ export default function NewsList() {
 
     function handleArticleClick() {
         if (isDesktopLayout && articlesScrollRef.current) {
-            persistMainMenuScroll(NEWS_PATHNAME, articlesScrollRef.current.scrollTop);
-            return;
+            persistNewsListScroll(newsListScrollKey, articlesScrollRef.current.scrollTop);
         }
+    }
 
-        const main = document.querySelector("main");
-        if (main instanceof HTMLElement) {
-            persistMainMenuScroll(NEWS_PATHNAME, main.scrollTop);
-        }
+    function buildArticleHref(articleId: number) {
+        return `/news/${articleId}${buildSearchString(buildListParams(page, search, selectedSourceId))}`;
+    }
+
+    function closeArticleDetail() {
+        navigate({
+            pathname: "/",
+            search: buildSearchString(buildListParams(page, search, selectedSourceId)),
+        });
+    }
+
+    function markArticleAsRead(articleId: number) {
+        setArticles((currentArticles) => currentArticles.map((article) => (
+            article.id === articleId ? { ...article, is_read: true } : article
+        )));
     }
 
     function handleSourcesResizeStart(event: React.PointerEvent<HTMLDivElement>) {
@@ -721,190 +777,216 @@ export default function NewsList() {
             </div>
 
             <div className="min-w-0 lg:flex lg:h-full lg:flex-1 lg:overflow-hidden">
-                <div className="flex w-full min-w-0 flex-col rounded-xl border border-border bg-card/30 lg:mx-auto lg:h-full lg:max-w-4xl lg:rounded-none lg:border-b-0 lg:border-l-0 lg:border-r lg:border-t-0">
-                    <div className="border-b border-border bg-background/80 px-4 py-4 backdrop-blur-sm md:px-6 lg:py-3">
-                        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between lg:gap-4">
-                            <div className="hidden min-w-0 lg:block">
-                                <p className="truncate text-sm font-medium text-foreground">
-                                    {selectedSource?.name ?? "All Articles"}
-                                </p>
-                                {selectedSource ? (
-                                    <div className="mt-1 flex min-w-0 items-center gap-2 text-xs text-muted-foreground/75">
-                                        <span className="shrink-0">{resultSummaryLabel}</span>
-                                        <span className="shrink-0" aria-hidden="true">•</span>
-                                        <span className="shrink-0">{formatLastFetchSummary(selectedSource.last_fetch)}</span>
-                                        <span className="shrink-0" aria-hidden="true">•</span>
-                                        <span className="shrink-0">{formatFetchInterval(selectedSource.fetch_interval)}</span>
-                                        <span className="shrink-0" aria-hidden="true">•</span>
-                                        <a
-                                            href={selectedSource.url}
-                                            title={selectedSource.url}
-                                            className="min-w-0 truncate transition-colors hover:text-muted-foreground"
-                                            onClick={(event) => handleExternalLink(event, selectedSource.url)}
-                                        >
-                                            {selectedSource.url}
-                                        </a>
+                <div className={cn(
+                    "flex w-full min-w-0 flex-col rounded-xl border border-border bg-card/30 lg:mx-auto lg:h-full lg:rounded-none lg:border-b-0 lg:border-l-0 lg:border-r lg:border-t-0",
+                    shouldRenderDetailOverlay ? "relative lg:max-w-none" : "lg:max-w-4xl",
+                )}>
+                    {shouldRenderStandaloneDetail && selectedArticleId !== null ? (
+                        <ArticleDetailView
+                            articleId={selectedArticleId}
+                            showAssistant={false}
+                            onBack={closeArticleDetail}
+                            onMarkAsRead={markArticleAsRead}
+                        />
+                    ) : (
+                        <>
+                            <div className="border-b border-border bg-background/80 px-4 py-4 backdrop-blur-sm md:px-6 lg:py-3">
+                                <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between lg:gap-4">
+                                    <div className="hidden min-w-0 lg:block">
+                                        <p className="truncate text-sm font-medium text-foreground">
+                                            {selectedSource?.name ?? "All Articles"}
+                                        </p>
+                                        {selectedSource ? (
+                                            <div className="mt-1 flex min-w-0 items-center gap-2 text-xs text-muted-foreground/75">
+                                                <span className="shrink-0">{resultSummaryLabel}</span>
+                                                <span className="shrink-0" aria-hidden="true">•</span>
+                                                <span className="shrink-0">{formatLastFetchSummary(selectedSource.last_fetch)}</span>
+                                                <span className="shrink-0" aria-hidden="true">•</span>
+                                                <span className="shrink-0">{formatFetchInterval(selectedSource.fetch_interval)}</span>
+                                                <span className="shrink-0" aria-hidden="true">•</span>
+                                                <a
+                                                    href={selectedSource.url}
+                                                    title={selectedSource.url}
+                                                    className="min-w-0 truncate transition-colors hover:text-muted-foreground"
+                                                    onClick={(event) => handleExternalLink(event, selectedSource.url)}
+                                                >
+                                                    {selectedSource.url}
+                                                </a>
+                                            </div>
+                                        ) : (
+                                            <div className="mt-1 flex min-w-0 items-center gap-2 text-xs text-muted-foreground/75">
+                                                <span className="shrink-0">{activeSourceSummaryLabel}</span>
+                                                <span className="shrink-0" aria-hidden="true">•</span>
+                                                <span className="truncate">{resultSummaryLabel}</span>
+                                            </div>
+                                        )}
                                     </div>
-                                ) : (
-                                    <div className="mt-1 flex min-w-0 items-center gap-2 text-xs text-muted-foreground/75">
-                                        <span className="shrink-0">{activeSourceSummaryLabel}</span>
-                                        <span className="shrink-0" aria-hidden="true">•</span>
-                                        <span className="truncate">{resultSummaryLabel}</span>
-                                    </div>
-                                )}
+
+                                    <form onSubmit={handleSearch} className="relative flex w-full items-center lg:w-auto lg:flex-none">
+                                        <Search className="absolute left-3 h-4 w-4 text-muted-foreground" />
+                                        <Input
+                                            placeholder="Search articles..."
+                                            className="pl-9 border-input focus-visible:border-ring focus-visible:ring-ring/30 lg:w-56 lg:transition-[width] lg:duration-200 lg:focus:w-72"
+                                            value={searchInput}
+                                            onChange={e => setSearchInput(e.target.value)}
+                                        />
+                                    </form>
+                                </div>
                             </div>
 
-                            <form onSubmit={handleSearch} className="relative flex w-full items-center lg:w-auto lg:flex-none">
-                                <Search className="absolute left-3 h-4 w-4 text-muted-foreground" />
-                                <Input
-                                    placeholder="Search articles..."
-                                    className="pl-9 border-input focus-visible:border-ring focus-visible:ring-ring/30 lg:w-56 lg:transition-[width] lg:duration-200 lg:focus:w-72"
-                                    value={searchInput}
-                                    onChange={e => setSearchInput(e.target.value)}
-                                />
-                            </form>
-                        </div>
-                    </div>
+                            <div ref={articlesScrollRef} className="px-4 py-4 md:px-6 md:py-6 lg:min-h-0 lg:flex-1 lg:overflow-y-auto">
+                                <div className="space-y-2">
+                                    {articles.map(article => (
+                                        <Link to={buildArticleHref(article.id)} key={article.id} className="block" onClick={handleArticleClick}>
+                                            <Card className="border-0 bg-transparent shadow-none transition-colors duration-150 hover:bg-cyan-500/10">
+                                                <CardHeader className="space-y-1 px-3 py-2.5">
+                                                    <div className="flex items-start gap-2">
+                                                        {!article.is_read && <span className="inline-block h-2 w-2 shrink-0 self-center rounded-full bg-blue-500"></span>}
+                                                        <CardTitle className="min-w-0 flex-1 text-lg leading-snug">{article.title}</CardTitle>
+                                                    </div>
+                                                    {article.summary && (
+                                                        <CardDescription
+                                                            className="min-w-0 line-clamp-1 text-sm"
+                                                            dangerouslySetInnerHTML={{ __html: article.summary }}
+                                                            onClick={handleHtmlLinkClick}
+                                                        />
+                                                    )}
+                                                    <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+                                                        <span className="text-cyan-700 dark:text-cyan-300">{article.source_name}</span>
+                                                        <span>Published {new Date(article.published_at).toLocaleString()}</span>
+                                                        <span>Inserted {new Date(article.inserted_at).toLocaleString()}</span>
+                                                        {article.guid && (
+                                                            <a
+                                                                href={article.guid}
+                                                                className="inline-flex shrink-0 items-center text-xs text-muted-foreground transition-colors hover:text-cyan-700 dark:hover:text-cyan-300"
+                                                                onClick={(e) => handleExternalLink(e, article.guid)}
+                                                            >
+                                                                <ExternalLink className="mr-1 h-3 w-3" />
+                                                                Original
+                                                            </a>
+                                                        )}
+                                                    </div>
+                                                </CardHeader>
+                                            </Card>
+                                        </Link>
+                                    ))}
 
-                    <div ref={articlesScrollRef} className="px-4 py-4 md:px-6 md:py-6 lg:min-h-0 lg:flex-1 lg:overflow-y-auto">
-                        <div className="space-y-2">
-                            {articles.map(article => (
-                                <Link to={`/news/${article.id}`} key={article.id} className="block" onClick={handleArticleClick}>
-                                    <Card className="border-0 bg-transparent shadow-none transition-colors duration-150 hover:bg-cyan-500/10">
-                                        <CardHeader className="space-y-1 px-3 py-2.5">
-                                            <div className="flex items-start gap-2">
-                                                {!article.is_read && <span className="inline-block h-2 w-2 shrink-0 self-center rounded-full bg-blue-500"></span>}
-                                                <CardTitle className="min-w-0 flex-1 text-lg leading-snug">{article.title}</CardTitle>
-                                            </div>
-                                            {article.summary && (
-                                                <CardDescription
-                                                    className="min-w-0 line-clamp-1 text-sm"
-                                                    dangerouslySetInnerHTML={{ __html: article.summary }}
-                                                    onClick={handleHtmlLinkClick}
-                                                />
-                                            )}
-                                            <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
-                                                <span className="text-cyan-700 dark:text-cyan-300">{article.source_name}</span>
-                                                <span>Published {new Date(article.published_at).toLocaleString()}</span>
-                                                <span>Inserted {new Date(article.inserted_at).toLocaleString()}</span>
-                                                {article.guid && (
-                                                    <a
-                                                        href={article.guid}
-                                                        className="inline-flex shrink-0 items-center text-xs text-muted-foreground transition-colors hover:text-cyan-700 dark:hover:text-cyan-300"
-                                                        onClick={(e) => handleExternalLink(e, article.guid)}
+                                    {articles.length === 0 && (
+                                        <div className="py-10 text-center text-muted-foreground">
+                                            {emptyStateMessage}
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+
+                            <div className="bg-background/80 px-4 py-3 backdrop-blur-sm md:px-6">
+                                <div className="flex items-center justify-between gap-2 sm:hidden">
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => goToPage(Math.max(0, page - 1))}
+                                        disabled={!canGoToPreviousPage}
+                                        className="h-9 rounded-md border border-border bg-background px-3 text-foreground shadow-sm hover:bg-accent/60"
+                                    >
+                                        <ChevronLeft className="h-4 w-4" />
+                                        <span className="sr-only">Previous page</span>
+                                    </Button>
+                                    <span className="min-w-0 flex-1 text-center text-sm font-medium text-muted-foreground">
+                                        {compactPaginationLabel}
+                                    </span>
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => goToPage(page + 1)}
+                                        disabled={!canGoToNextPage}
+                                        className="h-9 rounded-md border border-border bg-background px-3 text-foreground shadow-sm hover:bg-accent/60"
+                                    >
+                                        <span className="sr-only">Next page</span>
+                                        <ChevronRight className="h-4 w-4" />
+                                    </Button>
+                                </div>
+
+                                <div className="hidden items-center justify-center gap-3 sm:flex">
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => goToPage(Math.max(0, page - 1))}
+                                        disabled={!canGoToPreviousPage}
+                                        className="h-9 rounded-md border border-border bg-background px-3 text-foreground shadow-sm hover:bg-accent/60"
+                                    >
+                                        <ChevronLeft className="h-4 w-4" />
+                                        Previous
+                                    </Button>
+
+                                    {totalPages !== null && totalPages > 1 ? (
+                                        <nav aria-label="Pagination" className="flex items-center gap-1">
+                                            {paginationItems.map((item) => {
+                                                if (item.type === "ellipsis") {
+                                                    return (
+                                                        <span
+                                                            key={item.key}
+                                                            className="flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground"
+                                                            aria-hidden="true"
+                                                        >
+                                                            <MoreHorizontal className="h-4 w-4" />
+                                                        </span>
+                                                    );
+                                                }
+
+                                                const isCurrentPage = item.page === page;
+
+                                                return (
+                                                    <Button
+                                                        key={item.page}
+                                                        type="button"
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        aria-current={isCurrentPage ? "page" : undefined}
+                                                        onClick={isCurrentPage ? undefined : () => goToPage(item.page)}
+                                                        className={cn(
+                                                            "h-9 min-w-9 rounded-md border px-3 text-sm shadow-sm",
+                                                            isCurrentPage
+                                                                ? "pointer-events-none border-foreground bg-foreground text-background"
+                                                                : "border-border bg-background text-foreground hover:bg-accent/60",
+                                                        )}
                                                     >
-                                                        <ExternalLink className="mr-1 h-3 w-3" />
-                                                        Original
-                                                    </a>
-                                                )}
-                                            </div>
-                                        </CardHeader>
-                                    </Card>
-                                </Link>
-                            ))}
+                                                        {item.page + 1}
+                                                    </Button>
+                                                );
+                                            })}
+                                        </nav>
+                                    ) : (
+                                        <span className="text-sm font-medium text-muted-foreground">
+                                            {compactPaginationLabel}
+                                        </span>
+                                    )}
 
-                            {articles.length === 0 && (
-                                <div className="py-10 text-center text-muted-foreground">
-                                    {emptyStateMessage}
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => goToPage(page + 1)}
+                                        disabled={!canGoToNextPage}
+                                        className="h-9 rounded-md border border-border bg-background px-3 text-foreground shadow-sm hover:bg-accent/60"
+                                    >
+                                        Next
+                                        <ChevronRight className="h-4 w-4" />
+                                    </Button>
+                                </div>
+                            </div>
+
+                            {shouldRenderDetailOverlay && selectedArticleId !== null && (
+                                <div className="absolute inset-0 z-10 bg-background">
+                                    <ArticleDetailView
+                                        articleId={selectedArticleId}
+                                        className="h-full"
+                                        showAssistant={false}
+                                        onBack={closeArticleDetail}
+                                        onMarkAsRead={markArticleAsRead}
+                                    />
                                 </div>
                             )}
-                        </div>
-                    </div>
-
-                    <div className="bg-background/80 px-4 py-3 backdrop-blur-sm md:px-6">
-                        <div className="flex items-center justify-between gap-2 sm:hidden">
-                            <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => goToPage(Math.max(0, page - 1))}
-                                disabled={!canGoToPreviousPage}
-                                className="h-9 rounded-md border border-border bg-background px-3 text-foreground shadow-sm hover:bg-accent/60"
-                            >
-                                <ChevronLeft className="h-4 w-4" />
-                                <span className="sr-only">Previous page</span>
-                            </Button>
-                            <span className="min-w-0 flex-1 text-center text-sm font-medium text-muted-foreground">
-                                {compactPaginationLabel}
-                            </span>
-                            <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => goToPage(page + 1)}
-                                disabled={!canGoToNextPage}
-                                className="h-9 rounded-md border border-border bg-background px-3 text-foreground shadow-sm hover:bg-accent/60"
-                            >
-                                <span className="sr-only">Next page</span>
-                                <ChevronRight className="h-4 w-4" />
-                            </Button>
-                        </div>
-
-                        <div className="hidden items-center justify-center gap-3 sm:flex">
-                            <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => goToPage(Math.max(0, page - 1))}
-                                disabled={!canGoToPreviousPage}
-                                className="h-9 rounded-md border border-border bg-background px-3 text-foreground shadow-sm hover:bg-accent/60"
-                            >
-                                <ChevronLeft className="h-4 w-4" />
-                                Previous
-                            </Button>
-
-                            {totalPages !== null && totalPages > 1 ? (
-                                <nav aria-label="Pagination" className="flex items-center gap-1">
-                                    {paginationItems.map((item) => {
-                                        if (item.type === "ellipsis") {
-                                            return (
-                                                <span
-                                                    key={item.key}
-                                                    className="flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground"
-                                                    aria-hidden="true"
-                                                >
-                                                    <MoreHorizontal className="h-4 w-4" />
-                                                </span>
-                                            );
-                                        }
-
-                                        const isCurrentPage = item.page === page;
-
-                                        return (
-                                            <Button
-                                                key={item.page}
-                                                type="button"
-                                                variant="ghost"
-                                                size="sm"
-                                                aria-current={isCurrentPage ? "page" : undefined}
-                                                onClick={isCurrentPage ? undefined : () => goToPage(item.page)}
-                                                className={cn(
-                                                    "h-9 min-w-9 rounded-md border px-3 text-sm shadow-sm",
-                                                    isCurrentPage
-                                                        ? "pointer-events-none border-foreground bg-foreground text-background"
-                                                        : "border-border bg-background text-foreground hover:bg-accent/60",
-                                                )}
-                                            >
-                                                {item.page + 1}
-                                            </Button>
-                                        );
-                                    })}
-                                </nav>
-                            ) : (
-                                <span className="text-sm font-medium text-muted-foreground">
-                                    {compactPaginationLabel}
-                                </span>
-                            )}
-
-                            <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => goToPage(page + 1)}
-                                disabled={!canGoToNextPage}
-                                className="h-9 rounded-md border border-border bg-background px-3 text-foreground shadow-sm hover:bg-accent/60"
-                            >
-                                Next
-                                <ChevronRight className="h-4 w-4" />
-                            </Button>
-                        </div>
-                    </div>
+                        </>
+                    )}
                 </div>
             </div>
         </div>
