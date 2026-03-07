@@ -20,6 +20,7 @@ import {
     saveAIProviderSettings,
 } from "@/lib/ai-config";
 import { cn } from "@/lib/utils";
+import { PageShell } from "@/components/layout/PageShell";
 
 let db: Database | null = null;
 async function getDb() {
@@ -79,7 +80,7 @@ export default function Settings() {
     }
 
     return (
-        <div className="p-8 max-w-4xl mx-auto space-y-8">
+        <PageShell className="space-y-8">
             <div>
                 <h1 className="text-3xl font-bold tracking-tight">Settings</h1>
                 <p className="text-muted-foreground mt-2">Configure AI providers and manage local data.</p>
@@ -215,7 +216,6 @@ export default function Settings() {
                     </div>
                 </CardContent>
             </Card>
-
-        </div>
+        </PageShell>
     );
 }

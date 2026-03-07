@@ -8,6 +8,7 @@ import { useNavigate } from "react-router-dom";
 import { fetchSource, fetchSources, type FetchableSource } from "@/lib/source-fetch";
 import { addSourceFetchSyncListener } from "@/lib/source-events";
 import { formatFetchInterval, formatLastFetchSummary, normalizeFetchInterval } from "@/lib/source-utils";
+import { PageShell } from "@/components/layout/PageShell";
 
 type Source = FetchableSource & {
     config: string | null;
@@ -122,7 +123,7 @@ export default function SourceManager() {
     }
 
     return (
-        <div className="p-8 max-w-4xl mx-auto space-y-8">
+        <PageShell className="space-y-8">
             <div className="flex justify-between items-center">
                 <div>
                     <h1 className="text-3xl font-bold tracking-tight">Source Manager</h1>
@@ -182,6 +183,6 @@ export default function SourceManager() {
                     )}
                 </div>
             </div>
-        </div>
+        </PageShell>
     );
 }

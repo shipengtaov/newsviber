@@ -10,6 +10,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Lightbulb, Plus, Trash2, Zap, ArrowLeft, Send } from "lucide-react";
 import { streamChat, Message } from "@/lib/ai";
 import ReactMarkdown from "react-markdown";
+import { PageShell } from "@/components/layout/PageShell";
 
 let db: Database | null = null;
 async function getDb() {
@@ -284,7 +285,7 @@ Be concise and explore the user's questions further.`;
     // View 2: Project Detail (Cards List)
     if (activeProject) {
         return (
-            <div className="p-8 max-w-6xl mx-auto">
+            <PageShell size="wide">
                 <Button variant="ghost" size="sm" onClick={() => setActiveProject(null)} className="mb-4 -ml-2 text-muted-foreground">
                     <ArrowLeft className="w-4 h-4 mr-2" /> Back to Projects
                 </Button>
@@ -321,13 +322,13 @@ Be concise and explore the user's questions further.`;
                         </div>
                     )}
                 </div>
-            </div>
+            </PageShell>
         );
     }
 
     // View 1: Projects List
     return (
-        <div className="p-8 max-w-5xl mx-auto space-y-8">
+        <PageShell className="space-y-8">
             <div>
                 <h1 className="text-3xl font-bold tracking-tight">Creative Space</h1>
                 <p className="text-muted-foreground mt-2">Connect the dots across recent news using AI to generate fresh insights.</p>
@@ -381,6 +382,6 @@ Be concise and explore the user's questions further.`;
                     </Card>
                 ))}
             </div>
-        </div>
+        </PageShell>
     );
 }

@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import { useNavigate, useParams } from "react-router-dom";
 import { ChevronLeft } from "lucide-react";
+import { PageShell } from "@/components/layout/PageShell";
 
 let db: Database | null = null;
 async function getDb() {
@@ -87,7 +88,7 @@ export default function SourceForm() {
     }
 
     return (
-        <div className="p-8 max-w-4xl mx-auto space-y-8">
+        <PageShell className="space-y-8">
             <Button variant="ghost" onClick={() => navigate("/sources")} className="mb-4 -ml-4">
                 <ChevronLeft className="h-4 w-4 mr-2" />
                 Back to Sources
@@ -137,6 +138,6 @@ export default function SourceForm() {
                     </div>
                 </form>
             </div>
-        </div>
+        </PageShell>
     );
 }
