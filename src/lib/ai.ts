@@ -1,15 +1,18 @@
+import { getActiveAIProviderSettings } from "@/lib/ai-config";
+
 export type Message = {
     role: "system" | "user" | "assistant";
     content: string;
 };
 
 export async function streamChat(messages: Message[], onChunk: (chunk: string) => void): Promise<string> {
-    const aiUrl = localStorage.getItem("AI_API_URL") || "https://api.openai.com/v1";
-    const aiKey = localStorage.getItem("AI_API_KEY") || "";
-    const aiModel = localStorage.getItem("AI_MODEL") || "gpt-4o-mini";
+    const { provider, config } = getActiveAIProviderSettings();
+    const aiUrl = config.url;
+    const aiKey = config.apiKey;
+    const aiModel = config.model;
 
     if (!aiKey) {
-        throw new Error("AI API Key is missing. Please configure it in Settings.");
+        throw new Error(`${provider.name} API Key is missing. Please configure it in Settings.`);
     }
 
     const endpoint = aiUrl.endsWith("/") ? `${aiUrl}chat/completions` : `${aiUrl}/chat/completions`;
