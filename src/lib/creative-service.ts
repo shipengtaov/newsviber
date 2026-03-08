@@ -2,6 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 import type { CreativeReport } from "@/lib/ai";
 import { dispatchCreativeSyncEvent } from "@/lib/creative-events";
 import { getDb } from "@/lib/db";
+import { formatUtcDateTime } from "@/lib/time";
 
 export type CreativeProject = {
     id: number;
@@ -349,7 +350,7 @@ function summarizeArticleContextText(summary: string | null, content: string | n
 
 function buildCreativePrompt(project: CreativeProject, articles: CreativeArticleContextRow[]): string {
     const contextLines = articles.map((article, index) => {
-        const publishedAt = article.published_at ? new Date(article.published_at).toLocaleString() : "Unknown";
+        const publishedAt = formatUtcDateTime(article.published_at, "Unknown");
         const contextText = summarizeArticleContextText(article.summary, article.content);
 
         return [

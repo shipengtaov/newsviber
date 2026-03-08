@@ -33,6 +33,7 @@ import {
 import { type Message } from "@/lib/ai";
 import { PageShell } from "@/components/layout/PageShell";
 import { useStreamingConversation } from "@/hooks/use-streaming-conversation";
+import { formatUtcDate, formatUtcDateTime } from "@/lib/time";
 import ReactMarkdown from "react-markdown";
 import { ArrowLeft, Edit, Lightbulb, Pencil, Plus, Send, Trash2, WandSparkles } from "lucide-react";
 
@@ -78,16 +79,7 @@ function createProjectFormState(project?: CreativeProject): ProjectFormState {
 }
 
 function formatTimestamp(value: string | null): string {
-    if (!value) {
-        return "Never";
-    }
-
-    const parsed = new Date(value);
-    if (!Number.isFinite(parsed.getTime())) {
-        return "Never";
-    }
-
-    return parsed.toLocaleString();
+    return formatUtcDateTime(value, "Never");
 }
 
 function formatProjectScope(project: CreativeProject, sources: CreativeSourceOption[]): string {
@@ -616,7 +608,7 @@ Be concise and explore the user's questions further.`;
                         <Card key={card.id} className="flex h-72 cursor-pointer flex-col transition-all hover:border-primary/50 hover:shadow-md" onClick={() => setActiveCardId(card.id)}>
                             <CardHeader className="pb-2">
                                 <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
-                                    <span>{new Date(card.created_at).toLocaleDateString()}</span>
+                                    <span>{formatUtcDate(card.created_at)}</span>
                                     <span>{card.generation_mode === "auto" ? "Auto" : "Manual"} · {card.used_article_count}</span>
                                 </div>
                                 <CardTitle className="line-clamp-2 text-lg leading-tight">{card.title}</CardTitle>

@@ -1,3 +1,5 @@
+import { formatUtcDateTime } from "@/lib/time";
+
 const NEVER_FETCHED_LABEL = "Never fetched";
 
 export function normalizeFetchInterval(value: unknown, fallback: number = 60): number {
@@ -18,16 +20,7 @@ export function formatFetchInterval(value: unknown): string {
 }
 
 export function formatLastFetch(lastFetch: string | null): string {
-    if (!lastFetch) {
-        return NEVER_FETCHED_LABEL;
-    }
-
-    const parsed = new Date(lastFetch);
-    if (Number.isNaN(parsed.getTime())) {
-        return NEVER_FETCHED_LABEL;
-    }
-
-    return parsed.toLocaleString();
+    return formatUtcDateTime(lastFetch, NEVER_FETCHED_LABEL);
 }
 
 export function formatLastFetchSummary(lastFetch: string | null): string {

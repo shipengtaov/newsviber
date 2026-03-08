@@ -11,6 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import { fetchSource, fetchSources, type FetchableSource } from "@/lib/source-fetch";
 import { addSourceFetchSyncListener, dispatchSourceFetchSyncEvent } from "@/lib/source-events";
 import { formatFetchInterval, formatLastFetchSummary, normalizeFetchInterval } from "@/lib/source-utils";
+import { formatUtcDateTime } from "@/lib/time";
 import { ArticleDetailView } from "@/views/NewsDetail";
 
 type Article = {
@@ -859,8 +860,8 @@ export default function NewsList() {
                                                     )}
                                                     <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
                                                         <span className="text-cyan-700 dark:text-cyan-300">{article.source_name}</span>
-                                                        <span>Published {new Date(article.published_at).toLocaleString()}</span>
-                                                        <span>Inserted {new Date(article.inserted_at).toLocaleString()}</span>
+                                                        <span>Published {formatUtcDateTime(article.published_at)}</span>
+                                                        <span>Inserted {formatUtcDateTime(article.inserted_at)}</span>
                                                         {article.guid && (
                                                             <a
                                                                 href={article.guid}

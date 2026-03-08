@@ -8,6 +8,7 @@ import ReactMarkdown from "react-markdown";
 import { type Message } from "@/lib/ai";
 import { cn } from "@/lib/utils";
 import { getDb } from "@/lib/db";
+import { formatUtcDateTime } from "@/lib/time";
 import { useStreamingConversation } from "@/hooks/use-streaming-conversation";
 
 type FullArticle = {
@@ -145,7 +146,7 @@ export function ArticleDetailView({
 
                     if (relatedArticles.length > 0) {
                         relatedContext = `\n\nRelated Articles Context:\n${relatedArticles
-                            .map((relatedArticle) => `- [${relatedArticle.published_at}] ${relatedArticle.title}: ${relatedArticle.summary ?? ""}`)
+                            .map((relatedArticle) => `- [${formatUtcDateTime(relatedArticle.published_at, "Unknown")}] ${relatedArticle.title}: ${relatedArticle.summary ?? ""}`)
                             .join("\n")}`;
                     }
                 }
@@ -212,7 +213,7 @@ Answer the user's questions based primarily on the current article. Use related 
                         <h1 className="text-3xl md:text-4xl font-bold tracking-tight mb-4 text-foreground leading-tight">{article.title}</h1>
                         <div className="flex items-center space-x-4 text-sm text-muted-foreground">
                             <span className="bg-primary/10 text-primary px-2 py-0.5 font-medium rounded-md">{article.source_name}</span>
-                            <span>{new Date(article.published_at).toLocaleString()}</span>
+                            <span>{formatUtcDateTime(article.published_at)}</span>
                             <a
                                 href={article.guid}
                                 className="flex items-center hover:text-primary transition-colors hover:underline cursor-pointer"

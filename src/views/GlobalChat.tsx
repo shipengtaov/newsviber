@@ -6,6 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Send, Bot, User, Trash2 } from "lucide-react";
 import { type Message } from "@/lib/ai";
 import { getDb } from "@/lib/db";
+import { formatUtcDateTime } from "@/lib/time";
 import { useStreamingConversation } from "@/hooks/use-streaming-conversation";
 import ReactMarkdown from "react-markdown";
 
@@ -41,7 +42,7 @@ export default function GlobalChat() {
                 );
 
                 const contextStr = articles
-                    .map((article) => `- [${article.published_at}] ${article.title}: ${article.summary ?? ""}`)
+                    .map((article) => `- [${formatUtcDateTime(article.published_at, "Unknown")}] ${article.title}: ${article.summary ?? ""}`)
                     .join("\n");
                 const systemPrompt = `You are an AI assistant in a News Aggregation app. The user wants to discuss recent news.
 
