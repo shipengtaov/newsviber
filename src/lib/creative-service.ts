@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import { streamChat } from "@/lib/ai";
+import type { CreativeReport } from "@/lib/ai";
 import { dispatchCreativeSyncEvent } from "@/lib/creative-events";
 import { getDb } from "@/lib/db";
 
@@ -154,15 +154,6 @@ type CreativeArticleContextRow = {
     content: string | null;
     published_at: string | null;
     inserted_at: string;
-};
-
-type CreativeResponsePayload = {
-    title?: string;
-    signals?: string;
-    interpretation?: string;
-    ideas?: string;
-    counterpoints?: string;
-    next_actions?: string;
 };
 
 const DEFAULT_AUTO_INTERVAL_MINUTES = 60;
@@ -356,22 +347,6 @@ function summarizeArticleContextText(summary: string | null, content: string | n
     return base.replace(/\s+/g, " ").slice(0, MAX_CONTEXT_CHARS_PER_ARTICLE);
 }
 
-function parseCreativeResponse(rawResponse: string): CreativeResponsePayload {
-    const jsonBlockMatch = rawResponse.match(/```json\s*([\s\S]*?)\s*```/i);
-
-    if (jsonBlockMatch?.[1]) {
-        return JSON.parse(jsonBlockMatch[1]);
-    }
-
-    const startIndex = rawResponse.indexOf("{");
-    const endIndex = rawResponse.lastIndexOf("}");
-    if (startIndex !== -1 && endIndex !== -1 && endIndex > startIndex) {
-        return JSON.parse(rawResponse.slice(startIndex, endIndex + 1));
-    }
-
-    throw new Error("Failed to parse AI structured response.");
-}
-
 function buildCreativePrompt(project: CreativeProject, articles: CreativeArticleContextRow[]): string {
     const contextLines = articles.map((article, index) => {
         const publishedAt = article.published_at ? new Date(article.published_at).toLocaleString() : "Unknown";
@@ -386,19 +361,9 @@ function buildCreativePrompt(project: CreativeProject, articles: CreativeArticle
         ].join("\n");
     }).join("\n\n");
 
-    return `You are a visionary strategist. Analyze the following curated news context and combine it with the user's focus prompt to generate a structured creative report.
+    return `You are a visionary strategist. Analyze the curated news context and combine it with the user's focus prompt to generate a structured creative report.
 
-Your response MUST be wrapped in a markdown JSON code block. Format EXACTLY like this:
-\`\`\`json
-{
-  "title": "A catchy title for the insight",
-  "signals": "Key signals and trends identified (markdown supported)",
-  "interpretation": "What this means and why it matters (markdown supported)",
-  "ideas": "Creative ideas or hypotheses (markdown supported)",
-  "counterpoints": "Risks, challenges, or opposite views (markdown supported)",
-  "next_actions": "Recommended actionable next steps (markdown supported)"
-}
-\`\`\`
+Write concise but specific markdown-friendly content for each field. Ground the output in the supplied articles, call out uncertainty when evidence is weak, and avoid repeating the prompt verbatim.
 
 User's Focus Prompt:
 ${project.prompt}
@@ -491,15 +456,12 @@ async function loadArticlesForGeneration(projectId: number, articleIds: number[]
     return rows;
 }
 
-async function requestCreativeReport(project: CreativeProject, articles: CreativeArticleContextRow[]): Promise<string> {
-    let rawResponse = "";
-    await streamChat(
-        [{ role: "user", content: buildCreativePrompt(project, articles) }],
-        (chunk) => {
-            rawResponse += chunk;
-        },
-    );
-    return rawResponse;
+async function requestCreativeReport(
+    project: CreativeProject,
+    articles: CreativeArticleContextRow[],
+): Promise<CreativeReport> {
+    const { generateCreativeReport } = await import("@/lib/ai");
+    return generateCreativeReport(buildCreativePrompt(project, articles));
 }
 
 async function persistCreativeCard(input: PersistCreativeCardCommandInput): Promise<number> {
@@ -524,17 +486,18 @@ async function performCardGeneration(
         throw new Error("Some selected articles are no longer available for this project.");
     }
 
-    const rawResponse = await requestCreativeReport(project, articles);
-    const parsed = parseCreativeResponse(rawResponse);
+    const generatedReport = await requestCreativeReport(project, articles);
+    const { formatCreativeReportMarkdown } = await import("@/lib/ai");
+
     const cardId = await persistCreativeCard({
         projectId: project.id,
-        title: parsed.title || "Untitled Insight",
-        signals: parsed.signals || "",
-        interpretation: parsed.interpretation || "",
-        ideas: parsed.ideas || "",
-        counterpoints: parsed.counterpoints || "",
-        nextActions: parsed.next_actions || "",
-        fullReport: rawResponse,
+        title: generatedReport.title || "Untitled Insight",
+        signals: generatedReport.signals || "",
+        interpretation: generatedReport.interpretation || "",
+        ideas: generatedReport.ideas || "",
+        counterpoints: generatedReport.counterpoints || "",
+        nextActions: generatedReport.next_actions || "",
+        fullReport: formatCreativeReportMarkdown(generatedReport),
         generationMode: mode,
         usedArticleCount: articles.length,
         articleIds: articles.map((article) => article.id),

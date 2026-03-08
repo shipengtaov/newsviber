@@ -1,27 +1,19 @@
 import { useState, useRef, useEffect } from "react";
-import Database from "@tauri-apps/plugin-sql";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Send, Bot, User, Trash2 } from "lucide-react";
-import { streamChat, Message } from "@/lib/ai";
+import { type Message } from "@/lib/ai";
+import { getDb } from "@/lib/db";
+import { useStreamingConversation } from "@/hooks/use-streaming-conversation";
 import ReactMarkdown from "react-markdown";
 
-let db: Database | null = null;
-async function getDb() {
-    if (!db) {
-        db = await Database.load("sqlite:getnews.db");
-    }
-    return db;
-}
-
 export default function GlobalChat() {
-    const [messages, setMessages] = useState<Message[]>([]);
     const [input, setInput] = useState("");
-    const [isTyping, setIsTyping] = useState(false);
     const [timeRange, setTimeRange] = useState("7");
     const scrollRef = useRef<HTMLDivElement>(null);
+    const { messages, isStreaming, send, clear } = useStreamingConversation();
 
     useEffect(() => {
         if (scrollRef.current) {
@@ -31,51 +23,45 @@ export default function GlobalChat() {
 
     async function handleSend(e: React.FormEvent) {
         e.preventDefault();
-        if (!input.trim() || isTyping) return;
+        if (!input.trim() || isStreaming) return;
 
-        const userMsg: Message = { role: "user", content: input };
-        setMessages(prev => [...prev, userMsg]);
+        const inputValue = input.trim();
         setInput("");
-        setIsTyping(true);
 
-        try {
-            // 1. Fetch context based on timeRange
-            const db = await getDb();
-            const articles: any[] = await db.select(
-                `SELECT title, summary, source_id, published_at FROM articles WHERE published_at >= datetime('now', '-${timeRange} days') ORDER BY published_at DESC LIMIT 50`
-            );
+        await send({
+            content: inputValue,
+            buildConversation: async (history, userMessage) => {
+                const db = await getDb();
+                const articles: {
+                    title: string;
+                    summary: string | null;
+                    published_at: string | null;
+                }[] = await db.select(
+                    `SELECT title, summary, published_at FROM articles WHERE published_at >= datetime('now', '-${timeRange} days') ORDER BY published_at DESC LIMIT 50`
+                );
 
-            let contextStr = articles.map(a => `- [${a.published_at}] ${a.title}: ${a.summary}`).join("\\n");
-            const systemPrompt = `You are an AI assistant in a News Aggregation app. The user wants to discuss recent news.\\n\\nHere is the recent news context:\\n${contextStr}\\n\\nAnswer the user's questions based primarily on this context. Be concise and helpful.`;
+                const contextStr = articles
+                    .map((article) => `- [${article.published_at}] ${article.title}: ${article.summary ?? ""}`)
+                    .join("\n");
+                const systemPrompt = `You are an AI assistant in a News Aggregation app. The user wants to discuss recent news.
 
-            setMessages(prev => [...prev, { role: "assistant", content: "" }]);
+Here is the recent news context:
+${contextStr}
 
-            const fullConvo = [
-                { role: "system", content: systemPrompt } as Message,
-                ...messages,
-                userMsg
-            ];
+Answer the user's questions based primarily on this context. Be concise and helpful.`;
 
-            await streamChat(fullConvo, (chunk) => {
-                setMessages(prev => {
-                    const newM = [...prev];
-                    const last = newM[newM.length - 1];
-                    if (last.role === "assistant") {
-                        last.content += chunk;
-                    }
-                    return newM;
-                });
-            });
-
-        } catch (err: any) {
-            setMessages(prev => [...prev, { role: "assistant", content: `**Error:** ${err.message}` }]);
-        } finally {
-            setIsTyping(false);
-        }
+                return [
+                    { role: "system", content: systemPrompt } as Message,
+                    ...history,
+                    userMessage,
+                ];
+            },
+        });
     }
 
     function clearChat() {
-        setMessages([]);
+        clear();
+        setInput("");
     }
 
     return (
@@ -130,7 +116,7 @@ export default function GlobalChat() {
                                 </div>
                             </div>
                         ))}
-                        {isTyping && (
+                        {isStreaming && (
                             <div className="flex gap-4">
                                 <div className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 bg-muted">
                                     <Bot className="w-4 h-4" />
@@ -154,7 +140,7 @@ export default function GlobalChat() {
                             className="flex-1 rounded-full px-6 bg-muted/50 focus-visible:ring-1"
                             autoFocus
                         />
-                        <Button type="submit" size="icon" className="rounded-full shrink-0" disabled={isTyping || !input.trim()}>
+                        <Button type="submit" size="icon" className="rounded-full shrink-0" disabled={isStreaming || !input.trim()}>
                             <Send className="w-4 h-4" />
                         </Button>
                     </form>

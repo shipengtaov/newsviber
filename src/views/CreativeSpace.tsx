@@ -30,8 +30,9 @@ import {
     saveCreativeProject,
     deleteCreativeProject,
 } from "@/lib/creative-service";
-import { streamChat, type Message } from "@/lib/ai";
+import { type Message } from "@/lib/ai";
 import { PageShell } from "@/components/layout/PageShell";
+import { useStreamingConversation } from "@/hooks/use-streaming-conversation";
 import ReactMarkdown from "react-markdown";
 import { ArrowLeft, Edit, Lightbulb, Pencil, Plus, Send, Trash2, WandSparkles } from "lucide-react";
 
@@ -138,9 +139,13 @@ export default function CreativeSpace() {
     const [isLoadingCandidates, setIsLoadingCandidates] = useState(false);
     const [isGenerating, setIsGenerating] = useState(false);
 
-    const [chatMessages, setChatMessages] = useState<Message[]>([]);
     const [chatInput, setChatInput] = useState("");
-    const [isTyping, setIsTyping] = useState(false);
+    const {
+        messages: chatMessages,
+        isStreaming: isChatStreaming,
+        send: sendChatMessage,
+        replaceMessages: replaceChatMessages,
+    } = useStreamingConversation();
 
     const activeProject = projects.find((project) => project.id === activeProjectId) ?? null;
     const activeCard = cards.find((card) => card.id === activeCardId) ?? null;
@@ -216,9 +221,9 @@ export default function CreativeSpace() {
     }, [activeProjectId, manualDialogOpen, includeConsumed, candidateSearch, candidateSourceId]);
 
     useEffect(() => {
-        setChatMessages([]);
+        replaceChatMessages([]);
         setChatInput("");
-    }, [activeCardId]);
+    }, [activeCardId, replaceChatMessages]);
 
     async function loadProjects() {
         try {
@@ -440,17 +445,17 @@ export default function CreativeSpace() {
 
     async function handleChat(event: React.FormEvent) {
         event.preventDefault();
-        if (!chatInput.trim() || isTyping || !activeCard) {
+        if (!chatInput.trim() || isChatStreaming || !activeCard) {
             return;
         }
 
-        const userMessage: Message = { role: "user", content: chatInput.trim() };
-        setChatMessages((currentMessages) => [...currentMessages, userMessage]);
+        const inputValue = chatInput.trim();
         setChatInput("");
-        setIsTyping(true);
 
-        try {
-            const systemPrompt = `You are discussing a creative report you generated.
+        await sendChatMessage({
+            content: inputValue,
+            buildConversation: async (history, userMessage) => {
+                const systemPrompt = `You are discussing a creative report you generated.
 Report Data:
 Title: ${activeCard.title}
 Signals: ${activeCard.signals}
@@ -458,22 +463,13 @@ Ideas: ${activeCard.ideas}
 
 Be concise and explore the user's questions further.`;
 
-            setChatMessages((currentMessages) => [...currentMessages, { role: "assistant", content: "" }]);
-            const conversation = [{ role: "system", content: systemPrompt } as Message, ...chatMessages, userMessage];
-
-            await streamChat(conversation, (chunk) => {
-                setChatMessages((currentMessages) => {
-                    const nextMessages = [...currentMessages];
-                    const lastMessage = nextMessages[nextMessages.length - 1];
-                    lastMessage.content += chunk;
-                    return nextMessages;
-                });
-            });
-        } catch (error) {
-            toast({ title: "Chat failed", description: String(error), variant: "destructive" });
-        } finally {
-            setIsTyping(false);
-        }
+                return [
+                    { role: "system", content: systemPrompt } as Message,
+                    ...history,
+                    userMessage,
+                ];
+            },
+        });
     }
 
     if (activeCard) {
@@ -547,10 +543,10 @@ Be concise and explore the user's questions further.`;
                                     value={chatInput}
                                     onChange={(event) => setChatInput(event.target.value)}
                                     placeholder="Explore further..."
-                                    disabled={isTyping}
+                                    disabled={isChatStreaming}
                                     className="h-8 text-sm"
                                 />
-                                <Button type="submit" size="icon" className="h-8 w-8 shrink-0" disabled={isTyping || !chatInput.trim()}>
+                                <Button type="submit" size="icon" className="h-8 w-8 shrink-0" disabled={isChatStreaming || !chatInput.trim()}>
                                     <Send className="h-3.5 w-3.5" />
                                 </Button>
                             </form>

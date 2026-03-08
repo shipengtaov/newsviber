@@ -31,6 +31,9 @@ const LEGACY_AI_STORAGE_KEYS = [
 const getFaviconUrl = (domain: string) =>
   `https://www.google.com/s2/favicons?domain=${domain}&sz=64`;
 
+const AZURE_LEGACY_DEPLOYMENT_PATH_PATTERN =
+  /^(.*\/openai)\/deployments\/([^/]+)(?:\/.*)?$/i;
+
 export const PROVIDERS: AIProviderDefinition[] = [
   {
     id: "openai",
@@ -49,14 +52,14 @@ export const PROVIDERS: AIProviderDefinition[] = [
   {
     id: "gemini",
     name: "Google (Gemini)",
-    url: "https://generativelanguage.googleapis.com/v1beta/openai",
+    url: "https://generativelanguage.googleapis.com/v1beta",
     models: ["gemini-2.5-pro", "gemini-2.5-flash", "gemini-1.5-pro", "gemini-1.5-flash"],
     iconUrl: getFaviconUrl("gemini.google.com"),
   },
   {
     id: "deepseek",
     name: "DeepSeek",
-    url: "https://api.deepseek.com/v1",
+    url: "https://api.deepseek.com",
     models: ["deepseek-chat", "deepseek-reasoner"],
     iconUrl: getFaviconUrl("deepseek.com"),
   },
@@ -70,7 +73,7 @@ export const PROVIDERS: AIProviderDefinition[] = [
   {
     id: "kimi",
     name: "Moonshot (Kimi)",
-    url: "https://api.moonshot.cn/v1",
+    url: "https://api.moonshot.ai/v1",
     models: ["moonshot-v1-8k", "moonshot-v1-32k"],
     iconUrl: getFaviconUrl("moonshot.cn"),
   },
@@ -84,7 +87,7 @@ export const PROVIDERS: AIProviderDefinition[] = [
   {
     id: "minimax",
     name: "MiniMax",
-    url: "https://api.minimaxi.com/anthropic",
+    url: "https://api.minimax.io/anthropic/v1",
     models: ["minimax-text-01", "minimax-text-01v", "abab6.5s-chat"],
     iconUrl: getFaviconUrl("minimaxi.com"),
   },
@@ -105,21 +108,26 @@ export const PROVIDERS: AIProviderDefinition[] = [
   {
     id: "vercel",
     name: "Vercel AI Gateway",
-    url: "https://ai-gateway.vercel.sh",
-    models: [],
+    url: "https://ai-gateway.vercel.sh/v3/ai",
+    models: [
+      "openai/gpt-4o",
+      "anthropic/claude-sonnet-4",
+      "google/gemini-2.5-flash",
+      "deepseek/deepseek-v3",
+    ],
     iconUrl: getFaviconUrl("vercel.com"),
   },
   {
     id: "azure",
     name: "Azure OpenAI",
-    url: "https://YOUR_RESOURCE_NAME.openai.azure.com/openai/deployments/YOUR_DEPLOYMENT_NAME",
+    url: "https://YOUR_RESOURCE_NAME.openai.azure.com/openai",
     models: ["gpt-4o", "gpt-4o-mini"],
     iconUrl: getFaviconUrl("azure.microsoft.com"),
   },
   {
     id: "ollama",
     name: "Ollama (Local)",
-    url: "http://127.0.0.1:11434/v1",
+    url: "http://127.0.0.1:11434",
     models: ["llama3", "qwen2", "mistral"],
     iconUrl: getFaviconUrl("ollama.com"),
   },
@@ -134,6 +142,41 @@ export const PROVIDERS: AIProviderDefinition[] = [
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function normalizeString(value: unknown, fallback: string): string {
+  return typeof value === "string" ? value.trim() : fallback;
+}
+
+export type AzureUrlMigrationResult = {
+  baseUrl: string;
+  deploymentName: string | null;
+};
+
+export function extractAzureConfigFromUrl(url: string): AzureUrlMigrationResult | null {
+  const normalizedUrl = url.trim();
+  if (!normalizedUrl) {
+    return null;
+  }
+
+  try {
+    const parsedUrl = new URL(normalizedUrl);
+    const match = parsedUrl.pathname.match(AZURE_LEGACY_DEPLOYMENT_PATH_PATTERN);
+    if (!match) {
+      return null;
+    }
+
+    parsedUrl.pathname = match[1];
+    parsedUrl.search = "";
+    parsedUrl.hash = "";
+
+    return {
+      baseUrl: parsedUrl.toString().replace(/\/$/, ""),
+      deploymentName: decodeURIComponent(match[2] ?? ""),
+    };
+  } catch {
+    return null;
+  }
 }
 
 export function getProviderById(providerId: string): AIProviderDefinition {
@@ -164,19 +207,33 @@ export function normalizeProviderConfig(
   value?: Partial<AIProviderConfig> | null,
 ): AIProviderConfig {
   const defaults = getDefaultProviderConfig(providerId);
+  const normalizedUrl = normalizeString(value?.url, defaults.url);
+  const normalizedApiKey = normalizeString(value?.apiKey, defaults.apiKey);
+  const normalizedModel = normalizeString(value?.model, defaults.model);
+
+  if (providerId !== "azure") {
+    return {
+      url: normalizedUrl,
+      apiKey: normalizedApiKey,
+      model: normalizedModel,
+    };
+  }
+
+  const migratedAzureConfig = extractAzureConfigFromUrl(normalizedUrl);
+  const provider = getProviderById(providerId);
+  const shouldUseLegacyDeploymentName =
+    normalizedModel.length === 0 || provider.models.includes(normalizedModel);
+  const normalizedAzureUrl = migratedAzureConfig?.baseUrl ?? normalizedUrl;
+  const normalizedAzureModel =
+    shouldUseLegacyDeploymentName && migratedAzureConfig?.deploymentName
+      ? migratedAzureConfig.deploymentName
+      : normalizedModel;
 
   return {
-    url: typeof value?.url === "string" ? value.url : defaults.url,
-    apiKey: typeof value?.apiKey === "string" ? value.apiKey : defaults.apiKey,
-    model: typeof value?.model === "string" ? value.model : defaults.model,
-    ...(providerId === "azure"
-      ? {
-          azureApiVersion:
-            typeof value?.azureApiVersion === "string"
-              ? value.azureApiVersion
-              : defaults.azureApiVersion,
-        }
-      : {}),
+    url: normalizedAzureUrl,
+    apiKey: normalizedApiKey,
+    model: normalizedAzureModel || defaults.model,
+    azureApiVersion: normalizeString(value?.azureApiVersion, defaults.azureApiVersion ?? ""),
   };
 }
 

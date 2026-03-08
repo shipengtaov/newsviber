@@ -1,13 +1,14 @@
 import { useState, useEffect, useEffectEvent, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import Database from "@tauri-apps/plugin-sql";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ArrowLeft, ExternalLink, Send, Bot, User } from "lucide-react";
 import ReactMarkdown from "react-markdown";
-import { streamChat, Message } from "@/lib/ai";
+import { type Message } from "@/lib/ai";
 import { cn } from "@/lib/utils";
+import { getDb } from "@/lib/db";
+import { useStreamingConversation } from "@/hooks/use-streaming-conversation";
 
 type FullArticle = {
     id: number;
@@ -20,14 +21,6 @@ type FullArticle = {
     content: string;
     published_at: string;
 };
-
-let db: Database | null = null;
-async function getDb() {
-    if (!db) {
-        db = await Database.load("sqlite:getnews.db");
-    }
-    return db;
-}
 
 type ArticleDetailViewProps = {
     articleId: number;
@@ -48,13 +41,12 @@ export function ArticleDetailView({
     const [article, setArticle] = useState<FullArticle | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [loadError, setLoadError] = useState<string | null>(null);
-    const [messages, setMessages] = useState<Message[]>([]);
     const [input, setInput] = useState("");
-    const [isTyping, setIsTyping] = useState(false);
     const scrollRef = useRef<HTMLDivElement>(null);
     const notifyMarkedRead = useEffectEvent((id: number) => {
         onMarkAsRead?.(id);
     });
+    const { messages, isStreaming, send, replaceMessages } = useStreamingConversation();
 
     useEffect(() => {
         let isDisposed = false;
@@ -93,7 +85,7 @@ export function ArticleDetailView({
             }
         }
 
-        setMessages([]);
+        replaceMessages([]);
         setInput("");
         void loadCurrentArticle();
         void markAsRead(articleId);
@@ -119,62 +111,59 @@ export function ArticleDetailView({
 
     async function handleSend(e: React.FormEvent) {
         e.preventDefault();
-        if (!input.trim() || isTyping || !article) return;
+        if (!input.trim() || isStreaming || !article) return;
 
-        const userMsg: Message = { role: "user", content: input.trim() };
-        setMessages(prev => [...prev, userMsg]);
+        const inputValue = input.trim();
         setInput("");
-        setIsTyping(true);
 
-        try {
-            // Fetch Top N Related Articles via FTS
-            const db = await getDb();
-            const keywords = article.title.replace(/[^a-zA-Z0-9\u4e00-\u9fa5]/g, ' ').trim().split(/\s+/).slice(0, 5).join(' OR ');
+        await send({
+            content: inputValue,
+            buildConversation: async (history, userMessage) => {
+                const db = await getDb();
+                const keywords = article.title
+                    .replace(/[^a-zA-Z0-9\u4e00-\u9fa5]/g, " ")
+                    .trim()
+                    .split(/\s+/)
+                    .slice(0, 5)
+                    .join(" OR ");
 
-            let relatedContext = "";
-            if (keywords) {
-                const relatedUrls: any[] = await db.select(`
-          SELECT title, summary, published_at FROM articles_fts 
-          WHERE articles_fts MATCH $1 AND rowid != $2
-          LIMIT 3
-        `, [keywords, article.id]);
+                let relatedContext = "";
+                if (keywords) {
+                    const relatedArticles: {
+                        title: string;
+                        summary: string | null;
+                        published_at: string | null;
+                    }[] = await db.select(
+                        `
+                            SELECT title, summary, published_at
+                            FROM articles_fts
+                            WHERE articles_fts MATCH $1 AND rowid != $2
+                            LIMIT 3
+                        `,
+                        [keywords, article.id],
+                    );
 
-                if (relatedUrls.length > 0) {
-                    relatedContext = "\\n\\nRelated Articles Context:\\n" + relatedUrls.map(a => `- [${a.published_at}] ${a.title}: ${a.summary}`).join("\\n");
+                    if (relatedArticles.length > 0) {
+                        relatedContext = `\n\nRelated Articles Context:\n${relatedArticles
+                            .map((relatedArticle) => `- [${relatedArticle.published_at}] ${relatedArticle.title}: ${relatedArticle.summary ?? ""}`)
+                            .join("\n")}`;
+                    }
                 }
-            }
 
-            const systemPrompt = `You are a helpful reading assistant. The user is reading the following article titled "${article.title}" source: ${article.source_name}.
+                const systemPrompt = `You are a helpful reading assistant. The user is reading the following article titled "${article.title}" source: ${article.source_name}.
 Current Article Content:
 ${article.content}
 ${relatedContext}
 
 Answer the user's questions based primarily on the current article. Use related context if asked for broader info. Be concise.`;
 
-            setMessages(prev => [...prev, { role: "assistant", content: "" }]);
-
-            const fullConvo = [
-                { role: "system", content: systemPrompt } as Message,
-                ...messages,
-                userMsg
-            ];
-
-            await streamChat(fullConvo, (chunk) => {
-                setMessages(prev => {
-                    const newM = [...prev];
-                    const last = newM[newM.length - 1];
-                    if (last.role === "assistant") {
-                        last.content += chunk;
-                    }
-                    return newM;
-                });
-            });
-
-        } catch (err: any) {
-            setMessages(prev => [...prev, { role: "assistant", content: `**Error:** ${err.message}` }]);
-        } finally {
-            setIsTyping(false);
-        }
+                return [
+                    { role: "system", content: systemPrompt } as Message,
+                    ...history,
+                    userMessage,
+                ];
+            },
+        });
     }
 
     function handleBack() {
@@ -287,7 +276,7 @@ Answer the user's questions based primarily on the current article. Use related 
                                 </div>
                             ))
                         )}
-                        {isTyping && (
+                        {isStreaming && (
                             <div className="flex gap-3">
                                 <div className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 bg-card border">
                                     <Bot className="w-4 h-4 text-primary" />
@@ -308,13 +297,13 @@ Answer the user's questions based primarily on the current article. Use related 
                                 onChange={e => setInput(e.target.value)}
                                 placeholder="Ask anything..."
                                 className="pr-12 rounded-full bg-muted/50 border-transparent focus-visible:ring-1 focus-visible:ring-primary/50"
-                                disabled={isTyping}
+                                disabled={isStreaming}
                             />
                             <Button
                                 type="submit"
                                 size="icon"
                                 className="absolute right-1 w-8 h-8 rounded-full"
-                                disabled={isTyping || !input.trim()}
+                                disabled={isStreaming || !input.trim()}
                             >
                                 <Send className="w-4 h-4" />
                             </Button>

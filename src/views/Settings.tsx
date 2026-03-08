@@ -167,7 +167,7 @@ export default function Settings() {
 
                         <div className="grid gap-4 md:grid-cols-2 pt-4 border-t">
                             <div className="space-y-2 md:col-span-2">
-                                <Label>AI Base URL</Label>
+                                <Label>{selectedProviderId === "azure" ? "Azure Base URL" : "AI Base URL"}</Label>
                                 <Input
                                     value={selectedConfig.url}
                                     onChange={e => updateSelectedProviderConfig({ url: e.target.value })}
@@ -207,12 +207,12 @@ export default function Settings() {
                                 </div>
                             </div>
                             <div className="space-y-2">
-                                <Label>Model Name</Label>
+                                <Label>{selectedProviderId === "azure" ? "Deployment Name" : "Model Name"}</Label>
                                 <Input
                                     list="model-suggestions"
                                     value={selectedConfig.model}
                                     onChange={e => updateSelectedProviderConfig({ model: e.target.value })}
-                                    placeholder="e.g., gpt-4o-mini"
+                                    placeholder={selectedProviderId === "azure" ? "e.g., my-gpt-4o-deployment" : "e.g., gpt-4o-mini"}
                                 />
                                 <datalist id="model-suggestions">
                                     {selectedProvider.models.map(model => (
