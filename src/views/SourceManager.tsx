@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import Database from "@tauri-apps/plugin-sql";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { RefreshCcw, Trash2, Edit, Plus, Power, PowerOff } from "lucide-react";
 import { useNavigate } from "react-router-dom";
@@ -21,6 +21,19 @@ async function getDb() {
         db = await Database.load("sqlite:getnews.db");
     }
     return db;
+}
+
+function formatSourceTypeLabel(sourceType: string): string {
+    switch (sourceType) {
+        case "rss":
+            return "RSS Feed";
+        case "jina_url":
+            return "Jina URL Scrape";
+        case "twitter":
+            return "Twitter (/X)";
+        default:
+            return sourceType;
+    }
 }
 
 export default function SourceManager() {
@@ -129,7 +142,7 @@ export default function SourceManager() {
     }
 
     return (
-        <PageShell className="space-y-8">
+        <PageShell variant="workspace" className="space-y-8">
             <div className="flex justify-between items-center">
                 <div>
                     <h1 className="text-3xl font-bold tracking-tight">Source Manager</h1>
@@ -149,19 +162,24 @@ export default function SourceManager() {
 
             <div className="space-y-4">
                 <h2 className="text-2xl font-semibold">Active Sources</h2>
-                <div className="grid gap-4 md:grid-cols-2">
+                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                     {sources.map(s => (
-                        <Card key={s.id} className={`relative overflow-hidden ${!s.active ? 'opacity-75 bg-muted/50' : ''}`}>
-                            <div className="p-5">
-                                <div className="flex justify-between items-start mb-2">
-                                    <div className="flex items-center gap-2">
-                                        <h3 className="font-semibold">{s.name}</h3>
-                                        {!s.active && <span className="text-xs bg-destructive/10 text-destructive px-2 py-0.5 rounded-full">Inactive</span>}
-                                    </div>
-                                    <span className="text-xs uppercase bg-muted text-muted-foreground px-2 py-1 rounded-md">{s.source_type}</span>
+                        <Card
+                            key={s.id}
+                            className={`flex flex-col transition-all hover:border-primary/50 hover:shadow-md ${!s.active ? 'bg-muted/50 opacity-75' : ''}`}
+                        >
+                            <CardHeader className="px-4 py-4 pb-2">
+                                <div className="min-w-0 flex-1">
+                                    <CardTitle className="truncate text-lg">{s.name}</CardTitle>
+                                    <CardDescription className="mt-1.5 line-clamp-2 text-sm" title={s.url}>
+                                        {s.url}
+                                    </CardDescription>
                                 </div>
-                                <p className="text-sm text-muted-foreground truncate" title={s.url}>{s.url}</p>
-                                <div className="mt-3 space-y-1 text-xs text-muted-foreground">
+                            </CardHeader>
+                            <CardContent className="flex flex-1 flex-col px-4 pb-4 pt-0 text-sm text-muted-foreground">
+                                <div className="space-y-1.5">
+                                    <p>Type: {formatSourceTypeLabel(s.source_type)}</p>
+                                    <p>Status: {s.active ? "Active" : "Inactive"}</p>
                                     <p>{formatFetchInterval(s.fetch_interval)}</p>
                                     <p>{formatLastFetchSummary(s.last_fetch)}</p>
                                 </div>
@@ -172,18 +190,18 @@ export default function SourceManager() {
                                     <Button variant="outline" size="sm" onClick={() => navigate(`/sources/edit/${s.id}`)}>
                                         <Edit className="h-4 w-4 mr-2" /> Edit
                                     </Button>
-                                    <Button variant="outline" size="sm" onClick={() => toggleActive(s)}>
+                                    <Button variant="outline" size="sm" onClick={() => toggleActive(s)} title={s.active ? "Deactivate source" : "Activate source"}>
                                         {s.active ? <PowerOff className="h-4 w-4" /> : <Power className="h-4 w-4" />}
                                     </Button>
-                                    <Button variant="ghost" size="sm" onClick={() => deleteSource(s.id)} className="text-destructive ml-auto">
+                                    <Button variant="ghost" size="sm" onClick={() => deleteSource(s.id)} className="ml-auto text-destructive" title="Delete source">
                                         <Trash2 className="h-4 w-4" />
                                     </Button>
                                 </div>
-                            </div>
+                            </CardContent>
                         </Card>
                     ))}
                     {sources.length === 0 && (
-                        <div className="text-muted-foreground py-8 text-center md:col-span-2 border rounded-lg border-dashed">
+                        <div className="col-span-full rounded-xl border-2 border-dashed p-12 text-center text-muted-foreground">
                             No sources added yet.
                         </div>
                     )}

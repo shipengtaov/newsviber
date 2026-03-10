@@ -88,8 +88,8 @@ export default function SourceForm() {
     }
 
     return (
-        <PageShell className="space-y-8">
-            <Button variant="ghost" onClick={() => navigate("/sources")} className="mb-4 -ml-4">
+        <PageShell variant="workspace" className="space-y-8">
+            <Button variant="ghost" size="sm" onClick={() => navigate("/sources")} className="-ml-2">
                 <ChevronLeft className="h-4 w-4 mr-2" />
                 Back to Sources
             </Button>

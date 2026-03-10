@@ -117,7 +117,7 @@ export default function Settings() {
     }
 
     return (
-        <PageShell className="space-y-8">
+        <PageShell variant="workspace" className="space-y-8">
             <div>
                 <h1 className="text-3xl font-bold tracking-tight">Settings</h1>
                 <p className="text-muted-foreground mt-2">Configure AI providers and manage local data.</p>

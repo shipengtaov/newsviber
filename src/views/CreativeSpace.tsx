@@ -481,7 +481,7 @@ Be concise and explore the user's questions further.`;
                     </div>
                 </div>
                 <div className="flex flex-1 overflow-hidden">
-                    <div className="flex-1 space-y-8 overflow-y-auto p-8">
+                    <div className="flex-1 space-y-8 overflow-y-auto px-4 py-4 md:px-6 md:py-6 lg:px-4 lg:py-4">
                         <section>
                             <h3 className="mb-3 text-xl font-bold text-primary">Key Signals</h3>
                             <div className="prose prose-sm max-w-none dark:prose-invert">
@@ -551,7 +551,7 @@ Be concise and explore the user's questions further.`;
 
     if (activeProject) {
         return (
-            <PageShell size="wide" className="space-y-8">
+            <PageShell variant="workspace" size="wide" className="space-y-8">
                 <Button variant="ghost" size="sm" onClick={leaveProjectDetail} className="-ml-2">
                     <ArrowLeft className="mr-2 h-4 w-4" /> Back to Projects
                 </Button>
@@ -905,7 +905,7 @@ Be concise and explore the user's questions further.`;
     }
 
     return (
-        <PageShell size="wide" className="space-y-8">
+        <PageShell variant="workspace" size="wide" className="space-y-8">
             <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
                 <div>
                     <h1 className="text-3xl font-bold tracking-tight">Creative Space</h1>
