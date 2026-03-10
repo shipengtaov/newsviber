@@ -129,6 +129,50 @@ pub fn get_migrations() -> Vec<Migration> {
                     ON creative_cards(project_id, created_at DESC);
             ",
             kind: MigrationKind::Up,
+        },
+        Migration {
+            version: 5,
+            description: "add_global_chat_threads",
+            sql: "
+                CREATE TABLE IF NOT EXISTS chat_threads (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    title TEXT NOT NULL,
+                    time_range_mode TEXT NOT NULL DEFAULT 'preset',
+                    preset_days INTEGER,
+                    custom_start_date TEXT,
+                    custom_end_date TEXT,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                );
+
+                CREATE TABLE IF NOT EXISTS chat_thread_sources (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    thread_id INTEGER NOT NULL,
+                    source_id INTEGER NOT NULL,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY(thread_id) REFERENCES chat_threads(id) ON DELETE CASCADE,
+                    FOREIGN KEY(source_id) REFERENCES sources(id) ON DELETE CASCADE
+                );
+
+                CREATE TABLE IF NOT EXISTS chat_messages (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    thread_id INTEGER NOT NULL,
+                    role TEXT NOT NULL,
+                    content TEXT NOT NULL,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY(thread_id) REFERENCES chat_threads(id) ON DELETE CASCADE
+                );
+
+                CREATE INDEX IF NOT EXISTS idx_chat_threads_updated_at
+                    ON chat_threads(updated_at DESC);
+                CREATE UNIQUE INDEX IF NOT EXISTS idx_chat_thread_sources_unique
+                    ON chat_thread_sources(thread_id, source_id);
+                CREATE INDEX IF NOT EXISTS idx_chat_thread_sources_thread
+                    ON chat_thread_sources(thread_id);
+                CREATE INDEX IF NOT EXISTS idx_chat_messages_thread_created
+                    ON chat_messages(thread_id, created_at, id);
+            ",
+            kind: MigrationKind::Up,
         }
     ]
 }

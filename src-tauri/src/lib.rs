@@ -1,3 +1,4 @@
+mod chat;
 mod creative;
 mod db;
 pub mod fetchers;
@@ -21,6 +22,9 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             fetch_rss_cmd,
             fetch_jina_cmd,
+            chat::save_chat_thread_scope_cmd,
+            chat::persist_chat_message_cmd,
+            chat::delete_chat_thread_cmd,
             creative::save_creative_project_cmd,
             creative::persist_creative_card_cmd
         ])

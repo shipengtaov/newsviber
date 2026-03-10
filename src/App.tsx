@@ -96,6 +96,7 @@ function App() {
           <Route path="/sources/add" element={<SourceForm />} />
           <Route path="/sources/edit/:id" element={<SourceForm />} />
           <Route path="/chat" element={<GlobalChat />} />
+          <Route path="/chat/:threadId" element={<GlobalChat />} />
           <Route path="/creative" element={<CreativeSpace />} />
           <Route path="/settings" element={<Settings />} />
         </Route>

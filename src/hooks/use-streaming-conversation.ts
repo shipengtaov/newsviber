@@ -9,6 +9,22 @@ type ConversationBuilder = (
 type SendConversationInput = {
   content: string;
   buildConversation: ConversationBuilder;
+  onUserMessageCommitted?: (input: {
+    history: Message[];
+    userMessage: Message;
+    pendingMessages: Message[];
+  }) => Promise<void> | void;
+  onAssistantComplete?: (input: {
+    history: Message[];
+    userMessage: Message;
+    assistantMessage: Message;
+  }) => Promise<void> | void;
+  onAssistantError?: (input: {
+    history: Message[];
+    userMessage: Message;
+    assistantMessage: Message;
+    error: unknown;
+  }) => Promise<void> | void;
 };
 
 function appendAssistantChunk(messages: Message[], chunk: string): Message[] {
@@ -94,7 +110,13 @@ export function useStreamingConversation() {
     return String(error || "Unknown AI error.");
   }
 
-  const send = useCallback(async ({ content, buildConversation }: SendConversationInput) => {
+  const send = useCallback(async ({
+    content,
+    buildConversation,
+    onUserMessageCommitted,
+    onAssistantComplete,
+    onAssistantError,
+  }: SendConversationInput) => {
     const trimmedContent = content.trim();
     if (!trimmedContent || isStreamingRef.current) {
       return;
@@ -122,6 +144,16 @@ export function useStreamingConversation() {
     setIsStreaming(true);
 
     try {
+      await onUserMessageCommitted?.({
+        history,
+        userMessage,
+        pendingMessages,
+      });
+
+      if (abortController.signal.aborted) {
+        return;
+      }
+
       const conversation = await buildConversation(history, userMessage);
       if (abortController.signal.aborted) {
         return;
@@ -129,7 +161,7 @@ export function useStreamingConversation() {
 
       const { streamConversation } = await import("@/lib/ai");
 
-      await streamConversation(
+      const fullText = await streamConversation(
         conversation,
         (chunk) => {
           setMessages((currentMessages) => {
@@ -140,9 +172,28 @@ export function useStreamingConversation() {
         },
         abortController.signal,
       );
+
+      await onAssistantComplete?.({
+        history,
+        userMessage,
+        assistantMessage: {
+          role: "assistant",
+          content: fullText,
+        },
+      });
     } catch (error) {
       if (!abortController.signal.aborted) {
-        replaceAssistantMessage(`**Error:** ${getErrorMessage(error)}`);
+        const errorMessage = `**Error:** ${getErrorMessage(error)}`;
+        replaceAssistantMessage(errorMessage);
+        await onAssistantError?.({
+          history,
+          userMessage,
+          assistantMessage: {
+            role: "assistant",
+            content: errorMessage,
+          },
+          error,
+        });
       }
     } finally {
       if (abortControllerRef.current === abortController) {
