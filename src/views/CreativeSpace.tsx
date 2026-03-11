@@ -424,6 +424,7 @@ export default function CreativeSpace() {
     const [promptSuggestionOriginal, setPromptSuggestionOriginal] = useState("");
     const [promptSuggestionDraft, setPromptSuggestionDraft] = useState("");
     const [deletingProjectId, setDeletingProjectId] = useState<number | null>(null);
+    const [pendingDeleteProject, setPendingDeleteProject] = useState<CreativeProject | null>(null);
 
     const [manualDialogOpen, setManualDialogOpen] = useState(false);
     const [articleCandidates, setArticleCandidates] = useState<CreativeArticleCandidate[]>([]);
@@ -653,6 +654,21 @@ export default function CreativeSpace() {
         setActiveProjectId(projectId);
     }
 
+    function openDeleteProjectDialog(project: CreativeProject) {
+        setIsProjectActionsOpen(false);
+        setPendingDeleteProject(project);
+    }
+
+    function handleDeleteProjectDialogOpenChange(open: boolean) {
+        if (deletingProjectId !== null) {
+            return;
+        }
+
+        if (!open) {
+            setPendingDeleteProject(null);
+        }
+    }
+
     function handleProjectCardKeyDown(event: React.KeyboardEvent<HTMLDivElement>, projectId: number) {
         if (event.key !== "Enter" && event.key !== " ") {
             return;
@@ -717,6 +733,7 @@ export default function CreativeSpace() {
         try {
             await deleteCreativeProject(projectId);
             toast({ title: "Project deleted" });
+            setPendingDeleteProject(null);
 
             if (activeProjectId === projectId) {
                 leaveProjectDetail();
@@ -771,6 +788,47 @@ export default function CreativeSpace() {
         setPromptSuggestionDialogOpen(false);
         setPromptSuggestionDraft("");
         setPromptSuggestionOriginal("");
+    }
+
+    function renderDeleteProjectDialog() {
+        return (
+            <Dialog open={pendingDeleteProject !== null} onOpenChange={handleDeleteProjectDialogOpenChange}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Delete project?</DialogTitle>
+                        <DialogDescription>
+                            {pendingDeleteProject
+                                ? `Delete "${pendingDeleteProject.name}"? This permanently removes the project and all generated cards for it.`
+                                : "Delete this project? This permanently removes the project and all generated cards for it."}
+                        </DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            disabled={deletingProjectId !== null}
+                            onClick={() => handleDeleteProjectDialogOpenChange(false)}
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                            type="button"
+                            variant="destructive"
+                            disabled={pendingDeleteProject === null || deletingProjectId !== null}
+                            onClick={() => {
+                                if (!pendingDeleteProject) {
+                                    return;
+                                }
+
+                                void handleDeleteProject(pendingDeleteProject.id);
+                            }}
+                        >
+                            Delete
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+        );
     }
 
     function toggleProjectSourceSelection(sourceId: number) {
@@ -1050,10 +1108,10 @@ Be concise and explore the user's questions further.`;
                                             variant="ghost"
                                             size="sm"
                                             className="w-full justify-start text-destructive hover:text-destructive"
-                                            onClick={() => void handleDeleteProject(activeProject.id)}
+                                            onClick={() => openDeleteProjectDialog(activeProject)}
                                             disabled={deletingProjectId === activeProject.id}
                                         >
-                                            <Trash2 className="mr-2 h-4 w-4" /> {deletingProjectId === activeProject.id ? "Deleting..." : "Delete Project"}
+                                            <Trash2 className="mr-2 h-4 w-4" /> Delete Project
                                         </Button>
                                     </div>
                                 )}
@@ -1299,6 +1357,7 @@ Be concise and explore the user's questions further.`;
                 </Dialog>
 
                 {renderProjectDialog()}
+                {renderDeleteProjectDialog()}
             </PageShell>
         );
     }
@@ -1360,7 +1419,7 @@ Be concise and explore the user's questions further.`;
                                     className="ml-auto text-destructive"
                                     onClick={(event) => {
                                         stopCardClickPropagation(event);
-                                        void handleDeleteProject(project.id);
+                                        openDeleteProjectDialog(project);
                                     }}
                                     disabled={deletingProjectId === project.id}
                                     aria-label={deletingProjectId === project.id ? `Deleting ${project.name}` : `Delete ${project.name}`}
@@ -1379,6 +1438,7 @@ Be concise and explore the user's questions further.`;
                     </div>
                 )}
             </div>
+            {renderDeleteProjectDialog()}
         </PageShell>
     );
 }

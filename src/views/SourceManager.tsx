@@ -2,6 +2,14 @@ import { useState, useEffect } from "react";
 import Database from "@tauri-apps/plugin-sql";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { RefreshCcw, Trash2, Edit, Plus, Power, PowerOff } from "lucide-react";
 import { useNavigate } from "react-router-dom";
@@ -42,6 +50,8 @@ export default function SourceManager() {
     const [sources, setSources] = useState<Source[]>([]);
     const [isFetchingAll, setIsFetchingAll] = useState(false);
     const [fetchingSourceId, setFetchingSourceId] = useState<number | null>(null);
+    const [pendingDeleteSource, setPendingDeleteSource] = useState<Source | null>(null);
+    const [deletingSourceId, setDeletingSourceId] = useState<number | null>(null);
 
     const activeSourceCount = sources.filter((source) => Boolean(source.active)).length;
     const isAnyFetchInProgress = isFetchingAll || fetchingSourceId !== null;
@@ -79,14 +89,28 @@ export default function SourceManager() {
         }
     }
 
+    function handleDeleteDialogOpenChange(open: boolean) {
+        if (deletingSourceId !== null) {
+            return;
+        }
+
+        if (!open) {
+            setPendingDeleteSource(null);
+        }
+    }
+
     async function deleteSource(id: number) {
+        setDeletingSourceId(id);
         try {
             const db = await getDb();
             await db.execute("DELETE FROM sources WHERE id = $1", [id]);
             toast({ title: "Source deleted" });
-            loadSources();
+            setPendingDeleteSource(null);
+            await loadSources();
         } catch (err: any) {
             toast({ title: "Error", description: String(err), variant: "destructive" });
+        } finally {
+            setDeletingSourceId(null);
         }
     }
 
@@ -142,71 +166,116 @@ export default function SourceManager() {
     }
 
     return (
-        <PageShell variant="workspace" className="space-y-8">
-            <div className="flex justify-between items-center">
-                <div>
-                    <h1 className="text-3xl font-bold tracking-tight">Source Manager</h1>
-                    <p className="text-muted-foreground mt-2">Manage your RSS feeds, Twitter accounts, and URL monitors.</p>
+        <>
+            <PageShell variant="workspace" className="space-y-8">
+                <div className="flex items-center justify-between">
+                    <div>
+                        <h1 className="text-3xl font-bold tracking-tight">Source Manager</h1>
+                        <p className="mt-2 text-muted-foreground">Manage your RSS feeds, Twitter accounts, and URL monitors.</p>
+                    </div>
+                    <div className="flex gap-2">
+                        <Button variant="outline" onClick={fetchAll} disabled={isAnyFetchInProgress || activeSourceCount === 0}>
+                            <RefreshCcw className={`mr-2 h-4 w-4 ${isFetchingAll ? "animate-spin" : ""}`} />
+                            {isFetchingAll ? "Fetching All..." : "Fetch All"}
+                        </Button>
+                        <Button onClick={() => navigate("/sources/add")}>
+                            <Plus className="mr-2 h-4 w-4" />
+                            Add Source
+                        </Button>
+                    </div>
                 </div>
-                <div className="flex gap-2">
-                    <Button variant="outline" onClick={fetchAll} disabled={isAnyFetchInProgress || activeSourceCount === 0}>
-                        <RefreshCcw className={`h-4 w-4 mr-2 ${isFetchingAll ? 'animate-spin' : ''}`} />
-                        {isFetchingAll ? 'Fetching All...' : 'Fetch All'}
-                    </Button>
-                    <Button onClick={() => navigate("/sources/add")}>
-                        <Plus className="h-4 w-4 mr-2" />
-                        Add Source
-                    </Button>
-                </div>
-            </div>
 
-            <div className="space-y-4">
-                <h2 className="text-2xl font-semibold">Active Sources</h2>
-                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                    {sources.map(s => (
-                        <Card
-                            key={s.id}
-                            className={`flex flex-col transition-all hover:border-primary/50 hover:shadow-md ${!s.active ? 'bg-muted/50 opacity-75' : ''}`}
-                        >
-                            <CardHeader className="px-4 py-4 pb-2">
-                                <div className="min-w-0 flex-1">
-                                    <CardTitle className="truncate text-lg">{s.name}</CardTitle>
-                                    <CardDescription className="mt-1.5 line-clamp-2 text-sm" title={s.url}>
-                                        {s.url}
-                                    </CardDescription>
-                                </div>
-                            </CardHeader>
-                            <CardContent className="flex flex-1 flex-col px-4 pb-4 pt-0 text-sm text-muted-foreground">
-                                <div className="space-y-1.5">
-                                    <p>Type: {formatSourceTypeLabel(s.source_type)}</p>
-                                    <p>Status: {s.active ? "Active" : "Inactive"}</p>
-                                    <p>{formatFetchInterval(s.fetch_interval)}</p>
-                                    <p>{formatLastFetchSummary(s.last_fetch)}</p>
-                                </div>
-                                <div className="mt-4 flex flex-wrap gap-2">
-                                    <Button variant="outline" size="sm" onClick={() => fetchNow(s)} disabled={!s.active || isAnyFetchInProgress}>
-                                        <RefreshCcw className={`h-4 w-4 mr-2 ${fetchingSourceId === s.id ? 'animate-spin' : ''}`} /> Fetch
-                                    </Button>
-                                    <Button variant="outline" size="sm" onClick={() => navigate(`/sources/edit/${s.id}`)}>
-                                        <Edit className="h-4 w-4 mr-2" /> Edit
-                                    </Button>
-                                    <Button variant="outline" size="sm" onClick={() => toggleActive(s)} title={s.active ? "Deactivate source" : "Activate source"}>
-                                        {s.active ? <PowerOff className="h-4 w-4" /> : <Power className="h-4 w-4" />}
-                                    </Button>
-                                    <Button variant="ghost" size="sm" onClick={() => deleteSource(s.id)} className="ml-auto text-destructive" title="Delete source">
-                                        <Trash2 className="h-4 w-4" />
-                                    </Button>
-                                </div>
-                            </CardContent>
-                        </Card>
-                    ))}
-                    {sources.length === 0 && (
-                        <div className="col-span-full rounded-xl border-2 border-dashed p-12 text-center text-muted-foreground">
-                            No sources added yet.
-                        </div>
-                    )}
+                <div className="space-y-4">
+                    <h2 className="text-2xl font-semibold">Active Sources</h2>
+                    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                        {sources.map((source) => (
+                            <Card
+                                key={source.id}
+                                className={`flex flex-col transition-all hover:border-primary/50 hover:shadow-md ${!source.active ? "bg-muted/50 opacity-75" : ""}`}
+                            >
+                                <CardHeader className="px-4 py-4 pb-2">
+                                    <div className="min-w-0 flex-1">
+                                        <CardTitle className="truncate text-lg">{source.name}</CardTitle>
+                                        <CardDescription className="mt-1.5 line-clamp-2 text-sm" title={source.url}>
+                                            {source.url}
+                                        </CardDescription>
+                                    </div>
+                                </CardHeader>
+                                <CardContent className="flex flex-1 flex-col px-4 pb-4 pt-0 text-sm text-muted-foreground">
+                                    <div className="space-y-1.5">
+                                        <p>Type: {formatSourceTypeLabel(source.source_type)}</p>
+                                        <p>Status: {source.active ? "Active" : "Inactive"}</p>
+                                        <p>{formatFetchInterval(source.fetch_interval)}</p>
+                                        <p>{formatLastFetchSummary(source.last_fetch)}</p>
+                                    </div>
+                                    <div className="mt-4 flex flex-wrap gap-2">
+                                        <Button variant="outline" size="sm" onClick={() => fetchNow(source)} disabled={!source.active || isAnyFetchInProgress}>
+                                            <RefreshCcw className={`mr-2 h-4 w-4 ${fetchingSourceId === source.id ? "animate-spin" : ""}`} /> Fetch
+                                        </Button>
+                                        <Button variant="outline" size="sm" onClick={() => navigate(`/sources/edit/${source.id}`)}>
+                                            <Edit className="mr-2 h-4 w-4" /> Edit
+                                        </Button>
+                                        <Button variant="outline" size="sm" onClick={() => toggleActive(source)} title={source.active ? "Deactivate source" : "Activate source"}>
+                                            {source.active ? <PowerOff className="h-4 w-4" /> : <Power className="h-4 w-4" />}
+                                        </Button>
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={() => setPendingDeleteSource(source)}
+                                            className="ml-auto text-destructive"
+                                            title="Delete source"
+                                        >
+                                            <Trash2 className="h-4 w-4" />
+                                        </Button>
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        ))}
+                        {sources.length === 0 && (
+                            <div className="col-span-full rounded-xl border-2 border-dashed p-12 text-center text-muted-foreground">
+                                No sources added yet.
+                            </div>
+                        )}
+                    </div>
                 </div>
-            </div>
-        </PageShell>
+            </PageShell>
+
+            <Dialog open={pendingDeleteSource !== null} onOpenChange={handleDeleteDialogOpenChange}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Delete source?</DialogTitle>
+                        <DialogDescription>
+                            {pendingDeleteSource
+                                ? `Delete "${pendingDeleteSource.name}"? This permanently removes the source, its fetched articles, and any saved source scope references that point to it.`
+                                : "Delete this source? This permanently removes the source, its fetched articles, and any saved source scope references that point to it."}
+                        </DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            disabled={deletingSourceId !== null}
+                            onClick={() => handleDeleteDialogOpenChange(false)}
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                            type="button"
+                            variant="destructive"
+                            disabled={pendingDeleteSource === null || deletingSourceId !== null}
+                            onClick={() => {
+                                if (!pendingDeleteSource) {
+                                    return;
+                                }
+
+                                void deleteSource(pendingDeleteSource.id);
+                            }}
+                        >
+                            Delete
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+        </>
     );
 }
