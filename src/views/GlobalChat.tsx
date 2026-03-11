@@ -4,6 +4,14 @@ import ReactMarkdown from "react-markdown";
 import { Bot, ChevronLeft, ChevronRight, MessageSquare, Plus, Send, Trash2, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -196,6 +204,7 @@ export default function GlobalChat() {
     const [isLoadingThreads, setIsLoadingThreads] = useState(true);
     const [isLoadingThread, setIsLoadingThread] = useState(false);
     const [isDeletingThreadId, setIsDeletingThreadId] = useState<number | null>(null);
+    const [pendingDeleteThread, setPendingDeleteThread] = useState<GlobalChatThread | null>(null);
     const [chatThreadsPanelWidth, setChatThreadsPanelWidth] = useState<number>(() => readStoredChatThreadsPanelWidth());
     const [isResizingThreadsPanel, setIsResizingThreadsPanel] = useState(false);
     const [isDesktopLayout, setIsDesktopLayout] = useState<boolean>(() => {
@@ -529,16 +538,23 @@ export default function GlobalChat() {
         });
     }
 
-    async function handleDeleteThread(threadId: number) {
-        if (!window.confirm("Delete this chat conversation?")) {
+    function handleDeleteDialogOpenChange(open: boolean) {
+        if (isDeletingThreadId !== null) {
             return;
         }
 
+        if (!open) {
+            setPendingDeleteThread(null);
+        }
+    }
+
+    async function handleDeleteThread(threadId: number) {
         const isDeletingActiveThread = activeThreadIdRef.current === threadId;
         setIsDeletingThreadId(threadId);
         try {
             await deleteGlobalChatThread(threadId);
             setThreads((currentThreads) => currentThreads.filter((thread) => thread.id !== threadId));
+            setPendingDeleteThread(null);
 
             if (isDeletingActiveThread) {
                 resetDraftConversation();
@@ -688,7 +704,7 @@ export default function GlobalChat() {
                                             onClick={(event) => {
                                                 event.preventDefault();
                                                 event.stopPropagation();
-                                                void handleDeleteThread(thread.id);
+                                                setPendingDeleteThread(thread);
                                             }}
                                             aria-label="Delete chat"
                                             title="Delete chat"
@@ -722,6 +738,43 @@ export default function GlobalChat() {
                     </div>
                 )}
             </div>
+
+            <Dialog open={pendingDeleteThread !== null} onOpenChange={handleDeleteDialogOpenChange}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Delete chat conversation?</DialogTitle>
+                        <DialogDescription>
+                            {pendingDeleteThread
+                                ? `Delete "${pendingDeleteThread.title}"? This will permanently remove the conversation and its saved messages.`
+                                : "Delete this conversation? This will permanently remove the conversation and its saved messages."}
+                        </DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            disabled={isDeletingThreadId !== null}
+                            onClick={() => handleDeleteDialogOpenChange(false)}
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                            type="button"
+                            variant="destructive"
+                            disabled={pendingDeleteThread === null || isDeletingThreadId !== null}
+                            onClick={() => {
+                                if (!pendingDeleteThread) {
+                                    return;
+                                }
+
+                                void handleDeleteThread(pendingDeleteThread.id);
+                            }}
+                        >
+                            Delete
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
 
             <div className="flex min-h-0 min-w-0 flex-1 flex-col lg:flex-row">
                 <section className="flex min-h-0 min-w-0 flex-1 flex-col">
