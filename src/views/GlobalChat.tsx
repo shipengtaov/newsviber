@@ -796,7 +796,7 @@ export default function GlobalChat() {
                             {messages.length === 0 && !isLoadingThread && (
                                 <div className="mx-auto mt-20 max-w-md rounded-2xl border bg-card/50 p-8 text-center">
                                     <MessageSquare className="mx-auto h-12 w-12 text-primary/50" />
-                                    <h2 className="mt-4 text-xl font-semibold">Global Chat</h2>
+                                    <h2 className="mt-4 text-xl font-semibold">Chat</h2>
                                     <p className="mt-2 text-sm text-muted-foreground">
                                         Start a new conversation, pick a time range, and narrow the context by active news sources.
                                     </p>

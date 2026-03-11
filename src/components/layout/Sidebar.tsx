@@ -11,7 +11,7 @@ export function Sidebar({ collapsed }: SidebarProps) {
     const navItems = [
         { name: "News", path: "/", icon: Newspaper },
         { name: "Sources", path: "/sources", icon: Rss },
-        { name: "Global Chat", path: "/chat", icon: MessageSquare },
+        { name: "Chat", path: "/chat", icon: MessageSquare },
         { name: "Creative Space", path: "/creative", icon: Lightbulb },
         { name: "Settings", path: "/settings", icon: Settings },
     ];
