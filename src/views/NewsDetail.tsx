@@ -47,7 +47,7 @@ export function ArticleDetailView({
     const notifyMarkedRead = useEffectEvent((id: number) => {
         onMarkAsRead?.(id);
     });
-    const { messages, isStreaming, send, replaceMessages } = useStreamingConversation();
+    const { messages, isStreaming, streamPhase, send, replaceMessages } = useStreamingConversation();
 
     useEffect(() => {
         let isDisposed = false;
@@ -101,7 +101,7 @@ export function ArticleDetailView({
         if (scrollRef.current) {
             scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
         }
-    }, [messages]);
+    }, [messages, streamPhase]);
 
     async function markAsRead(articleId: number) {
         try {
@@ -270,24 +270,44 @@ Answer the user's questions based primarily on the current article. Use related 
                                         {m.role === "user" ? <User className="w-4 h-4" /> : <Bot className="w-4 h-4 text-primary" />}
                                     </div>
                                     <div className={`px-4 py-2.5 rounded-2xl max-w-[85%] ${m.role === "user" ? "bg-primary text-primary-foreground rounded-tr-sm" : "bg-card border shadow-sm rounded-tl-sm"}`}>
-                                        <div className="prose prose-sm dark:prose-invert leading-relaxed max-w-none break-words">
-                                            <ReactMarkdown>{m.content}</ReactMarkdown>
-                                        </div>
+                                        {(() => {
+                                            const isLiveAssistantMessage = m.role === "assistant"
+                                                && isStreaming
+                                                && i === messages.length - 1;
+                                            const isPreparingMessage = isLiveAssistantMessage
+                                                && streamPhase === "preparing"
+                                                && m.content.trim().length === 0;
+
+                                            if (isPreparingMessage) {
+                                                return (
+                                                    <div className="flex items-center gap-3 text-muted-foreground">
+                                                        <span>Connecting to the model...</span>
+                                                        <div className="flex items-center space-x-1">
+                                                            <span className="w-1.5 h-1.5 bg-primary/40 rounded-full animate-bounce" />
+                                                            <span className="w-1.5 h-1.5 bg-primary/60 rounded-full animate-bounce [animation-delay:0.2s]" />
+                                                            <span className="w-1.5 h-1.5 bg-primary/80 rounded-full animate-bounce [animation-delay:0.4s]" />
+                                                        </div>
+                                                    </div>
+                                                );
+                                            }
+
+                                            return (
+                                                <div className="space-y-2">
+                                                    <div className="prose prose-sm dark:prose-invert leading-relaxed max-w-none break-words">
+                                                        <ReactMarkdown>{m.content}</ReactMarkdown>
+                                                    </div>
+                                                    {isLiveAssistantMessage && streamPhase === "streaming" && (
+                                                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                                            <span className="w-2 h-2 rounded-full bg-primary/80 animate-pulse" />
+                                                            <span>Streaming...</span>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            );
+                                        })()}
                                     </div>
                                 </div>
                             ))
-                        )}
-                        {isStreaming && (
-                            <div className="flex gap-3">
-                                <div className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 bg-card border">
-                                    <Bot className="w-4 h-4 text-primary" />
-                                </div>
-                                <div className="px-4 py-3 rounded-2xl bg-card border shadow-sm flex items-center space-x-1">
-                                    <span className="w-1.5 h-1.5 bg-primary/40 rounded-full animate-bounce"></span>
-                                    <span className="w-1.5 h-1.5 bg-primary/60 rounded-full animate-bounce [animation-delay:0.2s]"></span>
-                                    <span className="w-1.5 h-1.5 bg-primary/80 rounded-full animate-bounce [animation-delay:0.4s]"></span>
-                                </div>
-                            </div>
                         )}
                     </div>
 

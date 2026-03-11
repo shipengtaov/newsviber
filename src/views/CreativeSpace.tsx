@@ -442,12 +442,14 @@ export default function CreativeSpace() {
     const {
         messages: chatMessages,
         isStreaming: isChatStreaming,
+        streamPhase: chatStreamPhase,
         send: sendChatMessage,
         replaceMessages: replaceChatMessages,
     } = useStreamingConversation();
     const promptOptimizationRequestIdRef = useRef(0);
     const projectDialogOpenRef = useRef(projectDialogOpen);
     const projectActionsPanelRef = useRef<HTMLDivElement | null>(null);
+    const cardDiscussionScrollRef = useRef<HTMLDivElement | null>(null);
 
     const activeProject = projects.find((project) => project.id === activeProjectId) ?? null;
     const activeCard = cards.find((card) => card.id === activeCardId) ?? null;
@@ -474,6 +476,19 @@ export default function CreativeSpace() {
 
         void loadCards(activeProjectId);
     }, [activeProjectId]);
+
+    useEffect(() => {
+        if (!isCardDiscussionOpen) {
+            return;
+        }
+
+        const container = cardDiscussionScrollRef.current;
+        if (!container) {
+            return;
+        }
+
+        container.scrollTop = container.scrollHeight;
+    }, [chatMessages, chatStreamPhase, isCardDiscussionOpen]);
 
     useEffect(() => {
         if (!manualDialogOpen || !activeProject) {
@@ -1033,16 +1048,48 @@ Be concise and explore the user's questions further.`;
                                 <SheetTitle>Discuss Card</SheetTitle>
                                 <SheetDescription>Ask follow-up questions or expand the report with AI.</SheetDescription>
                             </SheetHeader>
-                            <div className="flex-1 space-y-4 overflow-y-auto px-5 py-4 text-sm">
+                            <div className="flex-1 space-y-4 overflow-y-auto px-5 py-4 text-sm" ref={cardDiscussionScrollRef}>
                                 {chatMessages.length === 0 && (
                                     <p className="mt-10 text-center text-muted-foreground">Expand on this report with AI.</p>
                                 )}
                                 {chatMessages.map((message, index) => (
                                     <div key={index} className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}>
                                         <div className={`max-w-[88%] rounded-xl px-3 py-2 ${message.role === "user" ? "bg-primary text-primary-foreground" : "border bg-card shadow-sm"}`}>
-                                            <div className="prose prose-sm max-w-none break-words dark:prose-invert">
-                                                <ReactMarkdown>{message.content}</ReactMarkdown>
-                                            </div>
+                                            {(() => {
+                                                const isLiveAssistantMessage = message.role === "assistant"
+                                                    && isChatStreaming
+                                                    && index === chatMessages.length - 1;
+                                                const isPreparingMessage = isLiveAssistantMessage
+                                                    && chatStreamPhase === "preparing"
+                                                    && message.content.trim().length === 0;
+
+                                                if (isPreparingMessage) {
+                                                    return (
+                                                        <div className="flex items-center gap-3 text-muted-foreground">
+                                                            <span>Connecting to the model...</span>
+                                                            <div className="flex items-center space-x-1">
+                                                                <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-primary/40" />
+                                                                <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-primary/60 [animation-delay:0.2s]" />
+                                                                <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-primary/80 [animation-delay:0.4s]" />
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                }
+
+                                                return (
+                                                    <div className="space-y-2">
+                                                        <div className="prose prose-sm max-w-none break-words dark:prose-invert">
+                                                            <ReactMarkdown>{message.content}</ReactMarkdown>
+                                                        </div>
+                                                        {isLiveAssistantMessage && chatStreamPhase === "streaming" && (
+                                                            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                                                <span className="h-2 w-2 rounded-full bg-primary/80 animate-pulse" />
+                                                                <span>Streaming...</span>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                );
+                                            })()}
                                         </div>
                                     </div>
                                 ))}

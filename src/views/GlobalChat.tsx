@@ -221,6 +221,7 @@ export default function GlobalChat() {
     const {
         messages,
         isStreaming,
+        streamPhase,
         send,
         replaceMessages,
     } = useStreamingConversation();
@@ -240,7 +241,7 @@ export default function GlobalChat() {
 
     useEffect(() => {
         bottomRef.current?.scrollIntoView({ block: "end" });
-    }, [messages, isStreaming]);
+    }, [messages, streamPhase]);
 
     useEffect(() => {
         if (!parsedThread.isWellFormed) {
@@ -809,32 +810,51 @@ export default function GlobalChat() {
                                 </div>
                             )}
 
-                            <div className="space-y-6 pb-20">
-                                {messages.map((message, index) => (
-                                    <div key={`${message.role}-${index}`} className={`flex gap-4 ${message.role === "user" ? "flex-row-reverse" : ""}`}>
-                                        <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${message.role === "user" ? "bg-primary text-primary-foreground" : "bg-muted"}`}>
-                                            {message.role === "user" ? <User className="h-4 w-4" /> : <Bot className="h-4 w-4" />}
-                                        </div>
-                                        <div className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm ${message.role === "user" ? "bg-primary/10" : "border bg-muted/30"}`}>
-                                            <div className="prose prose-sm max-w-none dark:prose-invert">
-                                                <ReactMarkdown>{message.content}</ReactMarkdown>
+                                <div className="space-y-6 pb-20">
+                                    {messages.map((message, index) => (
+                                        <div key={`${message.role}-${index}`} className={`flex gap-4 ${message.role === "user" ? "flex-row-reverse" : ""}`}>
+                                            <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${message.role === "user" ? "bg-primary text-primary-foreground" : "bg-muted"}`}>
+                                                {message.role === "user" ? <User className="h-4 w-4" /> : <Bot className="h-4 w-4" />}
+                                            </div>
+                                            <div className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm ${message.role === "user" ? "bg-primary/10" : "border bg-muted/30"}`}>
+                                                {(() => {
+                                                    const isLiveAssistantMessage = message.role === "assistant"
+                                                        && isStreaming
+                                                        && index === messages.length - 1;
+                                                    const isPreparingMessage = isLiveAssistantMessage
+                                                        && streamPhase === "preparing"
+                                                        && message.content.trim().length === 0;
+
+                                                    if (isPreparingMessage) {
+                                                        return (
+                                                            <div className="flex items-center gap-3 text-muted-foreground">
+                                                                <span>Connecting to the model...</span>
+                                                                <div className="flex items-center space-x-1">
+                                                                    <span className="h-2 w-2 animate-bounce rounded-full bg-primary/40" />
+                                                                    <span className="h-2 w-2 animate-bounce rounded-full bg-primary/60 [animation-delay:0.2s]" />
+                                                                    <span className="h-2 w-2 animate-bounce rounded-full bg-primary/80 [animation-delay:0.4s]" />
+                                                                </div>
+                                                            </div>
+                                                        );
+                                                    }
+
+                                                    return (
+                                                        <div className="space-y-2">
+                                                            <div className="prose prose-sm max-w-none dark:prose-invert">
+                                                                <ReactMarkdown>{message.content}</ReactMarkdown>
+                                                            </div>
+                                                            {isLiveAssistantMessage && streamPhase === "streaming" && (
+                                                                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                                                    <span className="h-2 w-2 rounded-full bg-primary/80 animate-pulse" />
+                                                                    <span>Streaming...</span>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    );
+                                                })()}
                                             </div>
                                         </div>
-                                    </div>
-                                ))}
-
-                                {isStreaming && (
-                                    <div className="flex gap-4">
-                                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-muted">
-                                            <Bot className="h-4 w-4" />
-                                        </div>
-                                        <div className="flex items-center space-x-1 rounded-2xl border bg-muted/30 px-4 py-3">
-                                            <span className="h-2 w-2 animate-bounce rounded-full bg-primary/40" />
-                                            <span className="h-2 w-2 animate-bounce rounded-full bg-primary/60 [animation-delay:0.2s]" />
-                                            <span className="h-2 w-2 animate-bounce rounded-full bg-primary/80 [animation-delay:0.4s]" />
-                                        </div>
-                                    </div>
-                                )}
+                                    ))}
                                 <div ref={bottomRef} />
                             </div>
                         </div>

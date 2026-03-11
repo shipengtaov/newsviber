@@ -1,5 +1,16 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Message } from "@/lib/ai";
+import {
+  appendStreamingConversationChunk,
+  beginStreamingConversation,
+  createStreamingConversationState,
+  failStreamingConversation,
+  finishStreamingConversation,
+  type StreamPhase,
+  type StreamingConversationState,
+} from "@/hooks/streaming-conversation-state";
+
+export type { StreamPhase } from "@/hooks/streaming-conversation-state";
 
 type ConversationBuilder = (
   history: Message[],
@@ -27,32 +38,14 @@ type SendConversationInput = {
   }) => Promise<void> | void;
 };
 
-function appendAssistantChunk(messages: Message[], chunk: string): Message[] {
-  if (messages.length === 0) {
-    return messages;
-  }
-
-  const nextMessages = [...messages];
-  const lastMessage = nextMessages[nextMessages.length - 1];
-
-  if (lastMessage.role !== "assistant") {
-    return messages;
-  }
-
-  nextMessages[nextMessages.length - 1] = {
-    ...lastMessage,
-    content: lastMessage.content + chunk,
-  };
-
-  return nextMessages;
-}
-
 export function useStreamingConversation() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isStreaming, setIsStreaming] = useState(false);
+  const [streamPhase, setStreamPhase] = useState<StreamPhase>("idle");
   const abortControllerRef = useRef<AbortController | null>(null);
   const messagesRef = useRef<Message[]>([]);
   const isStreamingRef = useRef(false);
+  const streamPhaseRef = useRef<StreamPhase>("idle");
 
   useEffect(() => {
     messagesRef.current = messages;
@@ -62,45 +55,33 @@ export function useStreamingConversation() {
     isStreamingRef.current = isStreaming;
   }, [isStreaming]);
 
+  useEffect(() => {
+    streamPhaseRef.current = streamPhase;
+  }, [streamPhase]);
+
+  const applyState = useCallback((nextState: StreamingConversationState) => {
+    messagesRef.current = nextState.messages;
+    isStreamingRef.current = nextState.isStreaming;
+    streamPhaseRef.current = nextState.streamPhase;
+    setMessages(nextState.messages);
+    setIsStreaming(nextState.isStreaming);
+    setStreamPhase(nextState.streamPhase);
+  }, []);
+
   const stop = useCallback(() => {
     abortControllerRef.current?.abort();
     abortControllerRef.current = null;
-    isStreamingRef.current = false;
-    setIsStreaming(false);
-  }, []);
+    applyState(finishStreamingConversation(createStreamingConversationState(messagesRef.current)));
+  }, [applyState]);
 
   const replaceMessages = useCallback((nextMessages: Message[]) => {
     stop();
-    messagesRef.current = nextMessages;
-    setMessages(nextMessages);
-  }, [stop]);
+    applyState(createStreamingConversationState(nextMessages));
+  }, [applyState, stop]);
 
   const clear = useCallback(() => {
     replaceMessages([]);
   }, [replaceMessages]);
-
-  const replaceAssistantMessage = useCallback((content: string) => {
-    setMessages((currentMessages) => {
-      if (currentMessages.length === 0) {
-        return currentMessages;
-      }
-
-      const nextMessages = [...currentMessages];
-      const lastMessage = nextMessages[nextMessages.length - 1];
-
-      if (lastMessage.role !== "assistant") {
-        return currentMessages;
-      }
-
-      nextMessages[nextMessages.length - 1] = {
-        ...lastMessage,
-        content,
-      };
-
-      messagesRef.current = nextMessages;
-      return nextMessages;
-    });
-  }, []);
 
   function getErrorMessage(error: unknown): string {
     if (error instanceof Error) {
@@ -127,21 +108,13 @@ export function useStreamingConversation() {
       role: "user",
       content: trimmedContent,
     };
-    const assistantPlaceholder: Message = {
-      role: "assistant",
-      content: "",
-    };
-
     const abortController = new AbortController();
     abortControllerRef.current?.abort();
     abortControllerRef.current = abortController;
 
-    const pendingMessages = [...history, userMessage, assistantPlaceholder];
-    messagesRef.current = pendingMessages;
-    isStreamingRef.current = true;
-
-    setMessages(pendingMessages);
-    setIsStreaming(true);
+    const pendingState = beginStreamingConversation(history, userMessage);
+    const pendingMessages = pendingState.messages;
+    applyState(pendingState);
 
     try {
       await onUserMessageCommitted?.({
@@ -164,11 +137,16 @@ export function useStreamingConversation() {
       const fullText = await streamConversation(
         conversation,
         (chunk) => {
-          setMessages((currentMessages) => {
-            const nextMessages = appendAssistantChunk(currentMessages, chunk);
-            messagesRef.current = nextMessages;
-            return nextMessages;
-          });
+          applyState(
+            appendStreamingConversationChunk(
+              {
+                messages: messagesRef.current,
+                isStreaming: isStreamingRef.current,
+                streamPhase: streamPhaseRef.current,
+              },
+              chunk,
+            ),
+          );
         },
         abortController.signal,
       );
@@ -184,13 +162,22 @@ export function useStreamingConversation() {
     } catch (error) {
       if (!abortController.signal.aborted) {
         const errorMessage = `**Error:** ${getErrorMessage(error)}`;
-        replaceAssistantMessage(errorMessage);
+        const failedState = failStreamingConversation(
+          {
+            messages: messagesRef.current,
+            isStreaming: isStreamingRef.current,
+            streamPhase: streamPhaseRef.current,
+          },
+          errorMessage,
+        );
+        applyState(failedState);
+        const assistantMessage = failedState.messages[failedState.messages.length - 1];
         await onAssistantError?.({
           history,
           userMessage,
           assistantMessage: {
             role: "assistant",
-            content: errorMessage,
+            content: assistantMessage?.role === "assistant" ? assistantMessage.content : errorMessage,
           },
           error,
         });
@@ -198,12 +185,16 @@ export function useStreamingConversation() {
     } finally {
       if (abortControllerRef.current === abortController) {
         abortControllerRef.current = null;
+        applyState(
+          finishStreamingConversation({
+            messages: messagesRef.current,
+            isStreaming: isStreamingRef.current,
+            streamPhase: streamPhaseRef.current,
+          }),
+        );
       }
-
-      isStreamingRef.current = false;
-      setIsStreaming(false);
     }
-  }, [replaceAssistantMessage]);
+  }, [applyState]);
 
   useEffect(() => {
     return () => {
@@ -214,6 +205,7 @@ export function useStreamingConversation() {
   return {
     messages,
     isStreaming,
+    streamPhase,
     send,
     stop,
     clear,

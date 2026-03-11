@@ -58,7 +58,15 @@ export type ProviderFlavor =
   | "openai-compatible";
 
 const API_KEY_OPTIONAL_PROVIDERS = new Set(["ollama", "custom"]);
+const STREAMING_CHUNK_TIMEOUT_MS = 10_000;
 let tauriFetchPromise: Promise<FetchFunction | null> | null = null;
+
+class StreamingContractError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "StreamingContractError";
+  }
+}
 
 type ErrorWithMetadata = {
   message?: unknown;
@@ -92,6 +100,22 @@ function stringifyErrorResponse(response: unknown): string | null {
   } catch {
     return null;
   }
+}
+
+function createStreamingError(
+  providerName: string,
+  detail: string,
+  options?: { started: boolean },
+): StreamingContractError {
+  const detailText = detail.trim();
+  const prefix = options?.started
+    ? "Streaming response was interrupted."
+    : "Streaming chat requires real-time chunked output.";
+  const suffix = options?.started
+    ? ""
+    : " Please switch to a provider/model that supports streaming.";
+
+  return new StreamingContractError(`${providerName}: ${prefix} ${detailText}${suffix}`);
 }
 
 async function loadTauriFetch(): Promise<FetchFunction | null> {
@@ -402,45 +426,72 @@ export async function streamConversation(
   const { provider } = getActiveAIProviderSettings();
   let fullText = "";
   let streamError: unknown = null;
+  let hasReceivedTextChunk = false;
 
   const result = streamText({
     model: resolveModel(),
     messages: buildMessageArray(messages),
     abortSignal,
+    timeout: { chunkMs: STREAMING_CHUNK_TIMEOUT_MS },
     onError({ error }) {
       streamError = error;
     },
   });
 
-  for await (const part of result.fullStream) {
-    switch (part.type) {
-      case "text-delta": {
-        if (!part.text) {
+  try {
+    for await (const part of result.fullStream) {
+      switch (part.type) {
+        case "text-delta": {
+          if (!part.text) {
+            break;
+          }
+
+          hasReceivedTextChunk = true;
+          fullText += part.text;
+          onChunk(part.text);
           break;
         }
+        case "error": {
+          streamError = part.error;
+          break;
+        }
+        case "abort": {
+          if (abortSignal?.aborted) {
+            throw new Error("AI response was aborted.");
+          }
 
-        fullText += part.text;
-        onChunk(part.text);
-        break;
+          throw createStreamingError(
+            provider.name,
+            part.reason || `No stream chunk arrived within ${STREAMING_CHUNK_TIMEOUT_MS / 1000} seconds.`,
+            { started: hasReceivedTextChunk },
+          );
+        }
+        default:
+          break;
       }
-      case "error": {
-        streamError = part.error;
-        break;
-      }
-      case "abort": {
-        throw new Error("AI response was aborted.");
-      }
-      default:
-        break;
     }
+  } catch (error) {
+    if (error instanceof StreamingContractError) {
+      throw error;
+    }
+
+    if (abortSignal?.aborted) {
+      throw new Error("AI response was aborted.");
+    }
+
+    throw createStreamingError(provider.name, getErrorMessage(error), {
+      started: hasReceivedTextChunk,
+    });
   }
 
   if (streamError) {
-    throw new Error(`${provider.name}: ${getErrorMessage(streamError)}`);
+    throw createStreamingError(provider.name, getErrorMessage(streamError), {
+      started: hasReceivedTextChunk,
+    });
   }
 
   if (!fullText.trim()) {
-    throw new Error(`${provider.name}: AI returned an empty response.`);
+    throw createStreamingError(provider.name, "The provider returned no text chunks.");
   }
 
   return fullText;
