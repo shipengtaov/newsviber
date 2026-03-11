@@ -5,6 +5,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import {
     DEFAULT_AI_PROVIDER_ID,
@@ -17,7 +25,8 @@ import {
     normalizeProviderConfig,
     readCurrentProviderId,
     readStoredProviderConfigs,
-    saveAIProviderSettings,
+    saveCurrentProviderId,
+    saveProviderConfig,
 } from "@/lib/ai-config";
 import { cn } from "@/lib/utils";
 import { PageShell } from "@/components/layout/PageShell";
@@ -30,18 +39,8 @@ async function getDb() {
     return db;
 }
 
-function normalizeProviderConfigs(providerConfigs: AIProviderConfigs): AIProviderConfigs {
-    return PROVIDERS.reduce<AIProviderConfigs>((configs, provider) => {
-        configs[provider.id] = normalizeProviderConfig(provider.id, providerConfigs[provider.id]);
-        return configs;
-    }, {});
-}
-
-function getAiSettingsSnapshot(providerId: string, providerConfigs: AIProviderConfigs) {
-    return JSON.stringify({
-        currentProviderId: providerId,
-        providerConfigs: normalizeProviderConfigs(providerConfigs),
-    });
+function getProviderConfigSnapshot(providerId: string, providerConfig: AIProviderConfig) {
+    return JSON.stringify(normalizeProviderConfig(providerId, providerConfig));
 }
 
 export default function Settings() {
@@ -49,11 +48,12 @@ export default function Settings() {
     const [jinaKey, setJinaKey] = useState("");
     const [savedJinaKey, setSavedJinaKey] = useState("");
     const [selectedProviderId, setSelectedProviderId] = useState(DEFAULT_AI_PROVIDER_ID);
-    const [savedProviderId, setSavedProviderId] = useState(DEFAULT_AI_PROVIDER_ID);
     const [providerDrafts, setProviderDrafts] = useState<AIProviderConfigs>(getDefaultProviderConfigs);
     const [savedProviderDrafts, setSavedProviderDrafts] = useState<AIProviderConfigs>(getDefaultProviderConfigs);
     const [showAiApiKey, setShowAiApiKey] = useState(false);
     const [showJinaApiKey, setShowJinaApiKey] = useState(false);
+    const [pendingProviderId, setPendingProviderId] = useState<string | null>(null);
+    const [discardDialogOpen, setDiscardDialogOpen] = useState(false);
 
     useEffect(() => {
         // In a real app, these should be securely stored in tauri-plugin-store or OS keyring.
@@ -65,16 +65,17 @@ export default function Settings() {
         setJinaKey(storedJinaKey);
         setSavedJinaKey(storedJinaKey);
         setSelectedProviderId(storedProviderId);
-        setSavedProviderId(storedProviderId);
         setProviderDrafts(storedProviderConfigs);
         setSavedProviderDrafts(storedProviderConfigs);
     }, []);
 
     const selectedProvider = getProviderById(selectedProviderId);
     const selectedConfig = providerDrafts[selectedProviderId] || getDefaultProviderConfig(selectedProviderId);
-    const aiSettingsSnapshot = getAiSettingsSnapshot(selectedProviderId, providerDrafts);
-    const savedAiSettingsSnapshot = getAiSettingsSnapshot(savedProviderId, savedProviderDrafts);
-    const isAiDirty = aiSettingsSnapshot !== savedAiSettingsSnapshot;
+    const savedSelectedConfig = savedProviderDrafts[selectedProviderId] || getDefaultProviderConfig(selectedProviderId);
+    const selectedConfigSnapshot = getProviderConfigSnapshot(selectedProviderId, selectedConfig);
+    const savedSelectedConfigSnapshot = getProviderConfigSnapshot(selectedProviderId, savedSelectedConfig);
+    const normalizedSelectedConfig = normalizeProviderConfig(selectedProviderId, selectedConfig);
+    const isAiDirty = selectedConfigSnapshot !== savedSelectedConfigSnapshot;
     const isJinaDirty = jinaKey !== savedJinaKey;
 
     function updateSelectedProviderConfig(updates: Partial<AIProviderConfig>) {
@@ -88,10 +89,61 @@ export default function Settings() {
     }
 
     function persistAiSettings() {
-        saveAIProviderSettings(selectedProviderId, providerDrafts);
-        setSavedProviderId(selectedProviderId);
-        setSavedProviderDrafts(normalizeProviderConfigs(providerDrafts));
+        saveProviderConfig(selectedProviderId, selectedConfig);
+        setProviderDrafts((prev) => ({
+            ...prev,
+            [selectedProviderId]: normalizedSelectedConfig,
+        }));
+        setSavedProviderDrafts((prev) => ({
+            ...prev,
+            [selectedProviderId]: normalizedSelectedConfig,
+        }));
         toast({ title: "Settings Saved", description: "AI provider configuration has been updated." });
+    }
+
+    function resetSelectedProviderDraft() {
+        setProviderDrafts((prev) => ({
+            ...prev,
+            [selectedProviderId]: { ...savedSelectedConfig },
+        }));
+    }
+
+    function switchProvider(nextProviderId: string) {
+        saveCurrentProviderId(nextProviderId);
+        setSelectedProviderId(nextProviderId);
+    }
+
+    function handleProviderChange(nextProviderId: string) {
+        if (nextProviderId === selectedProviderId) {
+            return;
+        }
+
+        if (isAiDirty) {
+            setPendingProviderId(nextProviderId);
+            setDiscardDialogOpen(true);
+            return;
+        }
+
+        switchProvider(nextProviderId);
+    }
+
+    function handleDiscardDialogOpenChange(open: boolean) {
+        setDiscardDialogOpen(open);
+
+        if (!open) {
+            setPendingProviderId(null);
+        }
+    }
+
+    function confirmProviderSwitch() {
+        if (!pendingProviderId) {
+            return;
+        }
+
+        resetSelectedProviderDraft();
+        switchProvider(pendingProviderId);
+        setPendingProviderId(null);
+        setDiscardDialogOpen(false);
     }
 
     function persistJinaSettings() {
@@ -141,7 +193,7 @@ export default function Settings() {
                                             <button
                                                 key={provider.id}
                                                 type="button"
-                                                onClick={() => setSelectedProviderId(provider.id)}
+                                                onClick={() => handleProviderChange(provider.id)}
                                                 aria-pressed={isSelected}
                                                 className={cn(
                                                     "inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm transition-colors",
@@ -232,6 +284,25 @@ export default function Settings() {
                     </form>
                 </CardContent>
             </Card>
+
+            <Dialog open={discardDialogOpen} onOpenChange={handleDiscardDialogOpenChange}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Discard unsaved provider changes?</DialogTitle>
+                        <DialogDescription>
+                            Your changes for {selectedProvider.name} have not been saved. Discard them and switch providers?
+                        </DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter>
+                        <Button type="button" variant="outline" onClick={() => handleDiscardDialogOpenChange(false)}>
+                            Cancel
+                        </Button>
+                        <Button type="button" onClick={confirmProviderSwitch}>
+                            Discard and Switch
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
 
             <Card>
                 <CardHeader>

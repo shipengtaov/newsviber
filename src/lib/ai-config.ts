@@ -244,6 +244,19 @@ export function getDefaultProviderConfigs(): AIProviderConfigs {
   }, {});
 }
 
+function normalizeProviderConfigs(providerConfigs: AIProviderConfigs): AIProviderConfigs {
+  return PROVIDERS.reduce<AIProviderConfigs>((configs, provider) => {
+    configs[provider.id] = normalizeProviderConfig(provider.id, providerConfigs[provider.id]);
+    return configs;
+  }, {});
+}
+
+function clearLegacyAIStorageKeys() {
+  for (const key of LEGACY_AI_STORAGE_KEYS) {
+    localStorage.removeItem(key);
+  }
+}
+
 export function readCurrentProviderId(): string {
   const storedProviderId = localStorage.getItem(AI_CURRENT_PROVIDER_STORAGE_KEY);
   return isKnownProviderId(storedProviderId) ? storedProviderId : DEFAULT_AI_PROVIDER_ID;
@@ -276,24 +289,27 @@ export function readStoredProviderConfigs(): AIProviderConfigs {
   }
 }
 
-export function saveAIProviderSettings(
-  currentProviderId: string,
-  providerConfigs: AIProviderConfigs,
-) {
-  const normalizedConfigs = PROVIDERS.reduce<AIProviderConfigs>((configs, provider) => {
-    configs[provider.id] = normalizeProviderConfig(provider.id, providerConfigs[provider.id]);
-    return configs;
-  }, {});
-
+export function saveCurrentProviderId(currentProviderId: string) {
   localStorage.setItem(
     AI_CURRENT_PROVIDER_STORAGE_KEY,
     isKnownProviderId(currentProviderId) ? currentProviderId : DEFAULT_AI_PROVIDER_ID,
   );
-  localStorage.setItem(AI_PROVIDER_CONFIGS_STORAGE_KEY, JSON.stringify(normalizedConfigs));
+  clearLegacyAIStorageKeys();
+}
 
-  for (const key of LEGACY_AI_STORAGE_KEYS) {
-    localStorage.removeItem(key);
-  }
+export function saveProviderConfig(
+  providerId: string,
+  providerConfig: Partial<AIProviderConfig> | null | undefined,
+) {
+  const normalizedProviderId = isKnownProviderId(providerId) ? providerId : DEFAULT_AI_PROVIDER_ID;
+  const storedConfigs = readStoredProviderConfigs();
+  const normalizedConfigs = normalizeProviderConfigs({
+    ...storedConfigs,
+    [normalizedProviderId]: normalizeProviderConfig(normalizedProviderId, providerConfig),
+  });
+
+  localStorage.setItem(AI_PROVIDER_CONFIGS_STORAGE_KEY, JSON.stringify(normalizedConfigs));
+  clearLegacyAIStorageKeys();
 }
 
 export function getActiveAIProviderSettings() {
