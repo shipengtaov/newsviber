@@ -14,6 +14,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { addCreativeSyncListener } from "@/lib/creative-events";
@@ -36,7 +37,7 @@ import { useStreamingConversation } from "@/hooks/use-streaming-conversation";
 import { getCreativeCardBodyMarkdown, getCreativeCardPreviewExcerpt } from "@/lib/creative-card";
 import { formatUtcDate, formatUtcDateTime } from "@/lib/time";
 import ReactMarkdown from "react-markdown";
-import { ArrowLeft, Lightbulb, Loader2, Pencil, Plus, Send, Trash2, WandSparkles } from "lucide-react";
+import { ArrowLeft, ChevronDown, ChevronUp, Ellipsis, Lightbulb, Loader2, MessageSquare, Pencil, Plus, Send, Trash2, WandSparkles } from "lucide-react";
 
 type ProjectFormState = {
     name: string;
@@ -50,6 +51,11 @@ type ProjectFormState = {
 
 const DEFAULT_AUTO_INTERVAL_MINUTES = "60";
 const DEFAULT_MAX_ARTICLES_PER_CARD = "12";
+const CREATIVE_TILE_CARD_BASE_CLASS = "flex cursor-pointer flex-col overflow-hidden transition-all hover:border-primary/50 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2";
+const PROJECT_TILE_CARD_CLASS = `${CREATIVE_TILE_CARD_BASE_CLASS} h-[272px]`;
+const GENERATED_TILE_CARD_CLASS = CREATIVE_TILE_CARD_BASE_CLASS;
+const CREATIVE_TILE_HEADER_CLASS = "px-4 py-4 pb-2";
+const CREATIVE_TILE_BODY_CLASS = "flex flex-1 flex-col px-4 pb-4 pt-0";
 
 function createEmptyProjectFormState(): ProjectFormState {
     return {
@@ -105,6 +111,56 @@ function formatAutoSummary(project: CreativeProject): string {
     }
 
     return `Every ${project.auto_interval_minutes} minute${project.auto_interval_minutes === 1 ? "" : "s"}`;
+}
+
+function formatCompactAutoSummary(project: CreativeProject): string {
+    if (!project.auto_enabled) {
+        return "Manual";
+    }
+
+    return `${project.auto_interval_minutes}m`;
+}
+
+function formatProjectScopeSummary(project: CreativeProject, sources: CreativeSourceOption[]): string {
+    if (project.source_ids.length === 0) {
+        return "All sources";
+    }
+
+    const sourceNames = sources
+        .filter((source) => project.source_ids.includes(source.id))
+        .map((source) => source.name);
+
+    if (sourceNames.length === 1) {
+        return sourceNames[0];
+    }
+
+    return `${project.source_ids.length} source${project.source_ids.length === 1 ? "" : "s"}`;
+}
+
+function formatProjectRecentActivitySummary(project: CreativeProject): string {
+    if (project.last_auto_generated_at) {
+        return `Generated ${formatTimestamp(project.last_auto_generated_at)}`;
+    }
+
+    if (project.last_auto_checked_at) {
+        return `Checked ${formatTimestamp(project.last_auto_checked_at)}`;
+    }
+
+    return "No recent activity";
+}
+
+type ProjectOverviewItemProps = {
+    label: string;
+    value: React.ReactNode;
+};
+
+function ProjectOverviewItem({ label, value }: ProjectOverviewItemProps) {
+    return (
+        <div className="min-w-0">
+            <div className="text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">{label}</div>
+            <div className="mt-1 break-words text-sm font-medium leading-snug text-foreground">{value}</div>
+        </div>
+    );
 }
 
 type ProjectDialogProps = {
@@ -375,6 +431,9 @@ export default function CreativeSpace() {
     const [selectedArticleIds, setSelectedArticleIds] = useState<number[]>([]);
     const [isLoadingCandidates, setIsLoadingCandidates] = useState(false);
     const [isGenerating, setIsGenerating] = useState(false);
+    const [isProjectInfoOpen, setIsProjectInfoOpen] = useState(false);
+    const [isProjectActionsOpen, setIsProjectActionsOpen] = useState(false);
+    const [isCardDiscussionOpen, setIsCardDiscussionOpen] = useState(false);
 
     const [chatInput, setChatInput] = useState("");
     const {
@@ -385,6 +444,7 @@ export default function CreativeSpace() {
     } = useStreamingConversation();
     const promptOptimizationRequestIdRef = useRef(0);
     const projectDialogOpenRef = useRef(projectDialogOpen);
+    const projectActionsPanelRef = useRef<HTMLDivElement | null>(null);
 
     const activeProject = projects.find((project) => project.id === activeProjectId) ?? null;
     const activeCard = cards.find((card) => card.id === activeCardId) ?? null;
@@ -469,6 +529,41 @@ export default function CreativeSpace() {
         setChatInput("");
     }, [activeCardId, replaceChatMessages]);
 
+    useEffect(() => {
+        setIsProjectInfoOpen(false);
+        setIsProjectActionsOpen(false);
+    }, [activeProjectId]);
+
+    useEffect(() => {
+        setIsCardDiscussionOpen(false);
+    }, [activeCardId]);
+
+    useEffect(() => {
+        if (!isProjectActionsOpen) {
+            return;
+        }
+
+        function handlePointerDown(event: MouseEvent) {
+            if (!projectActionsPanelRef.current?.contains(event.target as Node)) {
+                setIsProjectActionsOpen(false);
+            }
+        }
+
+        function handleEscape(event: KeyboardEvent) {
+            if (event.key === "Escape") {
+                setIsProjectActionsOpen(false);
+            }
+        }
+
+        document.addEventListener("mousedown", handlePointerDown);
+        document.addEventListener("keydown", handleEscape);
+
+        return () => {
+            document.removeEventListener("mousedown", handlePointerDown);
+            document.removeEventListener("keydown", handleEscape);
+        };
+    }, [isProjectActionsOpen]);
+
     async function loadProjects() {
         try {
             const result = await listCreativeProjects();
@@ -546,6 +641,7 @@ export default function CreativeSpace() {
 
     function openEditProjectDialog(project: CreativeProject) {
         resetPromptSuggestionState();
+        setIsProjectActionsOpen(false);
         setEditingProjectId(project.id);
         setProjectForm(createProjectFormState(project));
         setProjectDialogOpen(true);
@@ -562,6 +658,15 @@ export default function CreativeSpace() {
 
         event.preventDefault();
         openProjectDetail(projectId);
+    }
+
+    function handleGeneratedCardKeyDown(event: React.KeyboardEvent<HTMLDivElement>, cardId: number) {
+        if (event.key !== "Enter" && event.key !== " ") {
+            return;
+        }
+
+        event.preventDefault();
+        setActiveCardId(cardId);
     }
 
     function stopCardClickPropagation(event: React.MouseEvent<HTMLButtonElement>) {
@@ -606,6 +711,7 @@ export default function CreativeSpace() {
 
     async function handleDeleteProject(projectId: number) {
         setDeletingProjectId(projectId);
+        setIsProjectActionsOpen(false);
         try {
             await deleteCreativeProject(projectId);
             toast({ title: "Project deleted" });
@@ -638,6 +744,9 @@ export default function CreativeSpace() {
         setManualDialogOpen(false);
         closeProjectDialog();
         setSelectedArticleIds([]);
+        setIsCardDiscussionOpen(false);
+        setIsProjectInfoOpen(false);
+        setIsProjectActionsOpen(false);
         setActiveCardId(null);
         setActiveProjectId(null);
     }
@@ -822,137 +931,243 @@ Be concise and explore the user's questions further.`;
     if (activeCard) {
         return (
             <div className="relative flex h-full flex-col bg-background">
-                <div className="flex items-center border-b p-4">
-                    <Button variant="ghost" size="sm" onClick={() => setActiveCardId(null)}>
-                        <ArrowLeft className="mr-2 h-4 w-4" /> Back
-                    </Button>
-                    <div className="ml-4 min-w-0">
-                        <div className="truncate text-lg font-semibold">{activeCard.title}</div>
-                        <div className="mt-1 flex flex-wrap gap-3 text-xs text-muted-foreground">
-                            <span>{activeCard.generation_mode === "auto" ? "Auto" : "Manual"} run</span>
-                            <span>{activeCard.used_article_count} article{activeCard.used_article_count === 1 ? "" : "s"}</span>
-                            <span>{formatTimestamp(activeCard.created_at)}</span>
+                <div className="sticky top-0 z-10 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/85">
+                    <div className="mx-auto flex w-full max-w-4xl flex-col gap-3 px-4 py-3 md:px-6">
+                        <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                            <div className="min-w-0">
+                                <Button variant="ghost" size="sm" onClick={() => setActiveCardId(null)} className="-ml-2 w-fit">
+                                    <ArrowLeft className="mr-2 h-4 w-4" /> Back
+                                </Button>
+                                <div className="mt-2 space-y-1">
+                                    <div className="text-balance text-lg font-semibold leading-tight md:text-xl">{activeCard.title}</div>
+                                    <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                                        <span>{activeCard.generation_mode === "auto" ? "Auto" : "Manual"} run</span>
+                                        <span>{activeCard.used_article_count} article{activeCard.used_article_count === 1 ? "" : "s"}</span>
+                                        <span>{formatTimestamp(activeCard.created_at)}</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setIsCardDiscussionOpen(true)}
+                                className="shrink-0 self-start"
+                            >
+                                <MessageSquare className="mr-2 h-4 w-4" /> Discuss Card
+                            </Button>
                         </div>
                     </div>
                 </div>
-                <div className="flex flex-1 overflow-hidden">
-                    <div className="flex-1 space-y-8 overflow-y-auto px-4 py-4 md:px-6 md:py-6 lg:px-4 lg:py-4">
-                        <div className="prose prose-sm max-w-none dark:prose-invert">
+                <div className="flex-1 overflow-y-auto">
+                    <div className="mx-auto w-full max-w-4xl px-4 py-5 md:px-6 md:py-6">
+                        <div className="prose prose-sm max-w-none break-words dark:prose-invert">
                             <ReactMarkdown>{activeCardBodyMarkdown}</ReactMarkdown>
                         </div>
                     </div>
-                    <div className="flex w-96 flex-col border-l bg-muted/10">
-                        <div className="border-b p-4 font-medium">Discuss Card</div>
-                        <div className="flex-1 space-y-4 overflow-y-auto p-4 text-sm">
-                            {chatMessages.length === 0 && (
-                                <p className="mt-10 text-center text-muted-foreground">Expand on this report with AI.</p>
-                            )}
-                            {chatMessages.map((message, index) => (
-                                <div key={index} className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}>
-                                    <div className={`max-w-[85%] rounded-xl px-3 py-2 ${message.role === "user" ? "bg-primary text-primary-foreground" : "border bg-card shadow-sm"}`}>
-                                        <div className="prose prose-sm max-w-none break-words dark:prose-invert">
-                                            <ReactMarkdown>{message.content}</ReactMarkdown>
+                </div>
+
+                <Sheet open={isCardDiscussionOpen} onOpenChange={setIsCardDiscussionOpen}>
+                    <SheetContent side="right" className="w-full max-w-xl p-0 sm:max-w-xl">
+                        <div className="flex h-full flex-col">
+                            <SheetHeader className="shrink-0 border-b px-5 pb-4 pt-5 text-left">
+                                <SheetTitle>Discuss Card</SheetTitle>
+                                <SheetDescription>Ask follow-up questions or expand the report with AI.</SheetDescription>
+                            </SheetHeader>
+                            <div className="flex-1 space-y-4 overflow-y-auto px-5 py-4 text-sm">
+                                {chatMessages.length === 0 && (
+                                    <p className="mt-10 text-center text-muted-foreground">Expand on this report with AI.</p>
+                                )}
+                                {chatMessages.map((message, index) => (
+                                    <div key={index} className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}>
+                                        <div className={`max-w-[88%] rounded-xl px-3 py-2 ${message.role === "user" ? "bg-primary text-primary-foreground" : "border bg-card shadow-sm"}`}>
+                                            <div className="prose prose-sm max-w-none break-words dark:prose-invert">
+                                                <ReactMarkdown>{message.content}</ReactMarkdown>
+                                            </div>
                                         </div>
                                     </div>
-                                </div>
-                            ))}
+                                ))}
+                            </div>
+                            <div className="shrink-0 border-t bg-background px-5 py-4">
+                                <form onSubmit={handleChat} className="flex items-center gap-2">
+                                    <Input
+                                        value={chatInput}
+                                        onChange={(event) => setChatInput(event.target.value)}
+                                        placeholder="Explore further..."
+                                        disabled={isChatStreaming}
+                                        className="h-9 text-sm"
+                                    />
+                                    <Button type="submit" size="icon" className="h-9 w-9 shrink-0" disabled={isChatStreaming || !chatInput.trim()}>
+                                        <Send className="h-4 w-4" />
+                                    </Button>
+                                </form>
+                            </div>
                         </div>
-                        <div className="border-t bg-card p-3">
-                            <form onSubmit={handleChat} className="flex items-center gap-2">
-                                <Input
-                                    value={chatInput}
-                                    onChange={(event) => setChatInput(event.target.value)}
-                                    placeholder="Explore further..."
-                                    disabled={isChatStreaming}
-                                    className="h-8 text-sm"
-                                />
-                                <Button type="submit" size="icon" className="h-8 w-8 shrink-0" disabled={isChatStreaming || !chatInput.trim()}>
-                                    <Send className="h-3.5 w-3.5" />
-                                </Button>
-                            </form>
-                        </div>
-                    </div>
-                </div>
+                    </SheetContent>
+                </Sheet>
             </div>
         );
     }
 
     if (activeProject) {
         return (
-            <PageShell variant="workspace" size="wide" className="space-y-8">
-                <Button variant="ghost" size="sm" onClick={leaveProjectDetail} className="-ml-2">
-                    <ArrowLeft className="mr-2 h-4 w-4" /> Back to Projects
-                </Button>
+            <PageShell variant="workspace" size="wide" className="space-y-3">
+                <div className="space-y-3 rounded-2xl bg-card p-3 shadow-sm">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                        <div className="flex min-w-0 items-center gap-2">
+                            <Button variant="ghost" size="sm" onClick={leaveProjectDetail} className="-ml-2 shrink-0">
+                                <ArrowLeft className="mr-2 h-4 w-4" /> Back
+                            </Button>
+                            <h1 className="truncate text-lg font-semibold tracking-tight md:text-xl">{activeProject.name}</h1>
+                        </div>
+                        <div className="flex shrink-0 items-center gap-2">
+                            <Button onClick={openManualGenerateDialog} disabled={isGenerating}>
+                                <WandSparkles className="mr-2 h-4 w-4" /> {isGenerating ? "Generating..." : "Generate Card"}
+                            </Button>
+                            <div className="relative" ref={projectActionsPanelRef}>
+                                <Button
+                                    variant="outline"
+                                    size="icon"
+                                    onClick={() => setIsProjectActionsOpen((current) => !current)}
+                                    aria-label="Open project actions"
+                                    aria-expanded={isProjectActionsOpen}
+                                >
+                                    <Ellipsis className="h-4 w-4" />
+                                </Button>
 
-                <div className="flex flex-col gap-4 border-b pb-6 lg:flex-row lg:items-start lg:justify-between">
-                    <div className="min-w-0 flex-1 space-y-2">
-                        <h1 className="text-3xl font-bold">{activeProject.name}</h1>
-                        <p className="max-w-3xl break-words text-sm text-muted-foreground">{activeProject.prompt}</p>
+                                {isProjectActionsOpen && (
+                                    <div className="absolute right-0 top-[calc(100%+0.5rem)] z-20 w-48 rounded-xl border bg-popover p-1.5 shadow-lg">
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            className="w-full justify-start"
+                                            onClick={() => openEditProjectDialog(activeProject)}
+                                        >
+                                            <Pencil className="mr-2 h-4 w-4" /> Edit Project
+                                        </Button>
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            className="w-full justify-start text-destructive hover:text-destructive"
+                                            onClick={() => void handleDeleteProject(activeProject.id)}
+                                            disabled={deletingProjectId === activeProject.id}
+                                        >
+                                            <Trash2 className="mr-2 h-4 w-4" /> {deletingProjectId === activeProject.id ? "Deleting..." : "Delete Project"}
+                                        </Button>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
                     </div>
-                    <div className="flex shrink-0 flex-wrap gap-2 self-start">
-                        <Button variant="outline" onClick={() => openEditProjectDialog(activeProject)}>
-                            <Pencil className="mr-2 h-4 w-4" /> Edit Project
-                        </Button>
-                        <Button onClick={openManualGenerateDialog} disabled={isGenerating}>
-                            <WandSparkles className="mr-2 h-4 w-4" /> {isGenerating ? "Generating..." : "Generate Card"}
-                        </Button>
+
+                    <div className="rounded-xl bg-muted/10 px-3 py-2">
+                        <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
+                            <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-4 gap-y-1.5 text-sm">
+                                <span className="inline-flex items-center gap-1.5">
+                                    <span className="text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">Auto</span>
+                                    <span className="font-medium text-foreground">{formatCompactAutoSummary(activeProject)}</span>
+                                </span>
+                                <span className="inline-flex min-w-0 items-center gap-1.5">
+                                    <span className="text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">Scope</span>
+                                    <span className="truncate font-medium text-foreground">{formatProjectScopeSummary(activeProject, sources)}</span>
+                                </span>
+                                <span className="inline-flex items-center gap-1.5">
+                                    <span className="text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">Max</span>
+                                    <span className="font-medium text-foreground">{activeProject.max_articles_per_card}</span>
+                                </span>
+                                <span className="inline-flex items-center gap-1.5">
+                                    <span className="text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">Cards</span>
+                                    <span className="font-medium text-foreground">{cards.length}</span>
+                                </span>
+                                <span className="inline-flex min-w-0 items-center gap-1.5">
+                                    <span className="text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">Updated</span>
+                                    <span className="truncate font-medium text-foreground">{formatProjectRecentActivitySummary(activeProject)}</span>
+                                </span>
+                            </div>
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => setIsProjectInfoOpen((current) => !current)}
+                                className="h-8 w-8 shrink-0 self-start lg:self-center"
+                                aria-label={isProjectInfoOpen ? "Collapse project info" : "Expand project info"}
+                                aria-expanded={isProjectInfoOpen}
+                                title={isProjectInfoOpen ? "Collapse project info" : "Expand project info"}
+                            >
+                                {isProjectInfoOpen ? (
+                                    <ChevronUp className="h-3.5 w-3.5" />
+                                ) : (
+                                    <ChevronDown className="h-3.5 w-3.5" />
+                                )}
+                            </Button>
+                        </div>
+
+                        {isProjectInfoOpen && (
+                            <div className="mt-3 grid gap-4 pt-1 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]">
+                                <div className="space-y-2">
+                                    <div className="text-sm font-medium">Focus Prompt</div>
+                                    <p className="break-words text-sm leading-6 text-muted-foreground">{activeProject.prompt}</p>
+                                </div>
+
+                                <div className="grid gap-x-4 gap-y-3 sm:grid-cols-2">
+                                    <ProjectOverviewItem
+                                        label="Automation"
+                                        value={activeProject.auto_enabled ? "Enabled" : "Manual only"}
+                                    />
+                                    <ProjectOverviewItem
+                                        label="Check Interval"
+                                        value={activeProject.auto_enabled ? formatAutoSummary(activeProject) : "Not scheduled"}
+                                    />
+                                    <ProjectOverviewItem
+                                        label="Scope"
+                                        value={formatProjectScope(activeProject, sources)}
+                                    />
+                                    <ProjectOverviewItem
+                                        label="Last Checked"
+                                        value={formatTimestamp(activeProject.last_auto_checked_at)}
+                                    />
+                                    <ProjectOverviewItem
+                                        label="Last Generated"
+                                        value={formatTimestamp(activeProject.last_auto_generated_at)}
+                                    />
+                                    <ProjectOverviewItem
+                                        label="Cards"
+                                        value={`${cards.length} card${cards.length === 1 ? "" : "s"}`}
+                                    />
+                                </div>
+                            </div>
+                        )}
                     </div>
                 </div>
 
-                <div className="grid gap-4 lg:grid-cols-3">
-                    <Card>
-                        <CardHeader className="pb-3">
-                            <CardTitle className="text-base">Auto Generation</CardTitle>
-                            <CardDescription>{formatAutoSummary(activeProject)}</CardDescription>
-                        </CardHeader>
-                        <CardContent className="space-y-2 text-sm text-muted-foreground">
-                            <p>Interval: {activeProject.auto_interval_minutes} minute{activeProject.auto_interval_minutes === 1 ? "" : "s"}</p>
-                            <p>Max articles per card: {activeProject.max_articles_per_card}</p>
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardHeader className="pb-3">
-                            <CardTitle className="text-base">News Scope</CardTitle>
-                            <CardDescription>{activeProject.source_ids.length === 0 ? "All sources" : `${activeProject.source_ids.length} selected source${activeProject.source_ids.length === 1 ? "" : "s"}`}</CardDescription>
-                        </CardHeader>
-                        <CardContent className="text-sm text-muted-foreground">
-                            {formatProjectScope(activeProject, sources)}
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardHeader className="pb-3">
-                            <CardTitle className="text-base">Automation History</CardTitle>
-                            <CardDescription>Last scheduler activity for this project</CardDescription>
-                        </CardHeader>
-                        <CardContent className="space-y-2 text-sm text-muted-foreground">
-                            <p>Last checked: {formatTimestamp(activeProject.last_auto_checked_at)}</p>
-                            <p>Last generated: {formatTimestamp(activeProject.last_auto_generated_at)}</p>
-                        </CardContent>
-                    </Card>
-                </div>
-
-                <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
+                <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
                     {cards.map((card) => (
-                        <Card key={card.id} className="flex h-72 cursor-pointer flex-col transition-all hover:border-primary/50 hover:shadow-md" onClick={() => setActiveCardId(card.id)}>
-                            <CardHeader className="pb-2">
+                        <Card
+                            key={card.id}
+                            className={GENERATED_TILE_CARD_CLASS}
+                            role="button"
+                            tabIndex={0}
+                            onClick={() => setActiveCardId(card.id)}
+                            onKeyDown={(event) => handleGeneratedCardKeyDown(event, card.id)}
+                        >
+                            <CardHeader className={CREATIVE_TILE_HEADER_CLASS}>
                                 <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
                                     <span>{formatUtcDate(card.created_at)}</span>
-                                    <span>{card.generation_mode === "auto" ? "Auto" : "Manual"} · {card.used_article_count}</span>
+                                    <span>
+                                        {card.generation_mode === "auto" ? "Auto" : "Manual"} · {card.used_article_count}
+                                    </span>
                                 </div>
-                                <CardTitle className="line-clamp-2 text-lg leading-tight">{card.title}</CardTitle>
+                                <CardTitle className="line-clamp-2 min-h-[3rem] text-base leading-6">{card.title}</CardTitle>
                             </CardHeader>
-                            <CardContent className="relative flex-1 overflow-hidden pt-2">
-                                <p className="line-clamp-4 text-sm text-muted-foreground">
+                            <CardContent className={CREATIVE_TILE_BODY_CLASS}>
+                                <p className="line-clamp-3 min-h-[4.5rem] text-sm leading-6 text-muted-foreground">
                                     {getCreativeCardPreviewExcerpt(card)}
                                 </p>
-                                <div className="absolute bottom-0 left-0 right-0 h-10 bg-gradient-to-t from-card to-transparent" />
                             </CardContent>
                         </Card>
                     ))}
 
                     {cards.length === 0 && (
-                        <div className="col-span-full flex flex-col items-center justify-center rounded-xl border-2 border-dashed p-12 text-center text-muted-foreground">
-                            <Lightbulb className="mb-4 h-12 w-12 text-muted-foreground/30" />
+                        <div className="col-span-full flex flex-col items-center justify-center rounded-xl border-2 border-dashed p-10 text-center text-muted-foreground">
+                            <Lightbulb className="mb-4 h-10 w-10 text-muted-foreground/30" />
                             <p>No creative cards generated yet.</p>
                             <p className="text-sm">Choose news articles and generate the first card for this project.</p>
                         </div>
@@ -1107,25 +1322,25 @@ Be concise and explore the user's questions further.`;
                 {projects.map((project) => (
                     <Card
                         key={project.id}
-                        className="flex cursor-pointer flex-col transition-all hover:border-primary/50 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                        className={PROJECT_TILE_CARD_CLASS}
                         role="button"
                         tabIndex={0}
                         onClick={() => openProjectDetail(project.id)}
                         onKeyDown={(event) => handleProjectCardKeyDown(event, project.id)}
                     >
-                        <CardHeader className="px-4 py-4 pb-2">
+                        <CardHeader className={CREATIVE_TILE_HEADER_CLASS}>
                             <div className="min-w-0 flex-1">
                                 <CardTitle className="truncate text-lg">{project.name}</CardTitle>
-                                <CardDescription className="mt-1.5 line-clamp-2 text-sm">{project.prompt}</CardDescription>
+                                <CardDescription className="mt-1.5 line-clamp-2 min-h-[2.5rem] text-sm">{project.prompt}</CardDescription>
                             </div>
                         </CardHeader>
-                        <CardContent className="flex-1 px-4 pb-4 pt-0 text-sm text-muted-foreground">
+                        <CardContent className={`${CREATIVE_TILE_BODY_CLASS} text-sm text-muted-foreground`}>
                             <div className="space-y-1.5">
                                 <p>{formatAutoSummary(project)}</p>
                                 <p>Scope: {project.source_ids.length === 0 ? "All sources" : `${project.source_ids.length} selected`}</p>
                                 <p>Max articles: {project.max_articles_per_card}</p>
                             </div>
-                            <div className="mt-4 flex flex-wrap gap-2">
+                            <div className="mt-auto flex flex-wrap gap-2 pt-4">
                                 <Button
                                     variant="outline"
                                     size="sm"
