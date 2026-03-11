@@ -362,9 +362,19 @@ function buildCreativePrompt(project: CreativeProject, articles: CreativeArticle
         ].join("\n");
     }).join("\n\n");
 
-    return `You are a visionary strategist. Analyze the curated news context and combine it with the user's focus prompt to generate a structured creative report.
+    return `You are a strategist generating a concise report from curated news context and the user's focus prompt.
 
-Write concise but specific markdown-friendly content for each field. Ground the output in the supplied articles, call out uncertainty when evidence is weak, and avoid repeating the prompt verbatim.
+Return a title and a markdown body.
+
+Rules for the markdown body:
+- Do not use a fixed template.
+- Do not default to headings like "Key Signals", "Ideas", or "Next Actions" unless the user's prompt explicitly makes that structure the best fit.
+- Choose section titles, structure, and level of detail based only on the user's prompt and the evidence in the supplied articles.
+- Keep the language consistent with the user's prompt.
+- Ground every major point in the supplied articles.
+- If evidence is weak or mixed, state the uncertainty clearly.
+- Do not repeat the prompt verbatim.
+- Do not include a top-level # title heading inside report_markdown.
 
 User's Focus Prompt:
 ${project.prompt}
@@ -493,11 +503,11 @@ async function performCardGeneration(
     const cardId = await persistCreativeCard({
         projectId: project.id,
         title: generatedReport.title || "Untitled Insight",
-        signals: generatedReport.signals || "",
-        interpretation: generatedReport.interpretation || "",
-        ideas: generatedReport.ideas || "",
-        counterpoints: generatedReport.counterpoints || "",
-        nextActions: generatedReport.next_actions || "",
+        signals: "",
+        interpretation: "",
+        ideas: "",
+        counterpoints: "",
+        nextActions: "",
         fullReport: formatCreativeReportMarkdown(generatedReport),
         generationMode: mode,
         usedArticleCount: articles.length,

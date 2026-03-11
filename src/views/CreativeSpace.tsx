@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -30,12 +30,13 @@ import {
     saveCreativeProject,
     deleteCreativeProject,
 } from "@/lib/creative-service";
-import { type Message } from "@/lib/ai";
+import { optimizeCreativeProjectPrompt, type Message } from "@/lib/ai";
 import { PageShell } from "@/components/layout/PageShell";
 import { useStreamingConversation } from "@/hooks/use-streaming-conversation";
+import { getCreativeCardBodyMarkdown, getCreativeCardPreviewExcerpt } from "@/lib/creative-card";
 import { formatUtcDate, formatUtcDateTime } from "@/lib/time";
 import ReactMarkdown from "react-markdown";
-import { ArrowLeft, Edit, Lightbulb, Pencil, Plus, Send, Trash2, WandSparkles } from "lucide-react";
+import { ArrowLeft, Lightbulb, Loader2, Pencil, Plus, Send, Trash2, WandSparkles } from "lucide-react";
 
 type ProjectFormState = {
     name: string;
@@ -106,6 +107,246 @@ function formatAutoSummary(project: CreativeProject): string {
     return `Every ${project.auto_interval_minutes} minute${project.auto_interval_minutes === 1 ? "" : "s"}`;
 }
 
+type ProjectDialogProps = {
+    open: boolean;
+    onOpenChange: (open: boolean) => void;
+    editingProjectId: number | null;
+    projectForm: ProjectFormState;
+    setProjectForm: React.Dispatch<React.SetStateAction<ProjectFormState>>;
+    isSavingProject: boolean;
+    sources: CreativeSourceOption[];
+    onSubmit: (event: React.FormEvent) => void;
+    onCancel: () => void;
+    onToggleProjectSourceSelection: (sourceId: number) => void;
+    onOptimizePrompt: () => void;
+    isOptimizingPrompt: boolean;
+    promptSuggestionOpen: boolean;
+    onPromptSuggestionOpenChange: (open: boolean) => void;
+    promptSuggestionOriginal: string;
+    promptSuggestionDraft: string;
+    setPromptSuggestionDraft: React.Dispatch<React.SetStateAction<string>>;
+    onApplyPromptSuggestion: () => void;
+    trigger?: React.ReactNode;
+};
+
+function ProjectDialog({
+    open,
+    onOpenChange,
+    editingProjectId,
+    projectForm,
+    setProjectForm,
+    isSavingProject,
+    sources,
+    onSubmit,
+    onCancel,
+    onToggleProjectSourceSelection,
+    onOptimizePrompt,
+    isOptimizingPrompt,
+    promptSuggestionOpen,
+    onPromptSuggestionOpenChange,
+    promptSuggestionOriginal,
+    promptSuggestionDraft,
+    setPromptSuggestionDraft,
+    onApplyPromptSuggestion,
+    trigger,
+}: ProjectDialogProps) {
+    return (
+        <>
+            <Dialog open={open} onOpenChange={onOpenChange}>
+                {trigger ? <DialogTrigger asChild>{trigger}</DialogTrigger> : null}
+                <DialogContent className="max-h-[90vh] max-w-3xl overflow-y-auto">
+                    <DialogHeader>
+                        <DialogTitle>{editingProjectId ? "Edit Creative Project" : "Create Creative Project"}</DialogTitle>
+                        <DialogDescription>
+                            Configure the focus prompt, automation interval, and source scope for this project.
+                        </DialogDescription>
+                    </DialogHeader>
+
+                    <form onSubmit={onSubmit} className="space-y-6">
+                        <div className="space-y-2">
+                            <Label>Project Name</Label>
+                            <Input
+                                value={projectForm.name}
+                                onChange={(event) => setProjectForm((current) => ({ ...current, name: event.target.value }))}
+                                placeholder="e.g. AI startup opportunities"
+                                required
+                            />
+                        </div>
+
+                        <div className="space-y-2">
+                            <div className="flex items-center justify-between gap-3">
+                                <Label>Focus Prompt</Label>
+                                <span className="text-xs text-muted-foreground">Use AI to refine the current prompt.</span>
+                            </div>
+                            <div className="relative">
+                                <Textarea
+                                    value={projectForm.prompt}
+                                    onChange={(event) => setProjectForm((current) => ({ ...current, prompt: event.target.value }))}
+                                    placeholder="Act as a product strategist. Look for product gaps and emerging needs..."
+                                    className="min-h-32 resize-none pb-12 pr-12"
+                                    required
+                                />
+                                <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
+                                    className="absolute bottom-2 right-2 h-8 w-8 rounded-full border bg-background/90 shadow-sm"
+                                    onClick={onOptimizePrompt}
+                                    disabled={!projectForm.prompt.trim() || isOptimizingPrompt}
+                                    aria-label="Optimize prompt with AI"
+                                    title="Optimize prompt with AI"
+                                >
+                                    {isOptimizingPrompt ? (
+                                        <Loader2 className="h-4 w-4 animate-spin" />
+                                    ) : (
+                                        <WandSparkles className="h-4 w-4" />
+                                    )}
+                                </Button>
+                            </div>
+                        </div>
+
+                        <div className="grid gap-4 md:grid-cols-2">
+                            <div className="space-y-3 rounded-xl border p-4">
+                                <label className="flex items-center gap-3 text-sm font-medium">
+                                    <Checkbox
+                                        checked={projectForm.autoEnabled}
+                                        onChange={(event) => setProjectForm((current) => ({ ...current, autoEnabled: event.target.checked }))}
+                                    />
+                                    Enable automatic card generation
+                                </label>
+                                <p className="text-sm text-muted-foreground">
+                                    The app checks this project every configured interval and only generates a card when new scoped articles exist.
+                                </p>
+                            </div>
+
+                            <div className="space-y-2">
+                                <Label>Auto interval (minutes)</Label>
+                                <Input
+                                    type="number"
+                                    min="1"
+                                    value={projectForm.autoIntervalMinutes}
+                                    onChange={(event) => setProjectForm((current) => ({ ...current, autoIntervalMinutes: event.target.value }))}
+                                    disabled={!projectForm.autoEnabled}
+                                />
+                                <p className="text-xs text-muted-foreground">Example: set to 60 to check once per hour.</p>
+                            </div>
+                        </div>
+
+                        <div className="space-y-2">
+                            <Label>Max articles per card</Label>
+                            <Input
+                                type="number"
+                                min="1"
+                                value={projectForm.maxArticlesPerCard}
+                                onChange={(event) => setProjectForm((current) => ({ ...current, maxArticlesPerCard: event.target.value }))}
+                            />
+                            <p className="text-xs text-muted-foreground">Applies to both automatic runs and manual article selection.</p>
+                        </div>
+
+                        <div className="space-y-4 rounded-xl border p-4">
+                            <div className="flex items-start justify-between gap-4">
+                                <div>
+                                    <Label>Source scope</Label>
+                                    <p className="mt-1 text-sm text-muted-foreground">
+                                        Choose which news sources can feed this project.
+                                    </p>
+                                </div>
+                                <label className="flex items-center gap-2 text-sm">
+                                    <Checkbox
+                                        checked={projectForm.useAllSources}
+                                        onChange={(event) => setProjectForm((current) => ({
+                                            ...current,
+                                            useAllSources: event.target.checked,
+                                            sourceIds: event.target.checked ? [] : current.sourceIds,
+                                        }))}
+                                    />
+                                    Use all sources
+                                </label>
+                            </div>
+
+                            {projectForm.useAllSources && (
+                                <div className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
+                                    New and existing articles from every source will be eligible for this project.
+                                </div>
+                            )}
+
+                            {!projectForm.useAllSources && (
+                                <div className="max-h-64 space-y-2 overflow-y-auto">
+                                    {sources.length === 0 && (
+                                        <div className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
+                                            No sources available yet.
+                                        </div>
+                                    )}
+
+                                    {sources.map((source) => (
+                                        <label key={source.id} className="flex items-center gap-3 rounded-lg border p-3 text-sm">
+                                            <Checkbox
+                                                checked={projectForm.sourceIds.includes(source.id)}
+                                                onChange={() => onToggleProjectSourceSelection(source.id)}
+                                            />
+                                            <div className="min-w-0 flex-1">
+                                                <div className="font-medium">{source.name}</div>
+                                                <div className="text-xs text-muted-foreground">
+                                                    {source.article_count} article{source.article_count === 1 ? "" : "s"} · {source.active ? "Active" : "Inactive"}
+                                                </div>
+                                            </div>
+                                        </label>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+
+                        <DialogFooter>
+                            <Button type="button" variant="outline" onClick={onCancel}>
+                                Cancel
+                            </Button>
+                            <Button type="submit" disabled={isSavingProject}>
+                                {isSavingProject ? "Saving..." : editingProjectId ? "Save Changes" : "Create Project"}
+                            </Button>
+                        </DialogFooter>
+                    </form>
+                </DialogContent>
+            </Dialog>
+
+            <Dialog open={promptSuggestionOpen} onOpenChange={onPromptSuggestionOpenChange}>
+                <DialogContent className="max-h-[90vh] max-w-3xl overflow-y-auto">
+                    <DialogHeader>
+                        <DialogTitle>Review Optimized Prompt</DialogTitle>
+                        <DialogDescription>
+                            Compare the original prompt with the AI rewrite, then choose whether to replace it.
+                        </DialogDescription>
+                    </DialogHeader>
+
+                    <div className="space-y-4">
+                        <div className="space-y-2">
+                            <Label>Original Prompt</Label>
+                            <Textarea value={promptSuggestionOriginal} readOnly className="min-h-28 resize-none bg-muted/40" />
+                        </div>
+
+                        <div className="space-y-2">
+                            <Label>Optimized Prompt</Label>
+                            <Textarea
+                                value={promptSuggestionDraft}
+                                onChange={(event) => setPromptSuggestionDraft(event.target.value)}
+                                className="min-h-40 resize-y"
+                            />
+                        </div>
+                    </div>
+
+                    <DialogFooter>
+                        <Button type="button" variant="outline" onClick={() => onPromptSuggestionOpenChange(false)}>
+                            Keep Original
+                        </Button>
+                        <Button type="button" onClick={onApplyPromptSuggestion} disabled={!promptSuggestionDraft.trim()}>
+                            Replace Prompt
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+        </>
+    );
+}
+
 export default function CreativeSpace() {
     const { toast } = useToast();
 
@@ -120,6 +361,10 @@ export default function CreativeSpace() {
     const [editingProjectId, setEditingProjectId] = useState<number | null>(null);
     const [projectForm, setProjectForm] = useState<ProjectFormState>(createEmptyProjectFormState);
     const [isSavingProject, setIsSavingProject] = useState(false);
+    const [isOptimizingPrompt, setIsOptimizingPrompt] = useState(false);
+    const [promptSuggestionDialogOpen, setPromptSuggestionDialogOpen] = useState(false);
+    const [promptSuggestionOriginal, setPromptSuggestionOriginal] = useState("");
+    const [promptSuggestionDraft, setPromptSuggestionDraft] = useState("");
     const [deletingProjectId, setDeletingProjectId] = useState<number | null>(null);
 
     const [manualDialogOpen, setManualDialogOpen] = useState(false);
@@ -138,9 +383,12 @@ export default function CreativeSpace() {
         send: sendChatMessage,
         replaceMessages: replaceChatMessages,
     } = useStreamingConversation();
+    const promptOptimizationRequestIdRef = useRef(0);
+    const projectDialogOpenRef = useRef(projectDialogOpen);
 
     const activeProject = projects.find((project) => project.id === activeProjectId) ?? null;
     const activeCard = cards.find((card) => card.id === activeCardId) ?? null;
+    const activeCardBodyMarkdown = activeCard ? getCreativeCardBodyMarkdown(activeCard) : "";
     const scopedSources = activeProject
         ? sources.filter((source) => activeProject.source_ids.length === 0 || activeProject.source_ids.includes(source.id))
         : [];
@@ -149,6 +397,10 @@ export default function CreativeSpace() {
         void loadProjects();
         void loadSources();
     }, []);
+
+    useEffect(() => {
+        projectDialogOpenRef.current = projectDialogOpen;
+    }, [projectDialogOpen]);
 
     useEffect(() => {
         if (activeProjectId === null) {
@@ -270,13 +522,30 @@ export default function CreativeSpace() {
         }
     }
 
+    function resetPromptSuggestionState() {
+        promptOptimizationRequestIdRef.current += 1;
+        setIsOptimizingPrompt(false);
+        setPromptSuggestionDialogOpen(false);
+        setPromptSuggestionOriginal("");
+        setPromptSuggestionDraft("");
+    }
+
+    function closeProjectDialog() {
+        resetPromptSuggestionState();
+        setProjectDialogOpen(false);
+        setEditingProjectId(null);
+        setProjectForm(createEmptyProjectFormState());
+    }
+
     function openCreateProjectDialog() {
+        resetPromptSuggestionState();
         setEditingProjectId(null);
         setProjectForm(createEmptyProjectFormState());
         setProjectDialogOpen(true);
     }
 
     function openEditProjectDialog(project: CreativeProject) {
+        resetPromptSuggestionState();
         setEditingProjectId(project.id);
         setProjectForm(createProjectFormState(project));
         setProjectDialogOpen(true);
@@ -317,9 +586,7 @@ export default function CreativeSpace() {
                 editingProjectId ?? undefined,
             );
 
-            setProjectDialogOpen(false);
-            setEditingProjectId(null);
-            setProjectForm(createEmptyProjectFormState());
+            closeProjectDialog();
 
             if (!editingProjectId) {
                 setActiveProjectId(savedProject.id);
@@ -369,10 +636,30 @@ export default function CreativeSpace() {
 
     function leaveProjectDetail() {
         setManualDialogOpen(false);
-        setProjectDialogOpen(false);
+        closeProjectDialog();
         setSelectedArticleIds([]);
         setActiveCardId(null);
         setActiveProjectId(null);
+    }
+
+    function handleProjectDialogOpenChange(open: boolean) {
+        if (open) {
+            setProjectDialogOpen(true);
+            return;
+        }
+
+        closeProjectDialog();
+    }
+
+    function handlePromptSuggestionOpenChange(open: boolean) {
+        if (open) {
+            setPromptSuggestionDialogOpen(true);
+            return;
+        }
+
+        setPromptSuggestionDialogOpen(false);
+        setPromptSuggestionDraft("");
+        setPromptSuggestionOriginal("");
     }
 
     function toggleProjectSourceSelection(sourceId: number) {
@@ -408,6 +695,48 @@ export default function CreativeSpace() {
 
             return [...currentSelectedIds, articleId];
         });
+    }
+
+    async function handlePromptOptimization() {
+        const rawPrompt = projectForm.prompt.trim();
+        if (!rawPrompt || isOptimizingPrompt) {
+            return;
+        }
+
+        const requestId = promptOptimizationRequestIdRef.current + 1;
+        promptOptimizationRequestIdRef.current = requestId;
+        setIsOptimizingPrompt(true);
+
+        try {
+            const optimizedPrompt = await optimizeCreativeProjectPrompt(rawPrompt);
+            if (!projectDialogOpenRef.current || promptOptimizationRequestIdRef.current !== requestId) {
+                return;
+            }
+
+            setPromptSuggestionOriginal(rawPrompt);
+            setPromptSuggestionDraft(optimizedPrompt);
+            setPromptSuggestionDialogOpen(true);
+        } catch (error) {
+            if (promptOptimizationRequestIdRef.current === requestId) {
+                toast({ title: "Failed to optimize prompt", description: String(error), variant: "destructive" });
+            }
+        } finally {
+            if (promptOptimizationRequestIdRef.current === requestId) {
+                setIsOptimizingPrompt(false);
+            }
+        }
+    }
+
+    function applyPromptSuggestion() {
+        const optimizedPrompt = promptSuggestionDraft.trim();
+        if (!optimizedPrompt) {
+            return;
+        }
+
+        setProjectForm((current) => ({ ...current, prompt: optimizedPrompt }));
+        setPromptSuggestionDialogOpen(false);
+        setPromptSuggestionOriginal("");
+        setPromptSuggestionDraft("");
     }
 
     async function handleManualGenerate() {
@@ -450,8 +779,8 @@ export default function CreativeSpace() {
                 const systemPrompt = `You are discussing a creative report you generated.
 Report Data:
 Title: ${activeCard.title}
-Signals: ${activeCard.signals}
-Ideas: ${activeCard.ideas}
+Body:
+${activeCardBodyMarkdown}
 
 Be concise and explore the user's questions further.`;
 
@@ -462,6 +791,32 @@ Be concise and explore the user's questions further.`;
                 ];
             },
         });
+    }
+
+    function renderProjectDialog(trigger?: React.ReactNode) {
+        return (
+            <ProjectDialog
+                open={projectDialogOpen}
+                onOpenChange={handleProjectDialogOpenChange}
+                editingProjectId={editingProjectId}
+                projectForm={projectForm}
+                setProjectForm={setProjectForm}
+                isSavingProject={isSavingProject}
+                sources={sources}
+                onSubmit={handleProjectSubmit}
+                onCancel={closeProjectDialog}
+                onToggleProjectSourceSelection={toggleProjectSourceSelection}
+                onOptimizePrompt={handlePromptOptimization}
+                isOptimizingPrompt={isOptimizingPrompt}
+                promptSuggestionOpen={promptSuggestionDialogOpen}
+                onPromptSuggestionOpenChange={handlePromptSuggestionOpenChange}
+                promptSuggestionOriginal={promptSuggestionOriginal}
+                promptSuggestionDraft={promptSuggestionDraft}
+                setPromptSuggestionDraft={setPromptSuggestionDraft}
+                onApplyPromptSuggestion={applyPromptSuggestion}
+                trigger={trigger}
+            />
+        );
     }
 
     if (activeCard) {
@@ -482,42 +837,15 @@ Be concise and explore the user's questions further.`;
                 </div>
                 <div className="flex flex-1 overflow-hidden">
                     <div className="flex-1 space-y-8 overflow-y-auto px-4 py-4 md:px-6 md:py-6 lg:px-4 lg:py-4">
-                        <section>
-                            <h3 className="mb-3 text-xl font-bold text-primary">Key Signals</h3>
-                            <div className="prose prose-sm max-w-none dark:prose-invert">
-                                <ReactMarkdown>{activeCard.signals}</ReactMarkdown>
-                            </div>
-                        </section>
-                        <section>
-                            <h3 className="mb-3 text-xl font-bold text-amber-500">Interpretation</h3>
-                            <div className="prose prose-sm max-w-none dark:prose-invert">
-                                <ReactMarkdown>{activeCard.interpretation}</ReactMarkdown>
-                            </div>
-                        </section>
-                        <section>
-                            <h3 className="mb-3 text-xl font-bold text-green-500">Creative Ideas</h3>
-                            <div className="prose prose-sm max-w-none dark:prose-invert">
-                                <ReactMarkdown>{activeCard.ideas}</ReactMarkdown>
-                            </div>
-                        </section>
-                        <section>
-                            <h3 className="mb-3 text-xl font-bold text-red-500">Counterpoints</h3>
-                            <div className="prose prose-sm max-w-none dark:prose-invert">
-                                <ReactMarkdown>{activeCard.counterpoints}</ReactMarkdown>
-                            </div>
-                        </section>
-                        <section>
-                            <h3 className="mb-3 text-xl font-bold text-indigo-500">Next Actions</h3>
-                            <div className="prose prose-sm max-w-none dark:prose-invert">
-                                <ReactMarkdown>{activeCard.next_actions}</ReactMarkdown>
-                            </div>
-                        </section>
+                        <div className="prose prose-sm max-w-none dark:prose-invert">
+                            <ReactMarkdown>{activeCardBodyMarkdown}</ReactMarkdown>
+                        </div>
                     </div>
                     <div className="flex w-96 flex-col border-l bg-muted/10">
                         <div className="border-b p-4 font-medium">Discuss Card</div>
                         <div className="flex-1 space-y-4 overflow-y-auto p-4 text-sm">
                             {chatMessages.length === 0 && (
-                                <p className="mt-10 text-center text-muted-foreground">Expand on these ideas with AI.</p>
+                                <p className="mt-10 text-center text-muted-foreground">Expand on this report with AI.</p>
                             )}
                             {chatMessages.map((message, index) => (
                                 <div key={index} className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}>
@@ -614,9 +942,9 @@ Be concise and explore the user's questions further.`;
                                 <CardTitle className="line-clamp-2 text-lg leading-tight">{card.title}</CardTitle>
                             </CardHeader>
                             <CardContent className="relative flex-1 overflow-hidden pt-2">
-                                <div className="prose prose-sm line-clamp-4 max-w-none text-sm text-muted-foreground dark:prose-invert">
-                                    <ReactMarkdown>{card.signals}</ReactMarkdown>
-                                </div>
+                                <p className="line-clamp-4 text-sm text-muted-foreground">
+                                    {getCreativeCardPreviewExcerpt(card)}
+                                </p>
                                 <div className="absolute bottom-0 left-0 right-0 h-10 bg-gradient-to-t from-card to-transparent" />
                             </CardContent>
                         </Card>
@@ -753,153 +1081,7 @@ Be concise and explore the user's questions further.`;
                     </DialogContent>
                 </Dialog>
 
-                <Dialog open={projectDialogOpen} onOpenChange={(open) => {
-                    setProjectDialogOpen(open);
-                    if (!open) {
-                        setEditingProjectId(null);
-                        setProjectForm(createEmptyProjectFormState());
-                    }
-                }}>
-                    <DialogContent className="max-h-[90vh] max-w-3xl overflow-y-auto">
-                        <DialogHeader>
-                            <DialogTitle>{editingProjectId ? "Edit Creative Project" : "Create Creative Project"}</DialogTitle>
-                            <DialogDescription>
-                                Configure the focus prompt, automation interval, and source scope for this project.
-                            </DialogDescription>
-                        </DialogHeader>
-
-                        <form onSubmit={handleProjectSubmit} className="space-y-6">
-                            <div className="space-y-2">
-                                <Label>Project Name</Label>
-                                <Input
-                                    value={projectForm.name}
-                                    onChange={(event) => setProjectForm((current) => ({ ...current, name: event.target.value }))}
-                                    placeholder="e.g. AI startup opportunities"
-                                    required
-                                />
-                            </div>
-
-                            <div className="space-y-2">
-                                <Label>Focus Prompt</Label>
-                                <Textarea
-                                    value={projectForm.prompt}
-                                    onChange={(event) => setProjectForm((current) => ({ ...current, prompt: event.target.value }))}
-                                    placeholder="Act as a product strategist. Look for product gaps and emerging needs..."
-                                    className="min-h-32 resize-none"
-                                    required
-                                />
-                            </div>
-
-                            <div className="grid gap-4 md:grid-cols-2">
-                                <div className="space-y-3 rounded-xl border p-4">
-                                    <label className="flex items-center gap-3 text-sm font-medium">
-                                        <Checkbox
-                                            checked={projectForm.autoEnabled}
-                                            onChange={(event) => setProjectForm((current) => ({ ...current, autoEnabled: event.target.checked }))}
-                                        />
-                                        Enable automatic card generation
-                                    </label>
-                                    <p className="text-sm text-muted-foreground">
-                                        The app checks this project every configured interval and only generates a card when new scoped articles exist.
-                                    </p>
-                                </div>
-
-                                <div className="space-y-2">
-                                    <Label>Auto interval (minutes)</Label>
-                                    <Input
-                                        type="number"
-                                        min="1"
-                                        value={projectForm.autoIntervalMinutes}
-                                        onChange={(event) => setProjectForm((current) => ({ ...current, autoIntervalMinutes: event.target.value }))}
-                                        disabled={!projectForm.autoEnabled}
-                                    />
-                                    <p className="text-xs text-muted-foreground">Example: set to 60 to check once per hour.</p>
-                                </div>
-                            </div>
-
-                            <div className="space-y-2">
-                                <Label>Max articles per card</Label>
-                                <Input
-                                    type="number"
-                                    min="1"
-                                    value={projectForm.maxArticlesPerCard}
-                                    onChange={(event) => setProjectForm((current) => ({ ...current, maxArticlesPerCard: event.target.value }))}
-                                />
-                                <p className="text-xs text-muted-foreground">Applies to both automatic runs and manual article selection.</p>
-                            </div>
-
-                            <div className="space-y-4 rounded-xl border p-4">
-                                <div className="flex items-start justify-between gap-4">
-                                    <div>
-                                        <Label>Source scope</Label>
-                                        <p className="mt-1 text-sm text-muted-foreground">
-                                            Choose which news sources can feed this project.
-                                        </p>
-                                    </div>
-                                    <label className="flex items-center gap-2 text-sm">
-                                        <Checkbox
-                                            checked={projectForm.useAllSources}
-                                            onChange={(event) => setProjectForm((current) => ({
-                                                ...current,
-                                                useAllSources: event.target.checked,
-                                                sourceIds: event.target.checked ? [] : current.sourceIds,
-                                            }))}
-                                        />
-                                        Use all sources
-                                    </label>
-                                </div>
-
-                                {projectForm.useAllSources && (
-                                    <div className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
-                                        New and existing articles from every source will be eligible for this project.
-                                    </div>
-                                )}
-
-                                {!projectForm.useAllSources && (
-                                    <div className="max-h-64 space-y-2 overflow-y-auto">
-                                        {sources.length === 0 && (
-                                            <div className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
-                                                No sources available yet.
-                                            </div>
-                                        )}
-
-                                        {sources.map((source) => (
-                                            <label key={source.id} className="flex items-center gap-3 rounded-lg border p-3 text-sm">
-                                                <Checkbox
-                                                    checked={projectForm.sourceIds.includes(source.id)}
-                                                    onChange={() => toggleProjectSourceSelection(source.id)}
-                                                />
-                                                <div className="min-w-0 flex-1">
-                                                    <div className="font-medium">{source.name}</div>
-                                                    <div className="text-xs text-muted-foreground">
-                                                        {source.article_count} article{source.article_count === 1 ? "" : "s"} · {source.active ? "Active" : "Inactive"}
-                                                    </div>
-                                                </div>
-                                            </label>
-                                        ))}
-                                    </div>
-                                )}
-                            </div>
-
-                            <DialogFooter>
-                                <Button
-                                    type="button"
-                                    variant="outline"
-                                    onClick={() => {
-                                        setProjectDialogOpen(false);
-                                        setEditingProjectId(null);
-                                        setProjectForm(createEmptyProjectFormState());
-                                    }}
-                                >
-                                    Cancel
-                                </Button>
-                                <Button type="submit" disabled={isSavingProject}>
-                                    {isSavingProject ? "Saving..." : editingProjectId ? "Save Changes" : "Create Project"}
-                                </Button>
-                            </DialogFooter>
-                        </form>
-                    </DialogContent>
-                </Dialog>
+                {renderProjectDialog()}
             </PageShell>
         );
     }
@@ -914,158 +1096,11 @@ Be concise and explore the user's questions further.`;
                     </p>
                 </div>
 
-                <Dialog open={projectDialogOpen} onOpenChange={(open) => {
-                    setProjectDialogOpen(open);
-                    if (!open) {
-                        setEditingProjectId(null);
-                        setProjectForm(createEmptyProjectFormState());
-                    }
-                }}>
-                    <DialogTrigger asChild>
-                        <Button onClick={openCreateProjectDialog}>
-                            <Plus className="mr-2 h-4 w-4" /> New Project
-                        </Button>
-                    </DialogTrigger>
-                    <DialogContent className="max-h-[90vh] max-w-3xl overflow-y-auto">
-                        <DialogHeader>
-                            <DialogTitle>{editingProjectId ? "Edit Creative Project" : "Create Creative Project"}</DialogTitle>
-                            <DialogDescription>
-                                Configure the focus prompt, automation interval, and source scope for this project.
-                            </DialogDescription>
-                        </DialogHeader>
-
-                        <form onSubmit={handleProjectSubmit} className="space-y-6">
-                            <div className="space-y-2">
-                                <Label>Project Name</Label>
-                                <Input
-                                    value={projectForm.name}
-                                    onChange={(event) => setProjectForm((current) => ({ ...current, name: event.target.value }))}
-                                    placeholder="e.g. AI startup opportunities"
-                                    required
-                                />
-                            </div>
-
-                            <div className="space-y-2">
-                                <Label>Focus Prompt</Label>
-                                <Textarea
-                                    value={projectForm.prompt}
-                                    onChange={(event) => setProjectForm((current) => ({ ...current, prompt: event.target.value }))}
-                                    placeholder="Act as a product strategist. Look for product gaps and emerging needs..."
-                                    className="min-h-32 resize-none"
-                                    required
-                                />
-                            </div>
-
-                            <div className="grid gap-4 md:grid-cols-2">
-                                <div className="space-y-3 rounded-xl border p-4">
-                                    <label className="flex items-center gap-3 text-sm font-medium">
-                                        <Checkbox
-                                            checked={projectForm.autoEnabled}
-                                            onChange={(event) => setProjectForm((current) => ({ ...current, autoEnabled: event.target.checked }))}
-                                        />
-                                        Enable automatic card generation
-                                    </label>
-                                    <p className="text-sm text-muted-foreground">
-                                        The app checks this project every configured interval and only generates a card when new scoped articles exist.
-                                    </p>
-                                </div>
-
-                                <div className="space-y-2">
-                                    <Label>Auto interval (minutes)</Label>
-                                    <Input
-                                        type="number"
-                                        min="1"
-                                        value={projectForm.autoIntervalMinutes}
-                                        onChange={(event) => setProjectForm((current) => ({ ...current, autoIntervalMinutes: event.target.value }))}
-                                        disabled={!projectForm.autoEnabled}
-                                    />
-                                    <p className="text-xs text-muted-foreground">Example: set to 60 to check once per hour.</p>
-                                </div>
-                            </div>
-
-                            <div className="space-y-2">
-                                <Label>Max articles per card</Label>
-                                <Input
-                                    type="number"
-                                    min="1"
-                                    value={projectForm.maxArticlesPerCard}
-                                    onChange={(event) => setProjectForm((current) => ({ ...current, maxArticlesPerCard: event.target.value }))}
-                                />
-                                <p className="text-xs text-muted-foreground">Applies to both automatic runs and manual article selection.</p>
-                            </div>
-
-                            <div className="space-y-4 rounded-xl border p-4">
-                                <div className="flex items-start justify-between gap-4">
-                                    <div>
-                                        <Label>Source scope</Label>
-                                        <p className="mt-1 text-sm text-muted-foreground">
-                                            Choose which news sources can feed this project.
-                                        </p>
-                                    </div>
-                                    <label className="flex items-center gap-2 text-sm">
-                                        <Checkbox
-                                            checked={projectForm.useAllSources}
-                                            onChange={(event) => setProjectForm((current) => ({
-                                                ...current,
-                                                useAllSources: event.target.checked,
-                                                sourceIds: event.target.checked ? [] : current.sourceIds,
-                                            }))}
-                                        />
-                                        Use all sources
-                                    </label>
-                                </div>
-
-                                {projectForm.useAllSources && (
-                                    <div className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
-                                        New and existing articles from every source will be eligible for this project.
-                                    </div>
-                                )}
-
-                                {!projectForm.useAllSources && (
-                                    <div className="max-h-64 space-y-2 overflow-y-auto">
-                                        {sources.length === 0 && (
-                                            <div className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
-                                                No sources available yet.
-                                            </div>
-                                        )}
-
-                                        {sources.map((source) => (
-                                            <label key={source.id} className="flex items-center gap-3 rounded-lg border p-3 text-sm">
-                                                <Checkbox
-                                                    checked={projectForm.sourceIds.includes(source.id)}
-                                                    onChange={() => toggleProjectSourceSelection(source.id)}
-                                                />
-                                                <div className="min-w-0 flex-1">
-                                                    <div className="font-medium">{source.name}</div>
-                                                    <div className="text-xs text-muted-foreground">
-                                                        {source.article_count} article{source.article_count === 1 ? "" : "s"} · {source.active ? "Active" : "Inactive"}
-                                                    </div>
-                                                </div>
-                                            </label>
-                                        ))}
-                                    </div>
-                                )}
-                            </div>
-
-                            <DialogFooter>
-                                <Button
-                                    type="button"
-                                    variant="outline"
-                                    onClick={() => {
-                                        setProjectDialogOpen(false);
-                                        setEditingProjectId(null);
-                                        setProjectForm(createEmptyProjectFormState());
-                                    }}
-                                >
-                                    Cancel
-                                </Button>
-                                <Button type="submit" disabled={isSavingProject}>
-                                    {isSavingProject ? "Saving..." : editingProjectId ? "Save Changes" : "Create Project"}
-                                </Button>
-                            </DialogFooter>
-                        </form>
-                    </DialogContent>
-                </Dialog>
+                {renderProjectDialog(
+                    <Button onClick={openCreateProjectDialog}>
+                        <Plus className="mr-2 h-4 w-4" /> New Project
+                    </Button>,
+                )}
             </div>
 
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
@@ -1099,7 +1134,7 @@ Be concise and explore the user's questions further.`;
                                         openEditProjectDialog(project);
                                     }}
                                 >
-                                    <Edit className="mr-2 h-4 w-4" />
+                                    <Pencil className="mr-2 h-4 w-4" />
                                     Edit
                                 </Button>
                                 <Button

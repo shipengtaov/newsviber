@@ -14,6 +14,7 @@ import type { FetchFunction } from "@ai-sdk/provider-utils";
 import { createMinimax, createMinimaxOpenAI } from "vercel-minimax-ai-provider";
 import { z } from "zod";
 import { createZhipu } from "zhipu-ai-provider";
+import { stripLeadingMarkdownTitle } from "@/lib/creative-card";
 import {
   type AIProviderConfig,
   getActiveAIProviderSettings,
@@ -27,14 +28,18 @@ export type Message = {
 
 export const creativeReportSchema = z.object({
   title: z.string().describe("A concise, catchy title for the insight."),
-  signals: z.string().describe("Key signals and trends identified from the selected news context."),
-  interpretation: z.string().describe("Why those signals matter and what they likely mean."),
-  ideas: z.string().describe("Creative ideas, opportunities, or hypotheses suggested by the signals."),
-  counterpoints: z.string().describe("Risks, objections, constraints, or opposing views."),
-  next_actions: z.string().describe("Recommended next steps that the user can act on."),
+  report_markdown: z.string().describe(
+    "The markdown body of the report, using section titles that fit the user's prompt. Do not include a top-level title heading.",
+  ),
 });
 
 export type CreativeReport = z.infer<typeof creativeReportSchema>;
+
+const optimizeCreativePromptSchema = z.object({
+  optimized_prompt: z.string().describe(
+    "A refined version of the user's prompt as a single prompt block, with no explanation or code fences.",
+  ),
+});
 
 export type ProviderFlavor =
   | "openai"
@@ -457,28 +462,43 @@ export async function generateCreativeReport(prompt: string): Promise<CreativeRe
   }
 }
 
-function sectionContent(content: string): string {
-  const trimmedContent = content.trim();
-  return trimmedContent || "_No content provided._";
+export async function optimizeCreativeProjectPrompt(rawPrompt: string): Promise<string> {
+  const { provider } = getActiveAIProviderSettings();
+  const trimmedPrompt = rawPrompt.trim();
+  if (!trimmedPrompt) {
+    throw new Error("Prompt is required.");
+  }
+
+  try {
+    const result = await generateObject({
+      model: resolveModel(),
+      schema: optimizeCreativePromptSchema,
+      prompt: `You are improving a creative analysis prompt for a news intelligence workspace.
+
+Rewrite the user's prompt so it is clearer, more actionable, and more likely to produce a strong report.
+
+Rules:
+- Preserve the user's original language.
+- Preserve the user's intent, audience, domain terms, and constraints.
+- Do not add new goals that the user did not imply.
+- Output only the optimized prompt text through the schema.
+
+Original prompt:
+${trimmedPrompt}`,
+    });
+
+    const optimizedPrompt = result.object.optimized_prompt.trim();
+    if (!optimizedPrompt) {
+      throw new Error("AI returned an empty optimized prompt.");
+    }
+
+    return optimizedPrompt;
+  } catch (error) {
+    throw new Error(`${provider.name}: ${getErrorMessage(error)}`);
+  }
 }
 
 export function formatCreativeReportMarkdown(report: CreativeReport): string {
-  return [
-    `# ${report.title.trim() || "Untitled Insight"}`,
-    "",
-    "## Key Signals",
-    sectionContent(report.signals),
-    "",
-    "## Interpretation",
-    sectionContent(report.interpretation),
-    "",
-    "## Creative Ideas",
-    sectionContent(report.ideas),
-    "",
-    "## Counterpoints",
-    sectionContent(report.counterpoints),
-    "",
-    "## Next Actions",
-    sectionContent(report.next_actions),
-  ].join("\n");
+  const normalizedMarkdown = stripLeadingMarkdownTitle(report.report_markdown ?? "").trim();
+  return normalizedMarkdown || "_No content provided._";
 }

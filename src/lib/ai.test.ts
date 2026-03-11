@@ -75,30 +75,20 @@ describe("Creative report formatting", () => {
     expect(
       creativeReportSchema.parse({
         title: "AI News Desk",
-        signals: "Model providers are shipping faster.",
-        interpretation: "Competition is compressing release cycles.",
-        ideas: "Package niche daily digests for product teams.",
-        counterpoints: "Signal quality can decay during hype spikes.",
-        next_actions: "Interview three teams that already monitor this space.",
+        report_markdown: "## Market pulse\nModel providers are shipping faster.",
       }),
     ).toMatchObject({
       title: "AI News Desk",
-      next_actions: "Interview three teams that already monitor this space.",
+      report_markdown: "## Market pulse\nModel providers are shipping faster.",
     });
   });
 
   it("formats a structured creative report as markdown", () => {
     const markdown = formatCreativeReportMarkdown({
       title: "AI News Desk",
-      signals: "Model providers are shipping faster.",
-      interpretation: "Competition is compressing release cycles.",
-      ideas: "Package niche daily digests for product teams.",
-      counterpoints: "Signal quality can decay during hype spikes.",
-      next_actions: "Interview three teams that already monitor this space.",
+      report_markdown: "# AI News Desk\n\n## Market pulse\nModel providers are shipping faster.",
     });
 
-    expect(markdown).toContain("# AI News Desk");
-    expect(markdown).toContain("## Key Signals");
-    expect(markdown).toContain("## Next Actions");
+    expect(markdown).toBe("## Market pulse\nModel providers are shipping faster.");
   });
 });
