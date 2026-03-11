@@ -51,9 +51,11 @@ type ProjectFormState = {
 
 const DEFAULT_AUTO_INTERVAL_MINUTES = "60";
 const DEFAULT_MAX_ARTICLES_PER_CARD = "12";
+const GENERATED_TILE_PREVIEW_MAX_LENGTH = 360;
+const CREATIVE_TILE_GRID_CLASS = "grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4";
 const CREATIVE_TILE_CARD_BASE_CLASS = "flex cursor-pointer flex-col overflow-hidden transition-all hover:border-primary/50 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2";
 const PROJECT_TILE_CARD_CLASS = `${CREATIVE_TILE_CARD_BASE_CLASS} h-[272px]`;
-const GENERATED_TILE_CARD_CLASS = CREATIVE_TILE_CARD_BASE_CLASS;
+const GENERATED_TILE_CARD_CLASS = `${CREATIVE_TILE_CARD_BASE_CLASS} min-h-[248px]`;
 const CREATIVE_TILE_HEADER_CLASS = "px-4 py-4 pb-2";
 const CREATIVE_TILE_BODY_CLASS = "flex flex-1 flex-col px-4 pb-4 pt-0";
 
@@ -1138,7 +1140,7 @@ Be concise and explore the user's questions further.`;
                     </div>
                 </div>
 
-                <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                <div className={CREATIVE_TILE_GRID_CLASS}>
                     {cards.map((card) => (
                         <Card
                             key={card.id}
@@ -1158,8 +1160,8 @@ Be concise and explore the user's questions further.`;
                                 <CardTitle className="line-clamp-2 min-h-[3rem] text-base leading-6">{card.title}</CardTitle>
                             </CardHeader>
                             <CardContent className={CREATIVE_TILE_BODY_CLASS}>
-                                <p className="line-clamp-3 min-h-[4.5rem] text-sm leading-6 text-muted-foreground">
-                                    {getCreativeCardPreviewExcerpt(card)}
+                                <p className="line-clamp-5 min-h-[7.5rem] text-sm leading-6 text-muted-foreground">
+                                    {getCreativeCardPreviewExcerpt(card, GENERATED_TILE_PREVIEW_MAX_LENGTH)}
                                 </p>
                             </CardContent>
                         </Card>
@@ -1318,7 +1320,7 @@ Be concise and explore the user's questions further.`;
                 )}
             </div>
 
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            <div className={CREATIVE_TILE_GRID_CLASS}>
                 {projects.map((project) => (
                     <Card
                         key={project.id}
