@@ -57,3 +57,72 @@
     --chart-5: 340 75% 55%
   }
 }
+
+@layer components {
+  .chat-markdown {
+    @apply prose prose-sm max-w-none break-words text-foreground/95 dark:prose-invert;
+    @apply prose-headings:mt-4 prose-headings:mb-2 prose-headings:font-semibold prose-headings:tracking-tight prose-headings:text-foreground;
+    @apply prose-h1:text-base prose-h2:text-base prose-h3:text-sm prose-h4:text-sm;
+    @apply prose-p:my-2 prose-p:leading-6 prose-strong:text-foreground;
+    @apply prose-ul:my-3 prose-ul:pl-5 prose-ol:my-3 prose-ol:pl-5 prose-li:my-1;
+    @apply prose-hr:my-4 prose-hr:border-border;
+    @apply prose-blockquote:my-4 prose-blockquote:border-l-4 prose-blockquote:border-primary/20 prose-blockquote:bg-muted/40 prose-blockquote:px-4 prose-blockquote:py-2 prose-blockquote:font-normal prose-blockquote:text-foreground/90;
+  }
+
+  .chat-markdown > :first-child {
+    @apply mt-0;
+  }
+
+  .chat-markdown > :last-child {
+    @apply mb-0;
+  }
+
+  .chat-markdown :where(code) {
+    @apply rounded bg-muted px-1.5 py-0.5 font-mono text-[0.9em] font-medium text-foreground;
+  }
+
+  .chat-markdown :where(code)::before,
+  .chat-markdown :where(code)::after {
+    content: none;
+  }
+
+  .chat-markdown :where(pre code) {
+    @apply bg-transparent p-0 text-inherit;
+  }
+
+  .chat-markdown :where(input[type="checkbox"]) {
+    @apply mr-2 align-middle accent-primary;
+  }
+
+  .chat-markdown-pre {
+    @apply overflow-x-auto rounded-xl border border-border bg-muted/80 px-4 py-3 text-sm leading-6 text-foreground shadow-sm;
+  }
+
+  .chat-markdown-link {
+    @apply font-medium text-primary underline decoration-primary/30 underline-offset-4 transition-colors hover:text-primary/80;
+  }
+
+  .chat-markdown-link-disabled {
+    @apply cursor-default text-muted-foreground underline decoration-dotted underline-offset-4;
+  }
+
+  .chat-markdown-table-wrapper {
+    @apply my-4 overflow-x-auto rounded-xl border border-border shadow-sm;
+  }
+
+  .chat-markdown-table {
+    @apply min-w-full border-collapse bg-card text-sm;
+  }
+
+  .chat-markdown-th {
+    @apply border-b border-border bg-muted/60 px-3 py-2 text-left font-semibold text-foreground;
+  }
+
+  .chat-markdown-td {
+    @apply border-b border-border/70 px-3 py-2 align-top text-foreground/90;
+  }
+
+  .chat-markdown tbody tr:last-child .chat-markdown-td {
+    @apply border-b-0;
+  }
+}

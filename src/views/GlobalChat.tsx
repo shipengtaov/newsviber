@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import ReactMarkdown from "react-markdown";
 import { Bot, ChevronLeft, ChevronRight, MessageSquare, Plus, Send, Trash2, User } from "lucide-react";
+import { ChatMarkdown } from "@/components/chat/ChatMarkdown";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -19,6 +19,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import { useStreamingConversation } from "@/hooks/use-streaming-conversation";
 import type { Message } from "@/lib/ai";
+import { buildGlobalChatSystemPrompt } from "@/lib/chat-prompts";
 import { cn } from "@/lib/utils";
 import {
     buildGlobalChatTitle,
@@ -136,36 +137,6 @@ function buildScopeSummary(scope: GlobalChatScopeInput, sources: GlobalChatSourc
             : "All active sources";
 
     return `Time range: ${timeLabel}. Data sources: ${sourceLabel}.`;
-}
-
-function buildGlobalChatSystemPrompt(scope: GlobalChatScopeInput, sources: GlobalChatSourceOption[], articles: Awaited<ReturnType<typeof listGlobalChatContextArticles>>): string {
-    const normalizedScope = normalizeGlobalChatScopeInput(scope);
-    const scopedSources = normalizedScope.source_ids.length === 0
-        ? sources
-        : sources.filter((source) => normalizedScope.source_ids.includes(source.id));
-    const sourceCoverageLines = scopedSources.length === 0
-        ? ["- No active sources are currently selected."]
-        : scopedSources.map((source) => (
-            `- ${source.name}: ${source.matching_article_count} matching article(s) in the current time range, ${source.article_count} total stored`
-        ));
-    const contextLines = articles.length === 0
-        ? ["- No articles matched the current thread filters."]
-        : articles.map((article) => (
-            `- [${formatUtcDateTime(article.published_at ?? article.inserted_at, "Unknown")}] ${article.source_name}: ${article.title}${article.summary ? ` - ${article.summary}` : ""}`
-        ));
-
-    return `You are an AI assistant inside a news aggregation app.
-
-Current thread scope:
-${buildScopeSummary(scope, sources)}
-
-Current source coverage:
-${sourceCoverageLines.join("\n")}
-
-Relevant news context:
-${contextLines.join("\n")}
-
-Answer the user's question primarily with the supplied context. If the context is sparse or missing facts, say that clearly instead of inventing details.`;
 }
 
 function pruneInactiveSourceIds(scope: GlobalChatScopeInput, sources: GlobalChatSourceOption[]): GlobalChatScopeInput {
@@ -610,7 +581,25 @@ export default function GlobalChat() {
             },
             buildConversation: async (history, userMessage) => {
                 const articles = await listGlobalChatContextArticles(scopeSnapshot);
-                const systemPrompt = buildGlobalChatSystemPrompt(scopeSnapshot, sources, articles);
+                const normalizedScope = normalizeGlobalChatScopeInput(scopeSnapshot);
+                const scopedSources = normalizedScope.source_ids.length === 0
+                    ? sources
+                    : sources.filter((source) => normalizedScope.source_ids.includes(source.id));
+                const sourceCoverageLines = scopedSources.length === 0
+                    ? ["- No active sources are currently selected."]
+                    : scopedSources.map((source) => (
+                        `- ${source.name}: ${source.matching_article_count} matching article(s) in the current time range, ${source.article_count} total stored`
+                    ));
+                const contextLines = articles.length === 0
+                    ? ["- No articles matched the current thread filters."]
+                    : articles.map((article) => (
+                        `- [${article.published_at ?? article.inserted_at ?? "Unknown"}] ${article.source_name}: ${article.title}${article.summary ? ` - ${article.summary}` : ""}`
+                    ));
+                const systemPrompt = buildGlobalChatSystemPrompt({
+                    scopeSummary: buildScopeSummary(scopeSnapshot, sources),
+                    sourceCoverageLines,
+                    contextLines,
+                });
 
                 return [
                     { role: "system", content: systemPrompt } as Message,
@@ -840,9 +829,7 @@ export default function GlobalChat() {
 
                                                     return (
                                                         <div className="space-y-2">
-                                                            <div className="prose prose-sm max-w-none dark:prose-invert">
-                                                                <ReactMarkdown>{message.content}</ReactMarkdown>
-                                                            </div>
+                                                            <ChatMarkdown content={message.content} />
                                                             {isLiveAssistantMessage && streamPhase === "streaming" && (
                                                                 <div className="flex items-center gap-2 text-xs text-muted-foreground">
                                                                     <span className="h-2 w-2 rounded-full bg-primary/80 animate-pulse" />

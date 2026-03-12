@@ -18,6 +18,7 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { addCreativeSyncListener } from "@/lib/creative-events";
+import { ChatMarkdown } from "@/components/chat/ChatMarkdown";
 import {
     type CreativeArticleCandidate,
     type CreativeCard,
@@ -32,6 +33,7 @@ import {
     deleteCreativeProject,
 } from "@/lib/creative-service";
 import { optimizeCreativeProjectPrompt, type Message } from "@/lib/ai";
+import { buildCreativeCardDiscussionSystemPrompt } from "@/lib/chat-prompts";
 import { PageShell } from "@/components/layout/PageShell";
 import { useStreamingConversation } from "@/hooks/use-streaming-conversation";
 import { getCreativeCardBodyMarkdown, getCreativeCardPreviewExcerpt } from "@/lib/creative-card";
@@ -960,13 +962,10 @@ export default function CreativeSpace() {
         await sendChatMessage({
             content: inputValue,
             buildConversation: async (history, userMessage) => {
-                const systemPrompt = `You are discussing a creative report you generated.
-Report Data:
-Title: ${activeCard.title}
-Body:
-${activeCardBodyMarkdown}
-
-Be concise and explore the user's questions further.`;
+                const systemPrompt = buildCreativeCardDiscussionSystemPrompt({
+                    title: activeCard.title,
+                    bodyMarkdown: activeCardBodyMarkdown,
+                });
 
                 return [
                     { role: "system", content: systemPrompt } as Message,
@@ -1078,9 +1077,7 @@ Be concise and explore the user's questions further.`;
 
                                                 return (
                                                     <div className="space-y-2">
-                                                        <div className="prose prose-sm max-w-none break-words dark:prose-invert">
-                                                            <ReactMarkdown>{message.content}</ReactMarkdown>
-                                                        </div>
+                                                        <ChatMarkdown content={message.content} />
                                                         {isLiveAssistantMessage && chatStreamPhase === "streaming" && (
                                                             <div className="flex items-center gap-2 text-xs text-muted-foreground">
                                                                 <span className="h-2 w-2 rounded-full bg-primary/80 animate-pulse" />

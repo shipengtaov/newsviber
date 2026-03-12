@@ -1,11 +1,13 @@
 import { useState, useEffect, useEffectEvent, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { openUrl } from "@tauri-apps/plugin-opener";
+import { ChatMarkdown } from "@/components/chat/ChatMarkdown";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ArrowLeft, ExternalLink, Send, Bot, User } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import { type Message } from "@/lib/ai";
+import { buildArticleDiscussionSystemPrompt } from "@/lib/chat-prompts";
 import { cn } from "@/lib/utils";
 import { getDb } from "@/lib/db";
 import { formatUtcDateTime } from "@/lib/time";
@@ -151,12 +153,12 @@ export function ArticleDetailView({
                     }
                 }
 
-                const systemPrompt = `You are a helpful reading assistant. The user is reading the following article titled "${article.title}" source: ${article.source_name}.
-Current Article Content:
-${article.content}
-${relatedContext}
-
-Answer the user's questions based primarily on the current article. Use related context if asked for broader info. Be concise.`;
+                const systemPrompt = buildArticleDiscussionSystemPrompt({
+                    articleTitle: article.title,
+                    sourceName: article.source_name,
+                    articleContent: article.content,
+                    relatedContext,
+                });
 
                 return [
                     { role: "system", content: systemPrompt } as Message,
@@ -293,9 +295,7 @@ Answer the user's questions based primarily on the current article. Use related 
 
                                             return (
                                                 <div className="space-y-2">
-                                                    <div className="prose prose-sm dark:prose-invert leading-relaxed max-w-none break-words">
-                                                        <ReactMarkdown>{m.content}</ReactMarkdown>
-                                                    </div>
+                                                    <ChatMarkdown content={m.content} />
                                                     {isLiveAssistantMessage && streamPhase === "streaming" && (
                                                         <div className="flex items-center gap-2 text-xs text-muted-foreground">
                                                             <span className="w-2 h-2 rounded-full bg-primary/80 animate-pulse" />

@@ -1,0 +1,52 @@
+import { renderToStaticMarkup } from "react-dom/server";
+import { describe, expect, it, vi } from "vitest";
+import { ChatMarkdown } from "@/components/chat/ChatMarkdown";
+
+vi.mock("@tauri-apps/plugin-opener", () => ({
+  openUrl: vi.fn(),
+}));
+
+describe("ChatMarkdown", () => {
+  it("renders structured markdown, GFM tables, and code blocks", () => {
+    const markup = renderToStaticMarkup(
+      <ChatMarkdown
+        content={`# Brief
+
+- First point
+
+> Important note
+
+| Provider | Model |
+| --- | --- |
+| OpenAI | GPT |
+
+Use \`npm test\`.
+
+\`\`\`bash
+npm test
+\`\`\`
+
+[Read more](https://example.com)`}
+      />,
+    );
+
+    expect(markup).toContain("<h1>Brief</h1>");
+    expect(markup).toContain("<ul>");
+    expect(markup).toContain("<blockquote>");
+    expect(markup).toContain('class="chat-markdown-table-wrapper not-prose"');
+    expect(markup).toContain('class="chat-markdown-pre not-prose"');
+    expect(markup).toContain("<code>npm test</code>");
+    expect(markup).toContain('href="https://example.com"');
+    expect(markup).toContain('target="_blank"');
+    expect(markup).toContain('rel="noreferrer noopener"');
+  });
+
+  it("does not render unsupported protocols as clickable links", () => {
+    const markup = renderToStaticMarkup(
+      <ChatMarkdown content="[Open local file](file:///tmp/example.txt)" />,
+    );
+
+    expect(markup).not.toContain("<a");
+    expect(markup).toContain("chat-markdown-link-disabled");
+  });
+});
