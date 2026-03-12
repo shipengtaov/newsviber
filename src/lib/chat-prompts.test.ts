@@ -23,12 +23,16 @@ describe("chat prompt builders", () => {
     const prompt = buildArticleDiscussionSystemPrompt({
       articleTitle: "Example article",
       sourceName: "Example source",
-      articleContent: "Article body",
-      relatedContext: "\n\nRelated Articles Context:\n- [2026-03-12T07:00:00Z] Related story: Context",
+      articleContent: "<p>Article <strong>body</strong></p>",
+      relatedContext: "\n\nRelated Articles Context:\n- [2026-03-12T07:00:00Z] Related story: <em>Context</em>",
     });
 
     expect(prompt).toContain('titled "Example article" source: Example source');
     expect(prompt).toContain("Related Articles Context:");
+    expect(prompt).toContain("Article body");
+    expect(prompt).toContain("Related story: Context");
+    expect(prompt).not.toContain("<strong>");
+    expect(prompt).not.toContain("<em>");
     expect(prompt).toContain(getChatMarkdownFormattingInstructions());
   });
 

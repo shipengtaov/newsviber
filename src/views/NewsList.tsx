@@ -12,6 +12,7 @@ import { fetchSource, fetchSources, type FetchableSource } from "@/lib/source-fe
 import { addSourceFetchSyncListener, dispatchSourceFetchSyncEvent } from "@/lib/source-events";
 import { formatFetchInterval, formatLastFetchSummary, normalizeFetchInterval } from "@/lib/source-utils";
 import { formatUtcDateTime } from "@/lib/time";
+import { sanitizeArticleHtml } from "@/lib/article-html";
 import { ArticleDetailView } from "@/views/NewsDetail";
 
 type Article = {
@@ -876,7 +877,7 @@ export default function NewsList() {
                                                     {article.summary && (
                                                         <CardDescription
                                                             className="min-w-0 line-clamp-1 text-sm"
-                                                            dangerouslySetInnerHTML={{ __html: article.summary }}
+                                                            dangerouslySetInnerHTML={{ __html: sanitizeArticleHtml(article.summary) }}
                                                             onClick={handleHtmlLinkClick}
                                                         />
                                                     )}

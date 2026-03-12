@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import type { Message } from "@/lib/ai";
+import { compactHtmlText } from "@/lib/article-html";
 import { getDb } from "@/lib/db";
 
 export type GlobalChatTimeRangeMode = "preset" | "custom";
@@ -536,8 +537,13 @@ export async function listGlobalChatContextArticles(input: Partial<GlobalChatSco
     return rows.map((row) => ({
         source_name: row.source_name,
         title: row.title,
-        summary: row.summary ?? "",
+        summary: compactHtmlText(row.summary ?? ""),
         published_at: row.published_at ?? null,
         inserted_at: row.inserted_at,
     }));
+}
+
+export function formatGlobalChatContextLine(article: Pick<GlobalChatArticleContextRow, "source_name" | "title" | "summary" | "published_at" | "inserted_at">): string {
+    const summary = compactHtmlText(article.summary);
+    return `- [${article.published_at ?? article.inserted_at ?? "Unknown"}] ${article.source_name}: ${article.title}${summary ? ` - ${summary}` : ""}`;
 }

@@ -2,12 +2,13 @@ import { useState, useEffect, useEffectEvent, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { ChatMarkdown } from "@/components/chat/ChatMarkdown";
+import { ArticleContent } from "@/components/article/ArticleContent";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ArrowLeft, ExternalLink, Send, Bot, User } from "lucide-react";
-import ReactMarkdown from "react-markdown";
 import { type Message } from "@/lib/ai";
 import { buildArticleDiscussionSystemPrompt } from "@/lib/chat-prompts";
+import { compactHtmlText, sanitizeArticleHtml } from "@/lib/article-html";
 import { cn } from "@/lib/utils";
 import { getDb } from "@/lib/db";
 import { formatUtcDateTime } from "@/lib/time";
@@ -148,7 +149,7 @@ export function ArticleDetailView({
 
                     if (relatedArticles.length > 0) {
                         relatedContext = `\n\nRelated Articles Context:\n${relatedArticles
-                            .map((relatedArticle) => `- [${formatUtcDateTime(relatedArticle.published_at, "Unknown")}] ${relatedArticle.title}: ${relatedArticle.summary ?? ""}`)
+                            .map((relatedArticle) => `- [${formatUtcDateTime(relatedArticle.published_at, "Unknown")}] ${relatedArticle.title}: ${compactHtmlText(relatedArticle.summary ?? "")}`)
                             .join("\n")}`;
                     }
                 }
@@ -229,7 +230,7 @@ export function ArticleDetailView({
                     {article.summary && (
                         <div
                             className="mb-6 text-sm text-muted-foreground"
-                            dangerouslySetInnerHTML={{ __html: article.summary }}
+                            dangerouslySetInnerHTML={{ __html: sanitizeArticleHtml(article.summary) }}
                             onClick={(e) => {
                                 const target = e.target as HTMLElement;
                                 const anchor = target.closest('a');
@@ -241,11 +242,18 @@ export function ArticleDetailView({
                         />
                     )}
 
-                    <div className="prose prose-neutral dark:prose-invert max-w-none w-full leading-relaxed text-foreground/90">
-                        <ReactMarkdown>
-                            {article.content || "_No content body available for this article._"}
-                        </ReactMarkdown>
-                    </div>
+                    <ArticleContent
+                        content={article.content}
+                        className="prose prose-neutral dark:prose-invert max-w-none w-full leading-relaxed text-foreground/90"
+                        onClick={(e) => {
+                            const target = e.target as HTMLElement;
+                            const anchor = target.closest('a');
+                            if (anchor && anchor.href) {
+                                e.preventDefault();
+                                openUrl(anchor.href);
+                            }
+                        }}
+                    />
                 </div>
             </div>
 

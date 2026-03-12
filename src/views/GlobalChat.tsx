@@ -26,6 +26,7 @@ import {
     createDefaultGlobalChatScopeInput,
     createGlobalChatCustomRangeFromPresetDays,
     deleteGlobalChatThread,
+    formatGlobalChatContextLine,
     formatLocalDateInputValue,
     getGlobalChatThread,
     listGlobalChatContextArticles,
@@ -592,9 +593,7 @@ export default function GlobalChat() {
                     ));
                 const contextLines = articles.length === 0
                     ? ["- No articles matched the current thread filters."]
-                    : articles.map((article) => (
-                        `- [${article.published_at ?? article.inserted_at ?? "Unknown"}] ${article.source_name}: ${article.title}${article.summary ? ` - ${article.summary}` : ""}`
-                    ));
+                    : articles.map((article) => formatGlobalChatContextLine(article));
                 const systemPrompt = buildGlobalChatSystemPrompt({
                     scopeSummary: buildScopeSummary(scopeSnapshot, sources),
                     sourceCoverageLines,

@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import type { CreativeReport } from "@/lib/ai";
+import { compactHtmlText } from "@/lib/article-html";
 import { dispatchCreativeSyncEvent } from "@/lib/creative-events";
 import { getDb } from "@/lib/db";
 import { formatUtcDateTime } from "@/lib/time";
@@ -343,9 +344,9 @@ function buildConsumedExistsExpression(projectId: number, params: unknown[], art
     )`;
 }
 
-function summarizeArticleContextText(summary: string | null, content: string | null): string {
-    const base = (summary && summary.trim()) || (content && content.trim()) || "No summary available.";
-    return base.replace(/\s+/g, " ").slice(0, MAX_CONTEXT_CHARS_PER_ARTICLE);
+export function summarizeArticleContextText(summary: string | null, content: string | null): string {
+    const base = compactHtmlText(summary ?? "") || compactHtmlText(content ?? "") || "No summary available.";
+    return base.slice(0, MAX_CONTEXT_CHARS_PER_ARTICLE);
 }
 
 function buildCreativePrompt(project: CreativeProject, articles: CreativeArticleContextRow[]): string {

@@ -4,6 +4,7 @@ import {
     buildGlobalChatCustomRangeBounds,
     buildGlobalChatEventTimestampExpression,
     buildGlobalChatTitle,
+    formatGlobalChatContextLine,
     normalizeGlobalChatMessage,
     normalizeGlobalChatScopeInput,
     normalizeGlobalChatThread,
@@ -119,5 +120,15 @@ describe("global chat normalization helpers", () => {
             content: "Hello",
             created_at: "2026-03-10 09:00:00",
         });
+    });
+
+    it("formats global chat context without leaking HTML tags", () => {
+        expect(formatGlobalChatContextLine({
+            source_name: "Ben's Bites",
+            title: "Shipping AI features",
+            summary: "<p>A concise summary with <strong>bold</strong> text</p>",
+            published_at: "2026-03-10T09:00:00Z",
+            inserted_at: "2026-03-10T09:10:00Z",
+        })).toBe("- [2026-03-10T09:00:00Z] Ben's Bites: Shipping AI features - A concise summary with bold text");
     });
 });

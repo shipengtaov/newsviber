@@ -1,3 +1,5 @@
+import { stripHtmlToText } from "@/lib/article-html";
+
 export function getChatMarkdownFormattingInstructions(): string {
   return `Respond in concise markdown.
 
@@ -54,9 +56,12 @@ export function buildArticleDiscussionSystemPrompt({
   articleContent,
   relatedContext,
 }: ArticleDiscussionSystemPromptInput): string {
+  const normalizedArticleContent = stripHtmlToText(articleContent);
+  const normalizedRelatedContext = relatedContext ? stripHtmlToText(relatedContext) : "";
+
   return appendChatMarkdownFormatting(`You are a helpful reading assistant. The user is reading the following article titled "${articleTitle}" source: ${sourceName}.
 Current Article Content:
-${articleContent}${relatedContext ?? ""}
+${normalizedArticleContent}${normalizedRelatedContext ? `\n\n${normalizedRelatedContext}` : ""}
 
 Answer the user's questions based primarily on the current article. Use related context if asked for broader info. Be concise.`);
 }
