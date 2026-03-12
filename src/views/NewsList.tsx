@@ -4,8 +4,8 @@ import { openUrl } from "@tauri-apps/plugin-opener";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { Search, ExternalLink, RefreshCcw, ChevronLeft, ChevronRight, MoreHorizontal } from "lucide-react";
+import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { Search, ExternalLink, RefreshCcw, ChevronLeft, ChevronRight, MoreHorizontal, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { fetchSource, fetchSources, type FetchableSource } from "@/lib/source-fetch";
@@ -50,6 +50,7 @@ const PAGE_SIZE = 20;
 const DEFAULT_SOURCES_PANEL_WIDTH = 240;
 const MIN_SOURCES_PANEL_WIDTH = 200;
 const MAX_SOURCES_PANEL_WIDTH = 420;
+const SOURCE_ACTION_BUTTON_CLASS_NAME = "h-9 w-9 shrink-0 rounded-lg text-muted-foreground hover:bg-sky-100/70 hover:text-sky-700 dark:hover:bg-sky-900/35 dark:hover:text-sky-300";
 
 let db: Database | null = null;
 async function getDb() {
@@ -258,7 +259,7 @@ function SourceFilterRow({
                 type="button"
                 variant="ghost"
                 size="icon"
-                className="h-9 w-9 shrink-0 rounded-lg text-muted-foreground hover:bg-sky-100/70 hover:text-sky-700 dark:hover:bg-sky-900/35 dark:hover:text-sky-300"
+                className={SOURCE_ACTION_BUTTON_CLASS_NAME}
                 onClick={onFetch}
                 disabled={isDisabled}
                 aria-label={fetchAriaLabel}
@@ -272,6 +273,7 @@ function SourceFilterRow({
 
 export default function NewsList() {
     const { toast } = useToast();
+    const location = useLocation();
     const navigate = useNavigate();
     const { id: articleIdParam } = useParams();
     const [articles, setArticles] = useState<Article[]>([]);
@@ -601,6 +603,15 @@ export default function NewsList() {
         setSearchParams(nextParams);
     }
 
+    function handleAddSource() {
+        const returnTo = `${location.pathname}${location.search}`;
+        const params = new URLSearchParams({ returnTo });
+        navigate({
+            pathname: "/sources/add",
+            search: `?${params.toString()}`,
+        });
+    }
+
     function handleExternalLink(e: React.MouseEvent, url: string) {
         e.preventDefault();
         e.stopPropagation();
@@ -719,8 +730,19 @@ export default function NewsList() {
                 style={isDesktopLayout ? { width: sourcesPanelWidth } : undefined}
             >
                 <div className="flex flex-col gap-2 rounded-xl border border-border bg-background/60 p-4 lg:h-full lg:min-h-0 lg:rounded-none lg:border-0 lg:bg-transparent lg:p-0 lg:pl-4 lg:py-4">
-                    <div className="lg:pr-4">
+                    <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-1 pr-1 lg:pr-[5px]">
                         <h2 className="text-sm font-semibold uppercase tracking-wide text-sky-700/90 dark:text-sky-300/90">Sources</h2>
+                        <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className={SOURCE_ACTION_BUTTON_CLASS_NAME}
+                            onClick={handleAddSource}
+                            aria-label="Add source"
+                            title="Add source"
+                        >
+                            <Plus className="h-4 w-4" />
+                        </Button>
                     </div>
 
                     <div className="space-y-1 pr-1 lg:pr-[5px] lg:flex-1 lg:min-h-0 lg:overflow-y-auto">

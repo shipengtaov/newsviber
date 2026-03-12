@@ -5,9 +5,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { ChevronLeft } from "lucide-react";
 import { PageShell } from "@/components/layout/PageShell";
+import { DEFAULT_SOURCE_RETURN_TO, isNewsReturnToPath, resolveSourceReturnTo } from "@/lib/source-navigation";
 
 let db: Database | null = null;
 async function getDb() {
@@ -26,7 +27,11 @@ export default function SourceForm() {
     const { toast } = useToast();
     const navigate = useNavigate();
     const { id } = useParams();
+    const [searchParams] = useSearchParams();
     const isEditing = !!id;
+    const resolvedReturnTo = resolveSourceReturnTo(searchParams.get("returnTo"));
+    const returnButtonLabel = isNewsReturnToPath(resolvedReturnTo) ? "Back to News" : "Back to Sources";
+    const shouldReplaceOnReturn = searchParams.has("returnTo") && resolvedReturnTo !== DEFAULT_SOURCE_RETURN_TO;
 
     const [name, setName] = useState("");
     const [type, setType] = useState("rss");
@@ -40,6 +45,10 @@ export default function SourceForm() {
         }
     }, [id]);
 
+    function navigateBack() {
+        navigate(resolvedReturnTo, { replace: shouldReplaceOnReturn });
+    }
+
     async function loadSource(sourceId: string) {
         try {
             const db = await getDb();
@@ -52,7 +61,7 @@ export default function SourceForm() {
                 setInterval(s.fetch_interval.toString());
             } else {
                 toast({ title: "Source not found", variant: "destructive" });
-                navigate("/sources");
+                navigate(resolvedReturnTo, { replace: shouldReplaceOnReturn });
             }
         } catch (err: any) {
             console.error(err);
@@ -79,7 +88,7 @@ export default function SourceForm() {
                 );
                 toast({ title: "Source added successfully" });
             }
-            navigate("/sources");
+            navigateBack();
         } catch (err: any) {
             toast({ title: "Error saving source", description: String(err), variant: "destructive" });
         } finally {
@@ -89,9 +98,9 @@ export default function SourceForm() {
 
     return (
         <PageShell variant="workspace" className="space-y-8">
-            <Button variant="ghost" size="sm" onClick={() => navigate("/sources")} className="-ml-2">
+            <Button variant="ghost" size="sm" onClick={navigateBack} className="-ml-2">
                 <ChevronLeft className="h-4 w-4 mr-2" />
-                Back to Sources
+                {returnButtonLabel}
             </Button>
 
             <div>
@@ -131,7 +140,7 @@ export default function SourceForm() {
                     </div>
 
                     <div className="flex justify-end gap-3 pt-6 border-t border-border/50">
-                        <Button type="button" variant="outline" onClick={() => navigate("/sources")}>Cancel</Button>
+                        <Button type="button" variant="outline" onClick={navigateBack}>Cancel</Button>
                         <Button type="submit" disabled={loading}>
                             {isEditing ? "Save Changes" : "Add Source"}
                         </Button>
