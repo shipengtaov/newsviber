@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 type ChatMarkdownProps = {
   content: string;
   className?: string;
+  tone?: "default" | "inverse";
 };
 
 function isSafeExternalUrl(value: string): boolean {
@@ -60,9 +61,9 @@ const chatMarkdownComponents: Components = {
   },
 };
 
-export function ChatMarkdown({ content, className }: ChatMarkdownProps) {
+export function ChatMarkdown({ content, className, tone = "default" }: ChatMarkdownProps) {
   return (
-    <div className={cn("chat-markdown", className)}>
+    <div className={cn("chat-markdown", tone === "inverse" && "chat-markdown-inverse", className)}>
       <ReactMarkdown remarkPlugins={[remarkGfm]} components={chatMarkdownComponents} skipHtml>
         {content}
       </ReactMarkdown>

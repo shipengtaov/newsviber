@@ -49,4 +49,32 @@ npm test
     expect(markup).not.toContain("<a");
     expect(markup).toContain("chat-markdown-link-disabled");
   });
+
+  it("applies inverse tone styles without changing markdown safety behavior", () => {
+    const markup = renderToStaticMarkup(
+      <ChatMarkdown
+        tone="inverse"
+        content={`# User Note
+
+Inline \`code\`
+
+\`\`\`txt
+visible code block
+\`\`\`
+
+| Column | Value |
+| --- | --- |
+| Tone | Inverse |
+
+[Safe link](https://example.com)
+[Unsafe link](file:///tmp/example.txt)`}
+      />,
+    );
+
+    expect(markup).toContain("chat-markdown-inverse");
+    expect(markup).toContain('class="chat-markdown-pre not-prose"');
+    expect(markup).toContain('href="https://example.com"');
+    expect(markup).not.toContain('href="file:///tmp/example.txt"');
+    expect(markup).toContain("chat-markdown-link-disabled");
+  });
 });

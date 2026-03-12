@@ -1041,7 +1041,11 @@ export default function CreativeSpace() {
                 </div>
 
                 <Sheet open={isCardDiscussionOpen} onOpenChange={setIsCardDiscussionOpen}>
-                    <SheetContent side="right" className="w-full max-w-xl p-0 sm:max-w-xl">
+                    <SheetContent
+                        side="right"
+                        className="w-full max-w-xl p-0 sm:max-w-xl"
+                        overlayClassName="bg-black/40 backdrop-blur-[1px]"
+                    >
                         <div className="flex h-full flex-col">
                             <SheetHeader className="shrink-0 border-b px-5 pb-4 pt-5 text-left">
                                 <SheetTitle>Discuss Card</SheetTitle>
@@ -1077,7 +1081,10 @@ export default function CreativeSpace() {
 
                                                 return (
                                                     <div className="space-y-2">
-                                                        <ChatMarkdown content={message.content} />
+                                                        <ChatMarkdown
+                                                            content={message.content}
+                                                            tone={message.role === "user" ? "inverse" : "default"}
+                                                        />
                                                         {isLiveAssistantMessage && chatStreamPhase === "streaming" && (
                                                             <div className="flex items-center gap-2 text-xs text-muted-foreground">
                                                                 <span className="h-2 w-2 rounded-full bg-primary/80 animate-pulse" />
