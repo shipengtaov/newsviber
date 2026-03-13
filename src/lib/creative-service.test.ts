@@ -36,6 +36,10 @@ vi.mock("@/lib/ai", async () => {
 import {
     buildCreativePrompt,
     generateCreativeCardForProject,
+    listCreativeCards,
+    listCreativeProjects,
+    markAllCreativeCardsAsRead,
+    markCreativeCardAsRead,
     summarizeArticleContextText,
 } from "@/lib/creative-service";
 
@@ -74,6 +78,7 @@ describe("creative service context helpers", () => {
                 last_auto_checked_at: null,
                 last_auto_generated_at: null,
                 source_ids: [],
+                unread_card_count: 0,
             },
             [{
                 id: 9,
@@ -109,6 +114,7 @@ describe("creative service context helpers", () => {
                     last_auto_checked_at: null,
                     last_auto_generated_at: null,
                     source_ids_csv: null,
+                    unread_card_count: 0,
                 }];
             }
 
@@ -133,6 +139,7 @@ describe("creative service context helpers", () => {
                     full_report: "## Key Signals\n- Faster inference",
                     generation_mode: "manual",
                     used_article_count: 1,
+                    is_read: 0,
                     created_at: "2026-03-13T00:00:00Z",
                 }];
             }
@@ -177,6 +184,87 @@ describe("creative service context helpers", () => {
             title: "Signals for builders",
             full_report: "## Key Signals\n- Faster inference",
         });
+        expect(dispatchCreativeSyncEventMock).toHaveBeenCalledTimes(1);
+    });
+});
+
+describe("creative service unread state", () => {
+    it("maps unread project counts from project queries", async () => {
+        getDbMock.mockResolvedValue({
+            select: vi.fn().mockResolvedValue([{
+                id: 3,
+                name: "Signals",
+                prompt: "Find startup patterns",
+                cycle_mode: "manual",
+                auto_enabled: 1,
+                auto_interval_minutes: 30,
+                max_articles_per_card: 9,
+                last_auto_checked_at: "2026-03-13T00:00:00Z",
+                last_auto_generated_at: "2026-03-13T01:00:00Z",
+                source_ids_csv: "1,2",
+                unread_card_count: 4,
+            }]),
+            execute: vi.fn(),
+        });
+
+        await expect(listCreativeProjects()).resolves.toEqual([expect.objectContaining({
+            id: 3,
+            source_ids: [1, 2],
+            unread_card_count: 4,
+        })]);
+    });
+
+    it("maps card read state from card queries", async () => {
+        getDbMock.mockResolvedValue({
+            select: vi.fn().mockResolvedValue([{
+                id: 18,
+                project_id: 3,
+                title: "Builder memo",
+                full_report: "## Memo",
+                generation_mode: "auto",
+                used_article_count: 2,
+                is_read: 1,
+                created_at: "2026-03-13T02:00:00Z",
+            }]),
+            execute: vi.fn(),
+        });
+
+        await expect(listCreativeCards(3)).resolves.toEqual([expect.objectContaining({
+            id: 18,
+            generation_mode: "auto",
+            is_read: true,
+        })]);
+    });
+
+    it("marks a single card as read and dispatches sync", async () => {
+        const executeMock = vi.fn().mockResolvedValue(undefined);
+        getDbMock.mockResolvedValue({
+            select: vi.fn(),
+            execute: executeMock,
+        });
+
+        await markCreativeCardAsRead(18);
+
+        expect(executeMock).toHaveBeenCalledWith(
+            "UPDATE creative_cards SET is_read = 1 WHERE id = $1",
+            [18],
+        );
+        expect(dispatchCreativeSyncEventMock).toHaveBeenCalledTimes(1);
+    });
+
+    it("marks all cards in a project as read and dispatches sync", async () => {
+        const executeMock = vi.fn().mockResolvedValue(undefined);
+        getDbMock.mockResolvedValue({
+            select: vi.fn(),
+            execute: executeMock,
+        });
+
+        await markAllCreativeCardsAsRead(7);
+
+        expect(executeMock).toHaveBeenCalledWith(
+            "UPDATE creative_cards SET is_read = 1 WHERE project_id = $1 AND is_read = 0",
+            [7],
+        );
         expect(dispatchCreativeSyncEventMock).toHaveBeenCalledTimes(1);
     });
 });

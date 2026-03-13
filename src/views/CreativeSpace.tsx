@@ -24,13 +24,15 @@ import {
     type CreativeCard,
     type CreativeProject,
     type CreativeSourceOption,
+    deleteCreativeProject,
     generateCreativeCardForProject,
     listCreativeCards,
     listCreativeProjects,
     listCreativeSources,
     listProjectCandidateArticles,
+    markAllCreativeCardsAsRead,
+    markCreativeCardAsRead,
     saveCreativeProject,
-    deleteCreativeProject,
 } from "@/lib/creative-service";
 import { optimizeCreativeProjectPrompt, type Message } from "@/lib/ai";
 import { buildCreativeCardDiscussionSystemPrompt } from "@/lib/chat-prompts";
@@ -38,6 +40,7 @@ import { PageShell } from "@/components/layout/PageShell";
 import { useStreamingConversation } from "@/hooks/use-streaming-conversation";
 import { getCreativeCardBodyMarkdown, getCreativeCardPreviewExcerpt } from "@/lib/creative-card";
 import { formatUtcDateTime } from "@/lib/time";
+import { cn } from "@/lib/utils";
 import ReactMarkdown from "react-markdown";
 import { ArrowLeft, ChevronDown, ChevronUp, Ellipsis, Lightbulb, Loader2, MessageSquare, Pencil, Plus, Send, Trash2, WandSparkles } from "lucide-react";
 
@@ -56,10 +59,10 @@ const DEFAULT_MAX_ARTICLES_PER_CARD = "12";
 const GENERATED_TILE_PREVIEW_MAX_LENGTH = 360;
 const CREATIVE_TILE_GRID_CLASS = "grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4";
 const CREATIVE_TILE_CARD_BASE_CLASS = "flex cursor-pointer flex-col overflow-hidden transition-all hover:border-primary/50 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2";
-const PROJECT_TILE_CARD_CLASS = `${CREATIVE_TILE_CARD_BASE_CLASS} h-[272px]`;
-const GENERATED_TILE_CARD_CLASS = `${CREATIVE_TILE_CARD_BASE_CLASS} min-h-[248px]`;
-const CREATIVE_TILE_HEADER_CLASS = "px-4 py-4 pb-2";
-const CREATIVE_TILE_BODY_CLASS = "flex flex-1 flex-col px-4 pb-4 pt-0";
+const PROJECT_TILE_CARD_CLASS = `${CREATIVE_TILE_CARD_BASE_CLASS} h-[288px]`;
+const GENERATED_TILE_CARD_CLASS = `${CREATIVE_TILE_CARD_BASE_CLASS} min-h-[268px]`;
+const CREATIVE_TILE_HEADER_CLASS = "px-5 py-5 pb-3";
+const CREATIVE_TILE_BODY_CLASS = "flex flex-1 flex-col px-5 pb-5 pt-0";
 
 function createEmptyProjectFormState(): ProjectFormState {
     return {
@@ -151,6 +154,10 @@ function formatProjectRecentActivitySummary(project: CreativeProject): string {
     }
 
     return "No recent activity";
+}
+
+function formatUnreadCardCount(count: number): string {
+    return count > 99 ? "99+" : String(Math.max(0, count));
 }
 
 type ProjectOverviewItemProps = {
@@ -436,6 +443,7 @@ export default function CreativeSpace() {
     const [selectedArticleIds, setSelectedArticleIds] = useState<number[]>([]);
     const [isLoadingCandidates, setIsLoadingCandidates] = useState(false);
     const [isGenerating, setIsGenerating] = useState(false);
+    const [isMarkingAllCardsRead, setIsMarkingAllCardsRead] = useState(false);
     const [isProjectInfoOpen, setIsProjectInfoOpen] = useState(false);
     const [isProjectActionsOpen, setIsProjectActionsOpen] = useState(false);
     const [isCardDiscussionOpen, setIsCardDiscussionOpen] = useState(false);
@@ -448,6 +456,7 @@ export default function CreativeSpace() {
         send: sendChatMessage,
         replaceMessages: replaceChatMessages,
     } = useStreamingConversation();
+    const markingCardReadIdsRef = useRef(new Set<number>());
     const promptOptimizationRequestIdRef = useRef(0);
     const projectDialogOpenRef = useRef(projectDialogOpen);
     const projectActionsPanelRef = useRef<HTMLDivElement | null>(null);
@@ -456,6 +465,11 @@ export default function CreativeSpace() {
     const activeProject = projects.find((project) => project.id === activeProjectId) ?? null;
     const activeCard = cards.find((card) => card.id === activeCardId) ?? null;
     const activeCardBodyMarkdown = activeCard ? getCreativeCardBodyMarkdown(activeCard) : "";
+    const activeProjectUnreadCount = activeProject
+        ? cards.length === 0
+            ? activeProject.unread_card_count
+            : cards.filter((card) => !card.is_read).length
+        : 0;
     const scopedSources = activeProject
         ? sources.filter((source) => activeProject.source_ids.length === 0 || activeProject.source_ids.includes(source.id))
         : [];
@@ -637,6 +651,47 @@ export default function CreativeSpace() {
         }
     }
 
+    function updateProjectUnreadCount(projectId: number, nextUnreadCount: number | ((currentCount: number) => number)) {
+        setProjects((currentProjects) => currentProjects.map((project) => (
+            project.id === projectId
+                ? {
+                    ...project,
+                    unread_card_count: Math.max(
+                        0,
+                        typeof nextUnreadCount === "function"
+                            ? nextUnreadCount(project.unread_card_count)
+                            : nextUnreadCount,
+                    ),
+                }
+                : project
+        )));
+    }
+
+    function openCreativeCard(cardId: number, cardSnapshot?: CreativeCard) {
+        const targetCard = cardSnapshot ?? cards.find((card) => card.id === cardId);
+        setActiveCardId(cardId);
+
+        if (!targetCard || targetCard.is_read || markingCardReadIdsRef.current.has(cardId)) {
+            return;
+        }
+
+        markingCardReadIdsRef.current.add(cardId);
+        setCards((currentCards) => currentCards.map((card) => (
+            card.id === cardId ? { ...card, is_read: true } : card
+        )));
+        updateProjectUnreadCount(targetCard.project_id, (currentCount) => currentCount - 1);
+
+        void markCreativeCardAsRead(cardId)
+            .catch(async (error) => {
+                toast({ title: "Failed to mark card as read", description: String(error), variant: "destructive" });
+                await loadProjects();
+                await loadCards(targetCard.project_id);
+            })
+            .finally(() => {
+                markingCardReadIdsRef.current.delete(cardId);
+            });
+    }
+
     function resetPromptSuggestionState() {
         promptOptimizationRequestIdRef.current += 1;
         setIsOptimizingPrompt(false);
@@ -701,11 +756,33 @@ export default function CreativeSpace() {
         }
 
         event.preventDefault();
-        setActiveCardId(cardId);
+        openCreativeCard(cardId);
     }
 
     function stopCardClickPropagation(event: React.MouseEvent<HTMLButtonElement>) {
         event.stopPropagation();
+    }
+
+    async function handleMarkAllCardsRead() {
+        if (!activeProject || isMarkingAllCardsRead || activeProjectUnreadCount === 0) {
+            return;
+        }
+
+        setIsMarkingAllCardsRead(true);
+        setCards((currentCards) => currentCards.map((card) => (
+            card.project_id === activeProject.id ? { ...card, is_read: true } : card
+        )));
+        updateProjectUnreadCount(activeProject.id, 0);
+
+        try {
+            await markAllCreativeCardsAsRead(activeProject.id);
+        } catch (error) {
+            toast({ title: "Failed to mark all cards as read", description: String(error), variant: "destructive" });
+            await loadProjects();
+            await loadCards(activeProject.id);
+        } finally {
+            setIsMarkingAllCardsRead(false);
+        }
     }
 
     async function handleProjectSubmit(event: React.FormEvent) {
@@ -938,8 +1015,10 @@ export default function CreativeSpace() {
                 mode: "manual",
             });
 
+            await loadProjects();
             await loadCards(activeProject.id);
-            setActiveCardId(generatedCard.id);
+            setCards((currentCards) => [generatedCard, ...currentCards.filter((card) => card.id !== generatedCard.id)]);
+            openCreativeCard(generatedCard.id, generatedCard);
             setManualDialogOpen(false);
             setSelectedArticleIds([]);
             toast({ title: "Card generated" });
@@ -1012,12 +1091,12 @@ export default function CreativeSpace() {
                                 <Button variant="ghost" size="sm" onClick={() => setActiveCardId(null)} className="-ml-2 w-fit">
                                     <ArrowLeft className="mr-2 h-4 w-4" /> Back
                                 </Button>
-                                <div className="mt-2 space-y-1">
+                                <div className="mt-2 space-y-2.5">
                                     <div className="text-balance text-lg font-semibold leading-tight md:text-xl">{activeCard.title}</div>
-                                    <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
                                         <span>{activeCard.generation_mode === "auto" ? "Auto" : "Manual"} run</span>
                                         <span>{activeCard.used_article_count} article{activeCard.used_article_count === 1 ? "" : "s"}</span>
-                                        <span>{formatTimestamp(activeCard.created_at)}</span>
+                                        <span className="tabular-nums">{formatTimestamp(activeCard.created_at)}</span>
                                     </div>
                                 </div>
                             </div>
@@ -1134,6 +1213,19 @@ export default function CreativeSpace() {
                             <Button onClick={openManualGenerateDialog} disabled={isGenerating}>
                                 <WandSparkles className="mr-2 h-4 w-4" /> {isGenerating ? "Generating..." : "Generate Card"}
                             </Button>
+                            <Button
+                                variant="outline"
+                                onClick={handleMarkAllCardsRead}
+                                disabled={isMarkingAllCardsRead || activeProjectUnreadCount === 0}
+                            >
+                                {isMarkingAllCardsRead ? (
+                                    <>
+                                        <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Marking...
+                                    </>
+                                ) : (
+                                    "Mark all as read"
+                                )}
+                            </Button>
                             <div className="relative" ref={projectActionsPanelRef}>
                                 <Button
                                     variant="outline"
@@ -1189,6 +1281,10 @@ export default function CreativeSpace() {
                                     <span className="text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">Cards</span>
                                     <span className="font-medium text-foreground">{cards.length}</span>
                                 </span>
+                                <span className="inline-flex items-center gap-1.5">
+                                    <span className="text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">Unread</span>
+                                    <span className="font-medium text-foreground tabular-nums">{formatUnreadCardCount(activeProjectUnreadCount)}</span>
+                                </span>
                                 <span className="inline-flex min-w-0 items-center gap-1.5">
                                     <span className="text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">Updated</span>
                                     <span className="truncate font-medium text-foreground">{formatProjectRecentActivitySummary(activeProject)}</span>
@@ -1240,6 +1336,10 @@ export default function CreativeSpace() {
                                         value={formatTimestamp(activeProject.last_auto_generated_at)}
                                     />
                                     <ProjectOverviewItem
+                                        label="Unread Cards"
+                                        value={formatUnreadCardCount(activeProjectUnreadCount)}
+                                    />
+                                    <ProjectOverviewItem
                                         label="Cards"
                                         value={`${cards.length} card${cards.length === 1 ? "" : "s"}`}
                                     />
@@ -1253,23 +1353,46 @@ export default function CreativeSpace() {
                     {cards.map((card) => (
                         <Card
                             key={card.id}
-                            className={GENERATED_TILE_CARD_CLASS}
+                            className={cn(
+                                GENERATED_TILE_CARD_CLASS,
+                                "rounded-[1.35rem] border-border/70 bg-card/95",
+                                card.is_read
+                                    ? "shadow-[0_18px_44px_-36px_rgba(15,15,15,0.28)]"
+                                    : "border-sky-200/80 bg-sky-50/40 shadow-[0_22px_48px_-40px_rgba(14,165,233,0.35)] dark:border-sky-400/20 dark:bg-sky-500/[0.06]",
+                            )}
                             role="button"
                             tabIndex={0}
-                            onClick={() => setActiveCardId(card.id)}
+                            onClick={() => openCreativeCard(card.id, card)}
                             onKeyDown={(event) => handleGeneratedCardKeyDown(event, card.id)}
                         >
                             <CardHeader className={CREATIVE_TILE_HEADER_CLASS}>
-                                <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
-                                    <span>{formatUtcDateTime(card.created_at)}</span>
+                                <div className="flex items-start justify-between gap-3">
+                                    <div className="min-w-0 flex-1">
+                                        <CardTitle
+                                            className={cn(
+                                                "line-clamp-2 min-h-[3rem] text-base leading-6 tracking-tight",
+                                                card.is_read ? "text-foreground/90" : "text-foreground",
+                                            )}
+                                        >
+                                            {card.title}
+                                        </CardTitle>
+                                    </div>
+                                    {!card.is_read && <span className="mt-1 inline-block h-2 w-2 shrink-0 rounded-full bg-blue-500"></span>}
+                                </div>
+                                <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+                                    <span className="tabular-nums">{formatUtcDateTime(card.created_at)}</span>
                                     <span>
                                         {card.generation_mode === "auto" ? "Auto" : "Manual"} · {card.used_article_count}
                                     </span>
                                 </div>
-                                <CardTitle className="line-clamp-2 min-h-[3rem] text-base leading-6">{card.title}</CardTitle>
                             </CardHeader>
                             <CardContent className={CREATIVE_TILE_BODY_CLASS}>
-                                <p className="line-clamp-5 min-h-[7.5rem] text-sm leading-6 text-muted-foreground">
+                                <p
+                                    className={cn(
+                                        "line-clamp-5 min-h-[7.5rem] text-sm leading-6",
+                                        card.is_read ? "text-muted-foreground" : "text-foreground/78",
+                                    )}
+                                >
                                     {getCreativeCardPreviewExcerpt(card, GENERATED_TILE_PREVIEW_MAX_LENGTH)}
                                 </p>
                             </CardContent>
@@ -1434,25 +1557,56 @@ export default function CreativeSpace() {
                 {projects.map((project) => (
                     <Card
                         key={project.id}
-                        className={PROJECT_TILE_CARD_CLASS}
+                        className={cn(
+                            PROJECT_TILE_CARD_CLASS,
+                            "rounded-[1.5rem] border-border/70 bg-card/95",
+                            project.unread_card_count > 0
+                                ? "border-sky-200/80 shadow-[0_24px_52px_-40px_rgba(14,165,233,0.32)] dark:border-sky-400/20"
+                                : "shadow-[0_18px_42px_-38px_rgba(15,15,15,0.28)]",
+                        )}
                         role="button"
                         tabIndex={0}
                         onClick={() => openProjectDetail(project.id)}
                         onKeyDown={(event) => handleProjectCardKeyDown(event, project.id)}
                     >
                         <CardHeader className={CREATIVE_TILE_HEADER_CLASS}>
-                            <div className="min-w-0 flex-1">
-                                <CardTitle className="truncate text-lg">{project.name}</CardTitle>
-                                <CardDescription className="mt-1.5 line-clamp-2 min-h-[2.5rem] text-sm">{project.prompt}</CardDescription>
+                            <div className="flex items-start justify-between gap-4">
+                                <div className="min-w-0 flex-1">
+                                    <CardTitle className="truncate text-xl tracking-tight">{project.name}</CardTitle>
+                                </div>
+                                {project.unread_card_count > 0 && (
+                                    <div className="inline-flex h-11 min-w-[2.75rem] shrink-0 items-center justify-center rounded-full border border-sky-200 bg-sky-100/85 px-2 text-sm font-semibold leading-none tabular-nums text-sky-700 dark:border-sky-400/20 dark:bg-sky-500/15 dark:text-sky-300">
+                                        <span>
+                                            {formatUnreadCardCount(project.unread_card_count)}
+                                        </span>
+                                    </div>
+                                )}
                             </div>
+                            <CardDescription className="mt-3 line-clamp-2 min-h-[3rem] text-sm leading-6 text-muted-foreground/90">
+                                {project.prompt}
+                            </CardDescription>
                         </CardHeader>
                         <CardContent className={`${CREATIVE_TILE_BODY_CLASS} text-sm text-muted-foreground`}>
-                            <div className="space-y-1.5">
-                                <p>{formatAutoSummary(project)}</p>
-                                <p>Scope: {project.source_ids.length === 0 ? "All sources" : `${project.source_ids.length} selected`}</p>
-                                <p>Max articles: {project.max_articles_per_card}</p>
+                            <div className="mt-auto border-t border-border/60 pt-4">
+                                <div className="grid grid-cols-3 gap-3 text-left">
+                                    <div>
+                                        <div className="text-[10px] font-medium uppercase tracking-[0.16em] text-muted-foreground">Auto</div>
+                                        <div className="mt-1 text-sm font-medium text-foreground">{formatCompactAutoSummary(project)}</div>
+                                    </div>
+                                    <div>
+                                        <div className="text-[10px] font-medium uppercase tracking-[0.16em] text-muted-foreground">Scope</div>
+                                        <div className="mt-1 truncate text-sm font-medium text-foreground">
+                                            {formatProjectScopeSummary(project, sources)}
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <div className="text-[10px] font-medium uppercase tracking-[0.16em] text-muted-foreground">Max</div>
+                                        <div className="mt-1 text-sm font-medium text-foreground tabular-nums">{project.max_articles_per_card}</div>
+                                    </div>
+                                </div>
                             </div>
-                            <div className="mt-auto flex flex-wrap gap-2 pt-4">
+
+                            <div className="mt-4 flex flex-wrap gap-2">
                                 <Button
                                     variant="outline"
                                     size="sm"

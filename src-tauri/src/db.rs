@@ -252,6 +252,15 @@ pub fn get_migrations() -> Vec<Migration> {
                 PRAGMA foreign_keys=ON;
             ",
             kind: MigrationKind::Up,
+        },
+        Migration {
+            version: 7,
+            description: "add_creative_card_read_state",
+            sql: "
+                ALTER TABLE creative_cards ADD COLUMN is_read BOOLEAN NOT NULL DEFAULT 0;
+                UPDATE creative_cards SET is_read = 1;
+            ",
+            kind: MigrationKind::Up,
         }
     ]
 }

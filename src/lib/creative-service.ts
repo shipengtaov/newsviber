@@ -16,6 +16,7 @@ export type CreativeProject = {
     last_auto_checked_at: string | null;
     last_auto_generated_at: string | null;
     source_ids: number[];
+    unread_card_count: number;
 };
 
 export type CreativeCard = {
@@ -25,6 +26,7 @@ export type CreativeCard = {
     full_report: string;
     generation_mode: "manual" | "auto";
     used_article_count: number;
+    is_read: boolean;
     created_at: string;
 };
 
@@ -102,6 +104,7 @@ type CreativeProjectRow = {
     last_auto_checked_at: string | null;
     last_auto_generated_at: string | null;
     source_ids_csv: string | null;
+    unread_card_count: number | null;
 };
 
 type CreativeCardRow = {
@@ -111,6 +114,7 @@ type CreativeCardRow = {
     full_report: string | null;
     generation_mode: string | null;
     used_article_count: number | null;
+    is_read: number | boolean | string | null;
     created_at: string;
 };
 
@@ -159,6 +163,12 @@ const PROJECT_SELECT_BASE_SQL = `
         p.max_articles_per_card,
         p.last_auto_checked_at,
         p.last_auto_generated_at,
+        (
+            SELECT COUNT(*)
+            FROM creative_cards unread_cards
+            WHERE unread_cards.project_id = p.id
+              AND unread_cards.is_read = 0
+        ) AS unread_card_count,
         GROUP_CONCAT(ps.source_id) AS source_ids_csv
     FROM creative_projects p
     LEFT JOIN creative_project_sources ps ON ps.project_id = p.id
@@ -216,6 +226,7 @@ function normalizeCreativeProject(row: CreativeProjectRow): CreativeProject {
         last_auto_checked_at: row.last_auto_checked_at ?? null,
         last_auto_generated_at: row.last_auto_generated_at ?? null,
         source_ids: parseCsvNumbers(row.source_ids_csv),
+        unread_card_count: Math.max(0, Number(row.unread_card_count) || 0),
     };
 }
 
@@ -229,6 +240,7 @@ function normalizeCreativeCard(row: CreativeCardRow): CreativeCard {
         full_report: row.full_report ?? "",
         generation_mode: generationMode,
         used_article_count: normalizePositiveInteger(row.used_article_count, 0),
+        is_read: normalizeBoolean(row.is_read),
         created_at: row.created_at,
     };
 }
@@ -397,6 +409,7 @@ async function getCreativeCard(cardId: number): Promise<CreativeCard | null> {
                 full_report,
                 generation_mode,
                 used_article_count,
+                is_read,
                 created_at
             FROM creative_cards
             WHERE id = $1
@@ -551,6 +564,7 @@ export async function listCreativeCards(projectId: number): Promise<CreativeCard
                 full_report,
                 generation_mode,
                 used_article_count,
+                is_read,
                 created_at
             FROM creative_cards
             WHERE project_id = $1
@@ -619,6 +633,18 @@ export async function saveCreativeProject(input: SaveCreativeProjectInput, proje
 export async function deleteCreativeProject(projectId: number): Promise<void> {
     const db = await getDb();
     await db.execute("DELETE FROM creative_projects WHERE id = $1", [projectId]);
+    dispatchCreativeSyncEvent();
+}
+
+export async function markCreativeCardAsRead(cardId: number): Promise<void> {
+    const db = await getDb();
+    await db.execute("UPDATE creative_cards SET is_read = 1 WHERE id = $1", [cardId]);
+    dispatchCreativeSyncEvent();
+}
+
+export async function markAllCreativeCardsAsRead(projectId: number): Promise<void> {
+    const db = await getDb();
+    await db.execute("UPDATE creative_cards SET is_read = 1 WHERE project_id = $1 AND is_read = 0", [projectId]);
     dispatchCreativeSyncEvent();
 }
 
