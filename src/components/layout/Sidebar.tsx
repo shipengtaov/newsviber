@@ -10,9 +10,9 @@ export function Sidebar({ collapsed }: SidebarProps) {
     const location = useLocation();
     const navItems = [
         { name: "News", path: "/", icon: Newspaper },
-        { name: "Sources", path: "/sources", icon: Rss },
-        { name: "Chat", path: "/chat", icon: MessageSquare },
         { name: "Creative Space", path: "/creative", icon: Lightbulb },
+        { name: "Chat", path: "/chat", icon: MessageSquare },
+        { name: "Sources", path: "/sources", icon: Rss },
         { name: "Settings", path: "/settings", icon: Settings },
     ];
 
