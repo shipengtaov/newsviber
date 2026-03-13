@@ -96,6 +96,10 @@ function formatTimestamp(value: string | null): string {
     return formatUtcDateTime(value, "Never");
 }
 
+function formatArticleCount(count: number): string {
+    return `${count} article${count === 1 ? "" : "s"}`;
+}
+
 function formatProjectScope(project: CreativeProject, sources: CreativeSourceOption[]): string {
     if (project.source_ids.length === 0) {
         return "All sources";
@@ -950,7 +954,7 @@ export default function CreativeSpace() {
 
             if (currentSelectedIds.length >= activeProject.max_articles_per_card) {
                 toast({
-                    title: `Select up to ${activeProject.max_articles_per_card} article${activeProject.max_articles_per_card === 1 ? "" : "s"}`,
+                    title: `Select up to ${formatArticleCount(activeProject.max_articles_per_card)}`,
                     variant: "destructive",
                 });
                 return currentSelectedIds;
@@ -1095,7 +1099,7 @@ export default function CreativeSpace() {
                                     <div className="text-balance text-lg font-semibold leading-tight md:text-xl">{activeCard.title}</div>
                                     <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
                                         <span>{activeCard.generation_mode === "auto" ? "Auto" : "Manual"} run</span>
-                                        <span>{activeCard.used_article_count} article{activeCard.used_article_count === 1 ? "" : "s"}</span>
+                                        <span>{formatArticleCount(activeCard.used_article_count)}</span>
                                         <span className="tabular-nums">{formatTimestamp(activeCard.created_at)}</span>
                                     </div>
                                 </div>
@@ -1275,7 +1279,7 @@ export default function CreativeSpace() {
                                 </span>
                                 <span className="inline-flex items-center gap-1.5">
                                     <span className="text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">Max</span>
-                                    <span className="font-medium text-foreground">{activeProject.max_articles_per_card}</span>
+                                    <span className="font-medium text-foreground">{formatArticleCount(activeProject.max_articles_per_card)}</span>
                                 </span>
                                 <span className="inline-flex items-center gap-1.5">
                                     <span className="text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">Cards</span>
@@ -1382,7 +1386,7 @@ export default function CreativeSpace() {
                                 <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
                                     <span className="tabular-nums">{formatUtcDateTime(card.created_at)}</span>
                                     <span>
-                                        {card.generation_mode === "auto" ? "Auto" : "Manual"} · {card.used_article_count}
+                                        {card.generation_mode === "auto" ? "Auto" : "Manual"} · {formatArticleCount(card.used_article_count)}
                                     </span>
                                 </div>
                             </CardHeader>
@@ -1413,7 +1417,7 @@ export default function CreativeSpace() {
                         <DialogHeader className="shrink-0 border-b px-6 pb-4 pt-6">
                             <DialogTitle>Generate Card</DialogTitle>
                             <DialogDescription>
-                                Select up to {activeProject.max_articles_per_card} article{activeProject.max_articles_per_card === 1 ? "" : "s"} for this manual run.
+                                Select up to {formatArticleCount(activeProject.max_articles_per_card)} for this manual run.
                             </DialogDescription>
                         </DialogHeader>
 
@@ -1456,7 +1460,7 @@ export default function CreativeSpace() {
 
                                 <div className="flex items-center justify-between text-sm">
                                     <span className="text-muted-foreground">
-                                        {selectedArticleIds.length} selected / {activeProject.max_articles_per_card} max
+                                        {formatArticleCount(selectedArticleIds.length)} selected / {formatArticleCount(activeProject.max_articles_per_card)} max
                                     </span>
                                     <Button type="button" variant="ghost" size="sm" onClick={() => setSelectedArticleIds([])} disabled={selectedArticleIds.length === 0}>
                                         Clear selection
@@ -1601,7 +1605,7 @@ export default function CreativeSpace() {
                                     </div>
                                     <div>
                                         <div className="text-[10px] font-medium uppercase tracking-[0.16em] text-muted-foreground">Max</div>
-                                        <div className="mt-1 text-sm font-medium text-foreground tabular-nums">{project.max_articles_per_card}</div>
+                                        <div className="mt-1 text-sm font-medium text-foreground">{formatArticleCount(project.max_articles_per_card)}</div>
                                     </div>
                                 </div>
                             </div>
