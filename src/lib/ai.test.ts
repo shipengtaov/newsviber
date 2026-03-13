@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
   creativeReportSchema,
-  formatCreativeReportMarkdown,
   normalizeProviderModelId,
   resolveProviderFlavor,
 } from "@/lib/ai";
@@ -70,25 +69,16 @@ describe("AI provider helpers", () => {
   });
 });
 
-describe("Creative report formatting", () => {
+describe("Creative report schema", () => {
   it("validates the creative report schema", () => {
     expect(
       creativeReportSchema.parse({
         title: "AI News Desk",
-        report_markdown: "## Market pulse\nModel providers are shipping faster.",
+        markdown: "## Market pulse\nModel providers are shipping faster.",
       }),
     ).toMatchObject({
       title: "AI News Desk",
-      report_markdown: "## Market pulse\nModel providers are shipping faster.",
+      markdown: "## Market pulse\nModel providers are shipping faster.",
     });
-  });
-
-  it("formats a structured creative report as markdown", () => {
-    const markdown = formatCreativeReportMarkdown({
-      title: "AI News Desk",
-      report_markdown: "# AI News Desk\n\n## Market pulse\nModel providers are shipping faster.",
-    });
-
-    expect(markdown).toBe("## Market pulse\nModel providers are shipping faster.");
   });
 });

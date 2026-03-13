@@ -27,11 +27,6 @@ pub struct SaveCreativeProjectCommandResult {
 pub struct PersistCreativeCardCommandInput {
     pub project_id: i64,
     pub title: String,
-    pub signals: String,
-    pub interpretation: String,
-    pub ideas: String,
-    pub counterpoints: String,
-    pub next_actions: String,
     pub full_report: String,
     pub generation_mode: String,
     pub used_article_count: i64,
@@ -190,11 +185,6 @@ pub async fn persist_creative_card_cmd(
     let PersistCreativeCardCommandInput {
         project_id,
         title,
-        signals,
-        interpretation,
-        ideas,
-        counterpoints,
-        next_actions,
         full_report,
         generation_mode,
         used_article_count,
@@ -229,25 +219,15 @@ pub async fn persist_creative_card_cmd(
                     (
                         project_id,
                         title,
-                        signals,
-                        interpretation,
-                        ideas,
-                        counterpoints,
-                        next_actions,
                         full_report,
                         generation_mode,
                         used_article_count
                     )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?)
             ",
         )
         .bind(project_id)
         .bind(title.trim())
-        .bind(signals)
-        .bind(interpretation)
-        .bind(ideas)
-        .bind(counterpoints)
-        .bind(next_actions)
         .bind(full_report)
         .bind(&generation_mode)
         .bind(article_ids.len() as i64)

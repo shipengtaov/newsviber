@@ -22,11 +22,6 @@ export type CreativeCard = {
     id: number;
     project_id: number;
     title: string;
-    signals: string;
-    interpretation: string;
-    ideas: string;
-    counterpoints: string;
-    next_actions: string;
     full_report: string;
     generation_mode: "manual" | "auto";
     used_article_count: number;
@@ -85,11 +80,6 @@ type SaveCreativeProjectCommandResult = {
 type PersistCreativeCardCommandInput = {
     projectId: number;
     title: string;
-    signals: string;
-    interpretation: string;
-    ideas: string;
-    counterpoints: string;
-    nextActions: string;
     fullReport: string;
     generationMode: "manual" | "auto";
     usedArticleCount: number;
@@ -118,11 +108,6 @@ type CreativeCardRow = {
     id: number;
     project_id: number;
     title: string;
-    signals: string | null;
-    interpretation: string | null;
-    ideas: string | null;
-    counterpoints: string | null;
-    next_actions: string | null;
     full_report: string | null;
     generation_mode: string | null;
     used_article_count: number | null;
@@ -241,11 +226,6 @@ function normalizeCreativeCard(row: CreativeCardRow): CreativeCard {
         id: row.id,
         project_id: row.project_id,
         title: row.title,
-        signals: row.signals ?? "",
-        interpretation: row.interpretation ?? "",
-        ideas: row.ideas ?? "",
-        counterpoints: row.counterpoints ?? "",
-        next_actions: row.next_actions ?? "",
         full_report: row.full_report ?? "",
         generation_mode: generationMode,
         used_article_count: normalizePositiveInteger(row.used_article_count, 0),
@@ -349,7 +329,7 @@ export function summarizeArticleContextText(summary: string | null, content: str
     return base.slice(0, MAX_CONTEXT_CHARS_PER_ARTICLE);
 }
 
-function buildCreativePrompt(project: CreativeProject, articles: CreativeArticleContextRow[]): string {
+export function buildCreativePrompt(project: CreativeProject, articles: CreativeArticleContextRow[]): string {
     const contextLines = articles.map((article, index) => {
         const publishedAt = formatUtcDateTime(article.published_at, "Unknown");
         const contextText = summarizeArticleContextText(article.summary, article.content);
@@ -363,19 +343,22 @@ function buildCreativePrompt(project: CreativeProject, articles: CreativeArticle
         ].join("\n");
     }).join("\n\n");
 
-    return `You are a strategist generating a concise report from curated news context and the user's focus prompt.
+    return `You are an AI assistant generating a creative report from curated news context and the user's focus prompt.
 
-Return a title and a markdown body.
+Return a JSON object with:
+- title: a concise title for the report
+- markdown: the report body in markdown only
 
-Rules for the markdown body:
-- Do not use a fixed template.
-- Do not default to headings like "Key Signals", "Ideas", or "Next Actions" unless the user's prompt explicitly makes that structure the best fit.
-- Choose section titles, structure, and level of detail based only on the user's prompt and the evidence in the supplied articles.
-- Keep the language consistent with the user's prompt.
+Guidelines:
+- Prioritize satisfying the user's focus prompt, including any requested structure, tone, depth, and output style that can be supported by the supplied evidence.
+- If the user explicitly wants sections such as Key Signals, Ideas, Next Actions, or any other structure, use that structure.
+- If the user does not specify a structure, choose the clearest markdown structure for the material.
 - Ground every major point in the supplied articles.
-- If evidence is weak or mixed, state the uncertainty clearly.
+- If evidence is weak, mixed, or missing, state the uncertainty clearly.
+- Keep the language consistent with the user's prompt.
+- Do not invent facts outside the supplied articles.
 - Do not repeat the prompt verbatim.
-- Do not include a top-level # title heading inside report_markdown.
+- Do not repeat the full report title as a top-level heading in markdown.
 
 User's Focus Prompt:
 ${project.prompt}
@@ -411,11 +394,6 @@ async function getCreativeCard(cardId: number): Promise<CreativeCard | null> {
                 id,
                 project_id,
                 title,
-                signals,
-                interpretation,
-                ideas,
-                counterpoints,
-                next_actions,
                 full_report,
                 generation_mode,
                 used_article_count,
@@ -499,17 +477,11 @@ async function performCardGeneration(
     }
 
     const generatedReport = await requestCreativeReport(project, articles);
-    const { formatCreativeReportMarkdown } = await import("@/lib/ai");
 
     const cardId = await persistCreativeCard({
         projectId: project.id,
-        title: generatedReport.title || "Untitled Insight",
-        signals: "",
-        interpretation: "",
-        ideas: "",
-        counterpoints: "",
-        nextActions: "",
-        fullReport: formatCreativeReportMarkdown(generatedReport),
+        title: generatedReport.title.trim() || "Untitled Insight",
+        fullReport: generatedReport.markdown.trim(),
         generationMode: mode,
         usedArticleCount: articles.length,
         articleIds: articles.map((article) => article.id),
@@ -576,11 +548,6 @@ export async function listCreativeCards(projectId: number): Promise<CreativeCard
                 id,
                 project_id,
                 title,
-                signals,
-                interpretation,
-                ideas,
-                counterpoints,
-                next_actions,
                 full_report,
                 generation_mode,
                 used_article_count,

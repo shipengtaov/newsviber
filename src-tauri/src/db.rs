@@ -173,6 +173,85 @@ pub fn get_migrations() -> Vec<Migration> {
                     ON chat_messages(thread_id, created_at, id);
             ",
             kind: MigrationKind::Up,
+        },
+        Migration {
+            version: 6,
+            description: "simplify_creative_cards_markdown_storage",
+            sql: "
+                PRAGMA foreign_keys=OFF;
+
+                DROP INDEX IF EXISTS idx_creative_cards_project_created;
+                DROP INDEX IF EXISTS idx_creative_card_articles_unique;
+                DROP INDEX IF EXISTS idx_creative_card_articles_article;
+
+                ALTER TABLE creative_cards RENAME TO creative_cards_old;
+                ALTER TABLE creative_card_articles RENAME TO creative_card_articles_old;
+
+                CREATE TABLE creative_cards (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    project_id INTEGER NOT NULL,
+                    title TEXT NOT NULL,
+                    full_report TEXT,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    generation_mode TEXT NOT NULL DEFAULT 'manual',
+                    used_article_count INTEGER NOT NULL DEFAULT 0,
+                    FOREIGN KEY(project_id) REFERENCES creative_projects(id) ON DELETE CASCADE
+                );
+
+                INSERT INTO creative_cards (
+                    id,
+                    project_id,
+                    title,
+                    full_report,
+                    created_at,
+                    generation_mode,
+                    used_article_count
+                )
+                SELECT
+                    id,
+                    project_id,
+                    title,
+                    full_report,
+                    created_at,
+                    generation_mode,
+                    used_article_count
+                FROM creative_cards_old;
+
+                CREATE TABLE creative_card_articles (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    card_id INTEGER NOT NULL,
+                    article_id INTEGER NOT NULL,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY(card_id) REFERENCES creative_cards(id) ON DELETE CASCADE,
+                    FOREIGN KEY(article_id) REFERENCES articles(id) ON DELETE CASCADE
+                );
+
+                INSERT INTO creative_card_articles (
+                    id,
+                    card_id,
+                    article_id,
+                    created_at
+                )
+                SELECT
+                    id,
+                    card_id,
+                    article_id,
+                    created_at
+                FROM creative_card_articles_old;
+
+                DROP TABLE creative_card_articles_old;
+                DROP TABLE creative_cards_old;
+
+                CREATE UNIQUE INDEX IF NOT EXISTS idx_creative_card_articles_unique
+                    ON creative_card_articles(card_id, article_id);
+                CREATE INDEX IF NOT EXISTS idx_creative_card_articles_article
+                    ON creative_card_articles(article_id);
+                CREATE INDEX IF NOT EXISTS idx_creative_cards_project_created
+                    ON creative_cards(project_id, created_at DESC);
+
+                PRAGMA foreign_keys=ON;
+            ",
+            kind: MigrationKind::Up,
         }
     ]
 }

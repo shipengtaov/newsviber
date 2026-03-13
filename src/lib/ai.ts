@@ -14,7 +14,6 @@ import type { FetchFunction } from "@ai-sdk/provider-utils";
 import { createMinimax, createMinimaxOpenAI } from "vercel-minimax-ai-provider";
 import { z } from "zod";
 import { createZhipu } from "zhipu-ai-provider";
-import { stripLeadingMarkdownTitle } from "@/lib/creative-card";
 import {
   type AIProviderConfig,
   getActiveAIProviderSettings,
@@ -28,8 +27,8 @@ export type Message = {
 
 export const creativeReportSchema = z.object({
   title: z.string().describe("A concise, catchy title for the insight."),
-  report_markdown: z.string().describe(
-    "The markdown body of the report, using section titles that fit the user's prompt. Do not include a top-level title heading.",
+  markdown: z.string().describe(
+    "The markdown body of the report, following the user's requested structure when possible. Do not repeat the full report title as a top-level heading.",
   ),
 });
 
@@ -547,9 +546,4 @@ ${trimmedPrompt}`,
   } catch (error) {
     throw new Error(`${provider.name}: ${getErrorMessage(error)}`);
   }
-}
-
-export function formatCreativeReportMarkdown(report: CreativeReport): string {
-  const normalizedMarkdown = stripLeadingMarkdownTitle(report.report_markdown ?? "").trim();
-  return normalizedMarkdown || "_No content provided._";
 }
