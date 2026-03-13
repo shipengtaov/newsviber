@@ -356,7 +356,7 @@ export function buildCreativePrompt(project: CreativeProject, articles: Creative
         ].join("\n");
     }).join("\n\n");
 
-    return `You are an AI assistant generating a creative report from curated news context and the user's focus prompt.
+    return `You are an AI assistant generating a report from curated news context and the user's focus prompt.
 
 Return a JSON object with:
 - title: a concise title for the report
