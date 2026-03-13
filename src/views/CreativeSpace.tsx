@@ -37,7 +37,7 @@ import { buildCreativeCardDiscussionSystemPrompt } from "@/lib/chat-prompts";
 import { PageShell } from "@/components/layout/PageShell";
 import { useStreamingConversation } from "@/hooks/use-streaming-conversation";
 import { getCreativeCardBodyMarkdown, getCreativeCardPreviewExcerpt } from "@/lib/creative-card";
-import { formatUtcDate, formatUtcDateTime } from "@/lib/time";
+import { formatUtcDateTime } from "@/lib/time";
 import ReactMarkdown from "react-markdown";
 import { ArrowLeft, ChevronDown, ChevronUp, Ellipsis, Lightbulb, Loader2, MessageSquare, Pencil, Plus, Send, Trash2, WandSparkles } from "lucide-react";
 
@@ -1261,7 +1261,7 @@ export default function CreativeSpace() {
                         >
                             <CardHeader className={CREATIVE_TILE_HEADER_CLASS}>
                                 <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
-                                    <span>{formatUtcDate(card.created_at)}</span>
+                                    <span>{formatUtcDateTime(card.created_at)}</span>
                                     <span>
                                         {card.generation_mode === "auto" ? "Auto" : "Manual"} · {card.used_article_count}
                                     </span>
