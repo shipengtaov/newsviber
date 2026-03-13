@@ -109,6 +109,11 @@ const NAMED_ENTITY_MAP: Record<string, string> = {
     quot: "\"",
 };
 
+export type ArticlePreview = {
+    source: "summary" | "content" | "none";
+    text: string;
+};
+
 export function isProbablyHtml(content: string): boolean {
     const trimmed = content.trim();
     if (!trimmed) {
@@ -165,6 +170,29 @@ export function stripHtmlToText(input: string): string {
 
 export function compactHtmlText(input: string): string {
     return stripHtmlToText(input).replace(/\s+/g, " ").trim();
+}
+
+export function resolveArticlePreview(summary: string | null | undefined, content: string | null | undefined): ArticlePreview {
+    const summaryText = compactHtmlText(summary ?? "");
+    if (summaryText) {
+        return {
+            source: "summary",
+            text: summaryText,
+        };
+    }
+
+    const contentText = compactHtmlText(content ?? "");
+    if (contentText) {
+        return {
+            source: "content",
+            text: contentText,
+        };
+    }
+
+    return {
+        source: "none",
+        text: "",
+    };
 }
 
 function decodeHtmlEntities(value: string): string {

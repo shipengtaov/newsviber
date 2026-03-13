@@ -122,7 +122,7 @@ export default function SourceForm() {
                             <Select value={type} onValueChange={setType}>
                                 <SelectTrigger className="bg-background/50"><SelectValue /></SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="rss">RSS Feed</SelectItem>
+                                    <SelectItem value="rss">RSS/Atom Feed</SelectItem>
                                     <SelectItem value="jina_url">Jina URL Scrape</SelectItem>
                                     <SelectItem value="twitter">Twitter (/X)</SelectItem>
                                 </SelectContent>

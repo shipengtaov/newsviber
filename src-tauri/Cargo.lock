@@ -1530,6 +1530,7 @@ dependencies = [
 name = "get-news"
 version = "0.1.0"
 dependencies = [
+ "atom_syndication",
  "chrono",
  "reqwest 0.13.2",
  "rss",

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+    resolveArticlePreview,
     compactHtmlText,
     isProbablyHtml,
     sanitizeArticleHtml,
@@ -60,6 +61,37 @@ describe("article HTML helpers", () => {
         `)).toBe("Launch & Learn\nFirst paragraph.\nSecond paragraph with link.");
 
         expect(compactHtmlText("<p>One</p><p>Two</p>")).toBe("One Two");
+    });
+
+    it("prefers summary text and falls back to content when summary has no readable text", () => {
+        expect(resolveArticlePreview(
+            "<p>Summary <strong>first</strong>.</p>",
+            "<div>Fallback body</div>",
+        )).toEqual({
+            source: "summary",
+            text: "Summary first.",
+        });
+
+        expect(resolveArticlePreview(
+            "",
+            "<h2>Deep dive</h2><p>Second line</p>",
+        )).toEqual({
+            source: "content",
+            text: "Deep dive Second line",
+        });
+
+        expect(resolveArticlePreview(
+            "   <p> </p>  ",
+            "<p>Body preview</p>",
+        )).toEqual({
+            source: "content",
+            text: "Body preview",
+        });
+
+        expect(resolveArticlePreview(null, "   ")).toEqual({
+            source: "none",
+            text: "",
+        });
     });
 
     it("detects real HTML without misclassifying plain text", () => {

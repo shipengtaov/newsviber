@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import type { CreativeReport } from "@/lib/ai";
-import { compactHtmlText } from "@/lib/article-html";
+import { resolveArticlePreview } from "@/lib/article-html";
 import { dispatchCreativeSyncEvent } from "@/lib/creative-events";
 import { getDb } from "@/lib/db";
 import { formatUtcDateTime } from "@/lib/time";
@@ -337,7 +337,8 @@ function buildConsumedExistsExpression(projectId: number, params: unknown[], art
 }
 
 export function summarizeArticleContextText(summary: string | null, content: string | null): string {
-    const base = compactHtmlText(summary ?? "") || compactHtmlText(content ?? "") || "No summary available.";
+    const preview = resolveArticlePreview(summary, content);
+    const base = preview.text || "No summary available.";
     return base.slice(0, MAX_CONTEXT_CHARS_PER_ARTICLE);
 }
 

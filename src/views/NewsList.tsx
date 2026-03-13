@@ -12,7 +12,7 @@ import { fetchSource, fetchSources, type FetchableSource } from "@/lib/source-fe
 import { addSourceFetchSyncListener, dispatchSourceFetchSyncEvent } from "@/lib/source-events";
 import { formatFetchInterval, formatLastFetchSummary, normalizeFetchInterval } from "@/lib/source-utils";
 import { formatUtcDateTime } from "@/lib/time";
-import { sanitizeArticleHtml } from "@/lib/article-html";
+import { resolveArticlePreview, sanitizeArticleHtml } from "@/lib/article-html";
 import { ArticleDetailView } from "@/views/NewsDetail";
 
 type Article = {
@@ -21,7 +21,8 @@ type Article = {
     source_name: string;
     guid: string;
     title: string;
-    summary: string;
+    summary: string | null;
+    content: string | null;
     published_at: string;
     inserted_at: string;
     is_read: boolean;
@@ -536,7 +537,7 @@ export default function NewsList() {
             const db = await getDb();
             const { joins, conditions, params } = buildArticleQueryParts(q, sourceId);
             const query = `
-                SELECT a.id, a.source_id, s.name as source_name, a.guid, a.title, a.summary, a.published_at, a.created_at as inserted_at, a.is_read
+                SELECT a.id, a.source_id, s.name as source_name, a.guid, a.title, a.summary, a.content, a.published_at, a.created_at as inserted_at, a.is_read
                 FROM articles a
                 JOIN sources s ON a.source_id = s.id
                 ${joins}
@@ -546,7 +547,11 @@ export default function NewsList() {
             const listParams = [...params, p * PAGE_SIZE];
 
             const result: Article[] = await db.select(query, listParams);
-            setArticles(result);
+            setArticles(result.map((article) => ({
+                ...article,
+                summary: article.summary ?? null,
+                content: article.content ?? null,
+            })));
         } catch (err) {
             console.error(err);
         }
@@ -866,40 +871,49 @@ export default function NewsList() {
 
                             <div ref={articlesScrollRef} className="px-4 py-4 md:px-6 md:py-6 lg:min-h-0 lg:flex-1 lg:overflow-y-auto">
                                 <div className="space-y-2">
-                                    {articles.map(article => (
-                                        <Link to={buildArticleHref(article.id)} key={article.id} className="block" onClick={handleArticleClick}>
-                                            <Card className="border-0 bg-transparent shadow-none transition-colors duration-150 hover:bg-cyan-500/10">
-                                                <CardHeader className="space-y-1 px-3 py-2.5">
-                                                    <div className="flex items-start gap-2">
-                                                        {!article.is_read && <span className="inline-block h-2 w-2 shrink-0 self-center rounded-full bg-blue-500"></span>}
-                                                        <CardTitle className="min-w-0 flex-1 text-lg leading-snug">{article.title}</CardTitle>
-                                                    </div>
-                                                    {article.summary && (
-                                                        <CardDescription
-                                                            className="min-w-0 line-clamp-1 text-sm"
-                                                            dangerouslySetInnerHTML={{ __html: sanitizeArticleHtml(article.summary) }}
-                                                            onClick={handleHtmlLinkClick}
-                                                        />
-                                                    )}
-                                                    <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
-                                                        <span className="text-cyan-700 dark:text-cyan-300">{article.source_name}</span>
-                                                        <span>Published {formatUtcDateTime(article.published_at)}</span>
-                                                        <span>Inserted {formatUtcDateTime(article.inserted_at)}</span>
-                                                        {article.guid && (
-                                                            <a
-                                                                href={article.guid}
-                                                                className="inline-flex shrink-0 items-center text-xs text-muted-foreground transition-colors hover:text-cyan-700 dark:hover:text-cyan-300"
-                                                                onClick={(e) => handleExternalLink(e, article.guid)}
-                                                            >
-                                                                <ExternalLink className="mr-1 h-3 w-3" />
-                                                                Original
-                                                            </a>
+                                    {articles.map(article => {
+                                        const preview = resolveArticlePreview(article.summary, article.content);
+
+                                        return (
+                                            <Link to={buildArticleHref(article.id)} key={article.id} className="block" onClick={handleArticleClick}>
+                                                <Card className="border-0 bg-transparent shadow-none transition-colors duration-150 hover:bg-cyan-500/10">
+                                                    <CardHeader className="space-y-1 px-3 py-2.5">
+                                                        <div className="flex items-start gap-2">
+                                                            {!article.is_read && <span className="inline-block h-2 w-2 shrink-0 self-center rounded-full bg-blue-500"></span>}
+                                                            <CardTitle className="min-w-0 flex-1 text-lg leading-snug">{article.title}</CardTitle>
+                                                        </div>
+                                                        {preview.source === "summary" && article.summary && (
+                                                            <CardDescription
+                                                                className="min-w-0 line-clamp-1 text-sm"
+                                                                dangerouslySetInnerHTML={{ __html: sanitizeArticleHtml(article.summary) }}
+                                                                onClick={handleHtmlLinkClick}
+                                                            />
                                                         )}
-                                                    </div>
-                                                </CardHeader>
-                                            </Card>
-                                        </Link>
-                                    ))}
+                                                        {preview.source === "content" && (
+                                                            <CardDescription className="min-w-0 line-clamp-1 text-sm">
+                                                                {preview.text}
+                                                            </CardDescription>
+                                                        )}
+                                                        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+                                                            <span className="text-cyan-700 dark:text-cyan-300">{article.source_name}</span>
+                                                            <span>Published {formatUtcDateTime(article.published_at)}</span>
+                                                            <span>Inserted {formatUtcDateTime(article.inserted_at)}</span>
+                                                            {article.guid && (
+                                                                <a
+                                                                    href={article.guid}
+                                                                    className="inline-flex shrink-0 items-center text-xs text-muted-foreground transition-colors hover:text-cyan-700 dark:hover:text-cyan-300"
+                                                                    onClick={(e) => handleExternalLink(e, article.guid)}
+                                                                >
+                                                                    <ExternalLink className="mr-1 h-3 w-3" />
+                                                                    Original
+                                                                </a>
+                                                            )}
+                                                        </div>
+                                                    </CardHeader>
+                                                </Card>
+                                            </Link>
+                                        );
+                                    })}
 
                                     {articles.length === 0 && (
                                         <div className="py-10 text-center text-muted-foreground">
