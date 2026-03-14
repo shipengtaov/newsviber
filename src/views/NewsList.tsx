@@ -1,18 +1,19 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import Database from "@tauri-apps/plugin-sql";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { Search, ExternalLink, RefreshCcw, ChevronLeft, ChevronRight, MoreHorizontal, Plus } from "lucide-react";
+import { Search, ExternalLink, RefreshCcw, ChevronLeft, ChevronRight, MoreHorizontal, Plus, CheckCheck, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
-import { fetchSource, fetchSources, type FetchableSource } from "@/lib/source-fetch";
+import { fetchSource, fetchSources } from "@/lib/source-fetch";
 import { addSourceFetchSyncListener, dispatchSourceFetchSyncEvent } from "@/lib/source-events";
-import { formatFetchInterval, formatLastFetchSummary, normalizeFetchInterval } from "@/lib/source-utils";
+import { getDb } from "@/lib/db";
+import { formatFetchInterval, formatLastFetchSummary } from "@/lib/source-utils";
 import { formatUtcDateTime } from "@/lib/time";
 import { resolveArticlePreview, sanitizeArticleHtml } from "@/lib/article-html";
+import { listNewsSources, markScopedNewsArticlesAsRead, type NewsSource } from "@/lib/news-service";
 import { ArticleDetailView } from "@/views/NewsDetail";
 
 type Article = {
@@ -28,10 +29,7 @@ type Article = {
     is_read: boolean;
 };
 
-type SourceFilterItem = FetchableSource & {
-    fetch_interval: number;
-    article_count: number;
-};
+type SourceFilterItem = NewsSource;
 
 type ParsedSourceParam = {
     sourceId: number | null;
@@ -53,14 +51,6 @@ const DEFAULT_SOURCES_PANEL_WIDTH = 240;
 const MIN_SOURCES_PANEL_WIDTH = 200;
 const MAX_SOURCES_PANEL_WIDTH = 420;
 const SOURCE_ACTION_BUTTON_CLASS_NAME = "h-9 w-9 shrink-0 rounded-lg text-muted-foreground hover:bg-sky-100/70 hover:text-sky-700 dark:hover:bg-sky-900/35 dark:hover:text-sky-300";
-
-let db: Database | null = null;
-async function getDb() {
-    if (!db) {
-        db = await Database.load("sqlite:getnews.db");
-    }
-    return db;
-}
 
 function parsePageParam(rawPage: string | null): number {
     const parsed = Number.parseInt(rawPage ?? "0", 10);
@@ -214,10 +204,15 @@ function buildPaginationItems(currentPage: number, totalPages: number): Paginati
     return items;
 }
 
+function formatUnreadArticleCount(count: number): string {
+    return count > 99 ? "99+" : String(Math.max(0, count));
+}
+
 type SourceFilterRowProps = {
     label: string;
     title: string;
     count: number;
+    unreadCount: number;
     isSelected: boolean;
     isFetching: boolean;
     isDisabled: boolean;
@@ -230,6 +225,7 @@ function SourceFilterRow({
     label,
     title,
     count,
+    unreadCount,
     isSelected,
     isFetching,
     isDisabled,
@@ -250,11 +246,20 @@ function SourceFilterRow({
                 title={title}
             >
                 <span className="min-w-0 truncate text-sm">{label}</span>
-                <span className={cn(
-                    "min-w-[2.5rem] shrink-0 text-right text-xs tabular-nums",
-                    isSelected ? "text-sky-700 dark:text-sky-300" : "text-muted-foreground",
-                )}>
-                    {count}
+                <span className="inline-flex min-w-[4.75rem] shrink-0 items-center justify-end gap-1.5">
+                    <span className={cn(
+                        "text-right text-xs tabular-nums",
+                        isSelected ? "text-sky-700 dark:text-sky-300" : "text-muted-foreground",
+                    )}>
+                        {count}
+                    </span>
+                    {unreadCount > 0 && (
+                        <span
+                            className="inline-flex h-[1.15rem] min-w-[1.15rem] items-center justify-center rounded-full bg-red-500 px-1 text-[9px] font-semibold leading-none tabular-nums text-white shadow-[0_8px_18px_-14px_rgba(239,68,68,0.95)] ring-1 ring-background dark:bg-red-500 dark:ring-slate-950"
+                        >
+                            {formatUnreadArticleCount(unreadCount)}
+                        </span>
+                    )}
                 </span>
             </Button>
             <Button
@@ -284,6 +289,7 @@ export default function NewsList() {
     const [sourcesLoaded, setSourcesLoaded] = useState(false);
     const [isFetchingAll, setIsFetchingAll] = useState(false);
     const [fetchingSourceId, setFetchingSourceId] = useState<number | null>(null);
+    const [isMarkingScopedRead, setIsMarkingScopedRead] = useState(false);
     const [sourcesPanelWidth, setSourcesPanelWidth] = useState<number>(() => readStoredSourcesPanelWidth());
     const [isResizingSourcesPanel, setIsResizingSourcesPanel] = useState(false);
     const [isDesktopLayout, setIsDesktopLayout] = useState<boolean>(() => {
@@ -373,11 +379,16 @@ export default function NewsList() {
         () => sources.reduce((total, source) => total + source.article_count, 0),
         [sources],
     );
+    const allUnreadCount = useMemo(
+        () => sources.reduce((total, source) => total + source.unread_count, 0),
+        [sources],
+    );
     const selectedSource = useMemo(() => {
         if (selectedSourceId === null) return null;
 
         return sources.find((source) => source.id === selectedSourceId) ?? null;
     }, [selectedSourceId, sources]);
+    const scopedUnreadCount = selectedSource?.unread_count ?? allUnreadCount;
     const hasActiveSources = sources.length > 0;
     const isAllSelected = selectedSourceId === null;
     const isAnyFetchInProgress = isFetchingAll || fetchingSourceId !== null;
@@ -402,6 +413,9 @@ export default function NewsList() {
         ? "Loading results..."
         : `${totalArticleCount} result${totalArticleCount === 1 ? "" : "s"}`;
     const activeSourceSummaryLabel = `${sources.length} active source${sources.length === 1 ? "" : "s"}`;
+    const markScopedReadLabel = selectedSource
+        ? `Mark all unread in ${selectedSource.name} as read`
+        : "Mark all unread in all active sources as read";
     const shouldRenderDetailOverlay = isDesktopLayout && selectedArticleId !== null;
     const shouldRenderStandaloneDetail = !isDesktopLayout && selectedArticleId !== null;
     const newsListScrollKey = useMemo(
@@ -508,23 +522,7 @@ export default function NewsList() {
 
     async function loadSources() {
         try {
-            const db = await getDb();
-            const result: SourceFilterItem[] = await db.select(`
-                SELECT s.id, s.name, s.source_type, s.url, s.active, s.fetch_interval, s.last_fetch, COUNT(a.id) as article_count
-                FROM sources s
-                LEFT JOIN articles a ON a.source_id = s.id
-                WHERE s.active = 1
-                GROUP BY s.id, s.name, s.source_type, s.url, s.active, s.fetch_interval, s.last_fetch
-                ORDER BY LOWER(s.name) ASC
-            `);
-            setSources(
-                result.map((source) => ({
-                    ...source,
-                    fetch_interval: normalizeFetchInterval(source.fetch_interval),
-                    last_fetch: source.last_fetch ?? null,
-                    article_count: Number(source.article_count) || 0,
-                })),
-            );
+            setSources(await listNewsSources());
         } catch (err) {
             console.error(err);
         } finally {
@@ -652,9 +650,66 @@ export default function NewsList() {
     }
 
     function markArticleAsRead(articleId: number) {
+        const targetArticle = articles.find((article) => article.id === articleId);
+        if (!targetArticle || targetArticle.is_read) {
+            return;
+        }
+
         setArticles((currentArticles) => currentArticles.map((article) => (
             article.id === articleId ? { ...article, is_read: true } : article
         )));
+        setSources((currentSources) => currentSources.map((source) => (
+            source.id === targetArticle.source_id
+                ? { ...source, unread_count: Math.max(0, source.unread_count - 1) }
+                : source
+        )));
+    }
+
+    function markVisibleArticlesInScopeAsRead(sourceId: number | null) {
+        setArticles((currentArticles) => currentArticles.map((article) => {
+            if (article.is_read) {
+                return article;
+            }
+
+            if (sourceId !== null && article.source_id !== sourceId) {
+                return article;
+            }
+
+            return { ...article, is_read: true };
+        }));
+    }
+
+    function clearUnreadCountsInScope(sourceId: number | null) {
+        setSources((currentSources) => currentSources.map((source) => {
+            if (sourceId !== null && source.id !== sourceId) {
+                return source;
+            }
+
+            if (source.unread_count === 0) {
+                return source;
+            }
+
+            return { ...source, unread_count: 0 };
+        }));
+    }
+
+    async function handleMarkScopedRead() {
+        if (isMarkingScopedRead || scopedUnreadCount === 0) {
+            return;
+        }
+
+        setIsMarkingScopedRead(true);
+        markVisibleArticlesInScopeAsRead(selectedSourceId);
+        clearUnreadCountsInScope(selectedSourceId);
+
+        try {
+            await markScopedNewsArticlesAsRead(selectedSourceId);
+        } catch (error) {
+            toast({ title: "Failed to mark articles as read", description: String(error), variant: "destructive" });
+            await refreshCurrentView();
+        } finally {
+            setIsMarkingScopedRead(false);
+        }
     }
 
     function handleSourcesResizeStart(event: React.PointerEvent<HTMLDivElement>) {
@@ -754,8 +809,9 @@ export default function NewsList() {
                     <div className="space-y-1 pr-1 lg:pr-[5px] lg:flex-1 lg:min-h-0 lg:overflow-y-auto">
                         <SourceFilterRow
                             label="All Articles"
-                            title={`All Articles (${allArticleCount})`}
+                            title={`All Articles (${allArticleCount}${allUnreadCount > 0 ? `, ${formatUnreadArticleCount(allUnreadCount)} unread` : ""})`}
                             count={allArticleCount}
+                            unreadCount={allUnreadCount}
                             isSelected={isAllSelected}
                             isFetching={isFetchingAll}
                             isDisabled={isAnyFetchInProgress || !hasActiveSources}
@@ -770,8 +826,9 @@ export default function NewsList() {
                                 <SourceFilterRow
                                     key={source.id}
                                     label={source.name}
-                                    title={`${source.name} (${source.article_count})`}
+                                    title={`${source.name} (${source.article_count}${source.unread_count > 0 ? `, ${formatUnreadArticleCount(source.unread_count)} unread` : ""})`}
                                     count={source.article_count}
+                                    unreadCount={source.unread_count}
                                     isSelected={isSelected}
                                     isFetching={fetchingSourceId === source.id}
                                     isDisabled={isAnyFetchInProgress}
@@ -857,15 +914,38 @@ export default function NewsList() {
                                         )}
                                     </div>
 
-                                    <form onSubmit={handleSearch} className="relative flex w-full items-center lg:w-auto lg:flex-none">
-                                        <Search className="absolute left-3 h-4 w-4 text-muted-foreground" />
-                                        <Input
-                                            placeholder="Search articles..."
-                                            className="pl-9 border-input focus-visible:border-ring focus-visible:ring-ring/30 lg:w-56 lg:transition-[width] lg:duration-200 lg:focus:w-72"
-                                            value={searchInput}
-                                            onChange={e => setSearchInput(e.target.value)}
-                                        />
-                                    </form>
+                                    <div className="flex w-full flex-col gap-2 sm:flex-row sm:items-center sm:justify-end lg:w-auto lg:flex-none">
+                                        <form onSubmit={handleSearch} className="relative flex w-full items-center sm:flex-1 lg:w-auto lg:flex-none">
+                                            <Search className="absolute left-3 h-4 w-4 text-muted-foreground" />
+                                            <Input
+                                                placeholder="Search articles..."
+                                                className="pl-9 border-input focus-visible:border-ring focus-visible:ring-ring/30 lg:w-56 lg:transition-[width] lg:duration-200 lg:focus:w-72"
+                                                value={searchInput}
+                                                onChange={e => setSearchInput(e.target.value)}
+                                            />
+                                        </form>
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            onClick={() => void handleMarkScopedRead()}
+                                            disabled={isMarkingScopedRead || scopedUnreadCount === 0}
+                                            aria-label={markScopedReadLabel}
+                                            title={markScopedReadLabel}
+                                            className="shrink-0"
+                                        >
+                                            {isMarkingScopedRead ? (
+                                                <>
+                                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                                    Marking...
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <CheckCheck className="h-4 w-4" />
+                                                    Mark all as read
+                                                </>
+                                            )}
+                                        </Button>
+                                    </div>
                                 </div>
                             </div>
 

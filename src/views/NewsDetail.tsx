@@ -9,6 +9,7 @@ import { ArrowLeft, ExternalLink, Send, Bot, User } from "lucide-react";
 import { type Message } from "@/lib/ai";
 import { buildArticleDiscussionSystemPrompt } from "@/lib/chat-prompts";
 import { compactHtmlText, sanitizeArticleHtml } from "@/lib/article-html";
+import { markNewsArticleAsRead } from "@/lib/news-service";
 import { cn } from "@/lib/utils";
 import { getDb } from "@/lib/db";
 import { formatUtcDateTime } from "@/lib/time";
@@ -93,7 +94,6 @@ export function ArticleDetailView({
         setInput("");
         void loadCurrentArticle();
         void markAsRead(articleId);
-        notifyMarkedRead(articleId);
 
         return () => {
             isDisposed = true;
@@ -108,9 +108,11 @@ export function ArticleDetailView({
 
     async function markAsRead(articleId: number) {
         try {
-            const db = await getDb();
-            await db.execute("UPDATE articles SET is_read = 1 WHERE id = $1", [articleId]);
-        } catch (err) { }
+            await markNewsArticleAsRead(articleId);
+            notifyMarkedRead(articleId);
+        } catch (err) {
+            console.error(err);
+        }
     }
 
     async function handleSend(e: React.FormEvent) {
