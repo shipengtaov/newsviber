@@ -97,20 +97,25 @@ export default function SourceForm() {
     }
 
     return (
-        <PageShell variant="workspace" className="space-y-8">
-            <Button variant="ghost" size="sm" onClick={navigateBack} className="-ml-2">
-                <ChevronLeft className="h-4 w-4 mr-2" />
-                {returnButtonLabel}
-            </Button>
-
-            <div>
-                <h1 className="text-3xl font-bold tracking-tight">{isEditing ? "Edit Source" : "Add New Source"}</h1>
-                <p className="text-muted-foreground mt-2">
-                    {isEditing ? "Update your data source configuration." : "Add a new data source to track automatically."}
-                </p>
-            </div>
-
-            <div className="mt-8">
+        <PageShell
+            variant="workspace"
+            contentClassName="space-y-8"
+            header={{
+                density: "compact",
+                leading: (
+                    <Button variant="ghost" onClick={navigateBack}>
+                        <ChevronLeft className="h-4 w-4 mr-2" />
+                        {returnButtonLabel}
+                    </Button>
+                ),
+                eyebrow: "Sources",
+                title: isEditing ? "Edit source" : "Add a new source",
+                description: isEditing ? "Update your data source configuration." : "Create a new inbound source and decide how often it refreshes.",
+                showDescription: false,
+                showStats: false,
+            }}
+        >
+            <div className="surface-panel px-5 py-5 md:px-7 md:py-7">
                 <form onSubmit={handleSubmit} className="space-y-8">
                     <div className="grid gap-6 md:grid-cols-2">
                         <div className="space-y-3">

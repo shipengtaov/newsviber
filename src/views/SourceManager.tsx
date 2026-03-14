@@ -54,6 +54,7 @@ export default function SourceManager() {
     const [deletingSourceId, setDeletingSourceId] = useState<number | null>(null);
 
     const activeSourceCount = sources.filter((source) => Boolean(source.active)).length;
+    const inactiveSourceCount = Math.max(0, sources.length - activeSourceCount);
     const isAnyFetchInProgress = isFetchingAll || fetchingSourceId !== null;
 
     useEffect(() => {
@@ -167,31 +168,41 @@ export default function SourceManager() {
 
     return (
         <>
-            <PageShell variant="workspace" className="space-y-8">
-                <div className="flex items-center justify-between">
-                    <div>
-                        <h1 className="text-3xl font-bold tracking-tight">Source Manager</h1>
-                        <p className="mt-2 text-muted-foreground">Manage your RSS feeds, Twitter accounts, and URL monitors.</p>
-                    </div>
-                    <div className="flex gap-2">
-                        <Button variant="outline" onClick={fetchAll} disabled={isAnyFetchInProgress || activeSourceCount === 0}>
-                            <RefreshCcw className={`mr-2 h-4 w-4 ${isFetchingAll ? "animate-spin" : ""}`} />
-                            {isFetchingAll ? "Fetching All..." : "Fetch All"}
-                        </Button>
-                        <Button onClick={() => navigate("/sources/add")}>
-                            <Plus className="mr-2 h-4 w-4" />
-                            Add Source
-                        </Button>
-                    </div>
-                </div>
+            <PageShell
+                variant="workspace"
+                contentClassName="space-y-8"
+                header={{
+                    density: "compact",
+                    eyebrow: "Sources",
+                    title: "Source management",
+                    description: "Manage the feeds that power your information flow.",
+                    showDescription: false,
+                    stats: [
+                        { label: "Active", value: `${activeSourceCount} running`, tone: "accent" },
+                        { label: "Inactive", value: `${inactiveSourceCount} paused` },
+                    ],
+                    actions: (
+                        <div className="flex flex-wrap gap-2">
+                            <Button variant="outline" onClick={fetchAll} disabled={isAnyFetchInProgress || activeSourceCount === 0}>
+                                <RefreshCcw className={`mr-2 h-4 w-4 ${isFetchingAll ? "animate-spin" : ""}`} />
+                                {isFetchingAll ? "Fetching All..." : "Fetch All"}
+                            </Button>
+                            <Button onClick={() => navigate("/sources/add")}>
+                                <Plus className="mr-2 h-4 w-4" />
+                                Add Source
+                            </Button>
+                        </div>
+                    ),
+                }}
+            >
 
                 <div className="space-y-4">
-                    <h2 className="text-2xl font-semibold">Active Sources</h2>
+                    <h2 className="font-display text-2xl font-semibold tracking-[-0.04em]">Connected sources</h2>
                     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                         {sources.map((source) => (
                             <Card
                                 key={source.id}
-                                className={`flex flex-col transition-all hover:border-primary/50 hover:shadow-md ${!source.active ? "bg-muted/50 opacity-75" : ""}`}
+                                className={`flex flex-col ${!source.active ? "bg-muted/40 opacity-80" : ""}`}
                             >
                                 <CardHeader className="px-4 py-4 pb-2">
                                     <div className="min-w-0 flex-1">
@@ -232,7 +243,7 @@ export default function SourceManager() {
                             </Card>
                         ))}
                         {sources.length === 0 && (
-                            <div className="col-span-full rounded-xl border-2 border-dashed p-12 text-center text-muted-foreground">
+                            <div className="editor-empty col-span-full">
                                 No sources added yet.
                             </div>
                         )}

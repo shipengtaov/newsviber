@@ -4,61 +4,234 @@
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 0 0% 3.9%;
+    color-scheme: light;
+    --font-display: "SF Pro Display", "Segoe UI Variable Display", "Segoe UI", "PingFang SC",
+      "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", system-ui, sans-serif;
+    --font-body: "SF Pro Text", "Segoe UI Variable Text", "Segoe UI", "PingFang SC",
+      "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", system-ui, sans-serif;
+    --font-mono: "SF Mono", "IBM Plex Mono", "JetBrains Mono", "Cascadia Code",
+      "Fira Code", ui-monospace, monospace;
+    --background: 44 28% 96%;
+    --foreground: 212 24% 16%;
     --card: 0 0% 100%;
-    --card-foreground: 0 0% 3.9%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 0 0% 3.9%;
-    --primary: 0 0% 9%;
-    --primary-foreground: 0 0% 98%;
-    --secondary: 0 0% 96.1%;
-    --secondary-foreground: 0 0% 9%;
-    --muted: 0 0% 96.1%;
-    --muted-foreground: 0 0% 45.1%;
-    --accent: 0 0% 96.1%;
-    --accent-foreground: 0 0% 9%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 0 0% 89.8%;
-    --input: 0 0% 89.8%;
-    --ring: 0 0% 3.9%;
-    --chart-1: 12 76% 61%;
-    --chart-2: 173 58% 39%;
-    --chart-3: 197 37% 24%;
-    --chart-4: 43 74% 66%;
-    --chart-5: 27 87% 67%;
-    --radius: 0.5rem
+    --card-foreground: 212 24% 18%;
+    --popover: 40 44% 98%;
+    --popover-foreground: 212 24% 18%;
+    --primary: 193 69% 38%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 42 28% 92%;
+    --secondary-foreground: 212 21% 20%;
+    --muted: 40 19% 89%;
+    --muted-foreground: 214 12% 40%;
+    --accent: 194 56% 93%;
+    --accent-foreground: 197 73% 24%;
+    --destructive: 4 72% 55%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 203 24% 83%;
+    --input: 203 24% 79%;
+    --ring: 193 69% 42%;
+    --chart-1: 193 69% 38%;
+    --chart-2: 36 92% 45%;
+    --chart-3: 160 44% 35%;
+    --chart-4: 12 70% 58%;
+    --chart-5: 218 44% 39%;
+    --radius: 1rem;
+    --shadow-soft: 0 22px 50px -34px rgba(27, 46, 66, 0.28);
+    --shadow-elevated: 0 28px 80px -42px rgba(17, 34, 53, 0.34);
+    --shadow-glow: 0 0 0 1px rgba(255, 255, 255, 0.72), 0 24px 70px -40px rgba(11, 84, 118, 0.38);
   }
   .dark {
-    --background: 0 0% 3.9%;
-    --foreground: 0 0% 98%;
-    --card: 0 0% 3.9%;
-    --card-foreground: 0 0% 98%;
-    --popover: 0 0% 3.9%;
-    --popover-foreground: 0 0% 98%;
-    --primary: 0 0% 98%;
-    --primary-foreground: 0 0% 9%;
-    --secondary: 0 0% 14.9%;
-    --secondary-foreground: 0 0% 98%;
-    --muted: 0 0% 14.9%;
-    --muted-foreground: 0 0% 63.9%;
-    --accent: 0 0% 14.9%;
-    --accent-foreground: 0 0% 98%;
-    --destructive: 0 62.8% 30.6%;
+    color-scheme: dark;
+    --background: 218 24% 11%;
+    --foreground: 44 22% 94%;
+    --card: 218 22% 14%;
+    --card-foreground: 44 22% 94%;
+    --popover: 220 20% 14%;
+    --popover-foreground: 44 22% 94%;
+    --primary: 191 66% 60%;
+    --primary-foreground: 216 31% 11%;
+    --secondary: 216 18% 19%;
+    --secondary-foreground: 44 22% 94%;
+    --muted: 216 16% 18%;
+    --muted-foreground: 214 13% 68%;
+    --accent: 194 30% 22%;
+    --accent-foreground: 44 22% 94%;
+    --destructive: 3 74% 59%;
     --destructive-foreground: 0 0% 98%;
-    --border: 0 0% 14.9%;
-    --input: 0 0% 14.9%;
-    --ring: 0 0% 83.1%;
-    --chart-1: 220 70% 50%;
-    --chart-2: 160 60% 45%;
-    --chart-3: 30 80% 55%;
-    --chart-4: 280 65% 60%;
-    --chart-5: 340 75% 55%
+    --border: 214 15% 26%;
+    --input: 214 15% 26%;
+    --ring: 191 66% 60%;
+    --chart-1: 191 66% 60%;
+    --chart-2: 38 92% 62%;
+    --chart-3: 159 43% 49%;
+    --chart-4: 8 78% 63%;
+    --chart-5: 224 60% 70%;
+    --shadow-soft: 0 28px 60px -34px rgba(0, 0, 0, 0.58);
+    --shadow-elevated: 0 36px 90px -44px rgba(0, 0, 0, 0.72);
+    --shadow-glow: 0 0 0 1px rgba(255, 255, 255, 0.08), 0 26px 76px -42px rgba(56, 189, 248, 0.22);
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  html,
+  body,
+  #root {
+    min-height: 100%;
+  }
+
+  html {
+    @apply scroll-smooth;
+  }
+
+  body {
+    font-family: var(--font-body);
+    @apply bg-background text-foreground antialiased;
+    background-image:
+      radial-gradient(circle at top left, hsl(192 80% 65% / 0.14), transparent 28%),
+      radial-gradient(circle at 85% 16%, hsl(36 92% 54% / 0.12), transparent 24%),
+      linear-gradient(180deg, hsl(46 30% 98%), hsl(var(--background)));
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body::selection {
+    background: hsl(var(--primary) / 0.2);
+    color: hsl(var(--foreground));
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    font-family: var(--font-display);
+    letter-spacing: -0.03em;
+  }
+
+  code,
+  pre,
+  kbd,
+  samp {
+    font-family: var(--font-mono);
+  }
+
+  button,
+  input,
+  textarea,
+  select {
+    font: inherit;
+  }
+
+  ::-webkit-scrollbar {
+    width: 12px;
+    height: 12px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    border: 3px solid transparent;
+    border-radius: 999px;
+    background: hsl(var(--border) / 0.95);
+    background-clip: padding-box;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: hsl(var(--muted-foreground) / 0.48);
+    background-clip: padding-box;
   }
 }
 
 @layer components {
+  .surface-panel {
+    @apply relative overflow-hidden rounded-[1.75rem] border shadow-soft backdrop-blur-xl;
+    border-color: hsl(var(--border) / 0.7);
+    background-color: hsl(var(--card) / 0.8);
+  }
+
+  .surface-panel::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    pointer-events: none;
+    background: linear-gradient(180deg, hsl(0 0% 100% / 0.42), transparent 22%);
+  }
+
+  .surface-panel > * {
+    position: relative;
+    z-index: 1;
+  }
+
+  .surface-panel-quiet {
+    @apply relative overflow-hidden rounded-[1.5rem] border shadow-soft backdrop-blur-md;
+    border-color: hsl(var(--border) / 0.6);
+    background-color: hsl(var(--card) / 0.62);
+  }
+
+  .surface-panel-elevated {
+    @apply surface-panel shadow-elevated;
+  }
+
+  .section-kicker {
+    @apply inline-flex items-center rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.22em] text-accent-foreground;
+    background-color: hsl(var(--accent) / 0.8);
+  }
+
+  .stat-pill {
+    @apply inline-flex min-w-[7rem] flex-col gap-1 rounded-[1.2rem] border px-4 py-3 shadow-soft backdrop-blur-sm;
+    border-color: hsl(var(--border) / 0.6);
+    background-color: hsl(var(--background) / 0.72);
+  }
+
+  .stat-pill-label {
+    @apply text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground;
+  }
+
+  .stat-pill-value {
+    @apply text-sm font-semibold text-foreground;
+  }
+
+  .editor-list-card {
+    @apply surface-panel-quiet rounded-[1.35rem] transition-all duration-200 motion-safe:hover:-translate-y-1 motion-safe:hover:shadow-elevated;
+  }
+
+  .editor-empty {
+    @apply surface-panel-quiet flex flex-col items-center justify-center gap-3 px-6 py-12 text-center text-sm text-muted-foreground;
+  }
+
+  .page-grid {
+    @apply grid gap-6;
+  }
+
+  .workspace-enter {
+    animation: workspace-fade-up 0.45s cubic-bezier(0.2, 1, 0.3, 1);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .workspace-enter {
+      animation: none;
+    }
+  }
+
+  @keyframes workspace-fade-up {
+    from {
+      opacity: 0;
+      transform: translateY(12px);
+    }
+
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
   .chat-markdown {
     --chat-markdown-body: hsl(var(--foreground) / 0.95);
     --chat-markdown-foreground: hsl(var(--foreground));

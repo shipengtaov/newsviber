@@ -26,7 +26,8 @@ describe("Sidebar", () => {
     it("keeps the active state logic for non-root routes", () => {
         const markup = renderSidebar("/creative");
 
-        expect(markup).toMatch(/title="Creative Space" class="[^"]*bg-primary\/10 text-primary[^"]*" href="\/creative"/);
-        expect(markup).toMatch(/title="Sources" class="[^"]*text-muted-foreground[^"]*" href="\/sources"/);
+        expect(markup).toContain('title="Creative Space" aria-current="page"');
+        expect(markup).toContain('title="Creative Space" aria-current="page" data-active="true"');
+        expect(markup).toContain('title="Sources" data-active="false"');
     });
 });

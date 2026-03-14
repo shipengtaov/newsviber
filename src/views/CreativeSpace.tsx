@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -14,11 +14,11 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { addCreativeSyncListener } from "@/lib/creative-events";
-import { ChatMarkdown } from "@/components/chat/ChatMarkdown";
+import { CreativeCardDiscussionPanel, CreativeCardDiscussionRail } from "@/components/creative/CreativeCardDiscussionPanel";
 import {
     type CreativeArticleCandidate,
     type CreativeCard,
@@ -42,7 +42,7 @@ import { getCreativeCardBodyMarkdown, getCreativeCardPreviewExcerpt } from "@/li
 import { formatUtcDateTime } from "@/lib/time";
 import { cn } from "@/lib/utils";
 import ReactMarkdown from "react-markdown";
-import { ArrowLeft, ChevronDown, ChevronUp, Ellipsis, Lightbulb, Loader2, MessageSquare, Pencil, Plus, Send, Trash2, WandSparkles } from "lucide-react";
+import { ArrowLeft, ChevronDown, ChevronUp, Ellipsis, Lightbulb, Loader2, MessageSquare, Pencil, Plus, Trash2, WandSparkles } from "lucide-react";
 
 type ProjectFormState = {
     name: string;
@@ -57,12 +57,13 @@ type ProjectFormState = {
 const DEFAULT_AUTO_INTERVAL_MINUTES = "60";
 const DEFAULT_MAX_ARTICLES_PER_CARD = "12";
 const GENERATED_TILE_PREVIEW_MAX_LENGTH = 360;
-const CREATIVE_TILE_GRID_CLASS = "grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4";
-const CREATIVE_TILE_CARD_BASE_CLASS = "flex cursor-pointer flex-col overflow-hidden transition-all hover:border-primary/50 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2";
-const PROJECT_TILE_CARD_CLASS = `${CREATIVE_TILE_CARD_BASE_CLASS} h-[288px]`;
-const GENERATED_TILE_CARD_CLASS = `${CREATIVE_TILE_CARD_BASE_CLASS} min-h-[268px]`;
-const CREATIVE_TILE_HEADER_CLASS = "px-5 py-5 pb-3";
-const CREATIVE_TILE_BODY_CLASS = "flex flex-1 flex-col px-5 pb-5 pt-0";
+const DESKTOP_CARD_DISCUSSION_MEDIA_QUERY = "(min-width: 1024px)";
+const CREATIVE_TILE_GRID_CLASS = "grid gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4";
+const CREATIVE_TILE_CARD_BASE_CLASS = "editor-list-card flex cursor-pointer flex-col overflow-hidden focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2";
+const PROJECT_TILE_CARD_CLASS = `${CREATIVE_TILE_CARD_BASE_CLASS} h-[296px]`;
+const GENERATED_TILE_CARD_CLASS = `${CREATIVE_TILE_CARD_BASE_CLASS} min-h-[276px]`;
+const CREATIVE_TILE_HEADER_CLASS = "px-6 py-6 pb-3";
+const CREATIVE_TILE_BODY_CLASS = "flex flex-1 flex-col px-6 pb-6 pt-0";
 
 function createEmptyProjectFormState(): ProjectFormState {
     return {
@@ -451,6 +452,13 @@ export default function CreativeSpace() {
     const [isProjectInfoOpen, setIsProjectInfoOpen] = useState(false);
     const [isProjectActionsOpen, setIsProjectActionsOpen] = useState(false);
     const [isCardDiscussionOpen, setIsCardDiscussionOpen] = useState(false);
+    const [isDesktopCardDiscussionLayout, setIsDesktopCardDiscussionLayout] = useState<boolean>(() => {
+        if (typeof window === "undefined") {
+            return false;
+        }
+
+        return window.matchMedia(DESKTOP_CARD_DISCUSSION_MEDIA_QUERY).matches;
+    });
 
     const [chatInput, setChatInput] = useState("");
     const {
@@ -465,6 +473,7 @@ export default function CreativeSpace() {
     const projectDialogOpenRef = useRef(projectDialogOpen);
     const projectActionsPanelRef = useRef<HTMLDivElement | null>(null);
     const cardDiscussionScrollRef = useRef<HTMLDivElement | null>(null);
+    const cardDiscussionToggleButtonRef = useRef<HTMLButtonElement | null>(null);
 
     const activeProject = projects.find((project) => project.id === activeProjectId) ?? null;
     const activeCard = cards.find((card) => card.id === activeCardId) ?? null;
@@ -477,6 +486,8 @@ export default function CreativeSpace() {
     const scopedSources = activeProject
         ? sources.filter((source) => activeProject.source_ids.length === 0 || activeProject.source_ids.includes(source.id))
         : [];
+    const autoEnabledProjectCount = projects.filter((project) => project.auto_enabled).length;
+    const totalUnreadCardCount = projects.reduce((total, project) => total + project.unread_card_count, 0);
 
     useEffect(() => {
         void loadProjects();
@@ -486,6 +497,20 @@ export default function CreativeSpace() {
     useEffect(() => {
         projectDialogOpenRef.current = projectDialogOpen;
     }, [projectDialogOpen]);
+
+    useEffect(() => {
+        const mediaQueryList = window.matchMedia(DESKTOP_CARD_DISCUSSION_MEDIA_QUERY);
+        const handleChange = (event: MediaQueryListEvent) => {
+            setIsDesktopCardDiscussionLayout(event.matches);
+        };
+
+        setIsDesktopCardDiscussionLayout(mediaQueryList.matches);
+        mediaQueryList.addEventListener("change", handleChange);
+
+        return () => {
+            mediaQueryList.removeEventListener("change", handleChange);
+        };
+    }, []);
 
     useEffect(() => {
         if (activeProjectId === null) {
@@ -1033,7 +1058,7 @@ export default function CreativeSpace() {
         }
     }
 
-    async function handleChat(event: React.FormEvent) {
+    async function handleChat(event: FormEvent<HTMLFormElement>) {
         event.preventDefault();
         if (!chatInput.trim() || isChatStreaming || !activeCard) {
             return;
@@ -1085,135 +1110,118 @@ export default function CreativeSpace() {
         );
     }
 
+    function closeCardDiscussion() {
+        setIsCardDiscussionOpen(false);
+        cardDiscussionToggleButtonRef.current?.focus();
+    }
+
     if (activeCard) {
         return (
-            <div className="relative flex h-full flex-col bg-background">
-                <div className="sticky top-0 z-10 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/85">
-                    <div className="mx-auto flex w-full max-w-4xl flex-col gap-3 px-4 py-3 md:px-6">
-                        <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-                            <div className="min-w-0">
-                                <Button variant="ghost" size="sm" onClick={() => setActiveCardId(null)} className="-ml-2 w-fit">
-                                    <ArrowLeft className="mr-2 h-4 w-4" /> Back
-                                </Button>
-                                <div className="mt-2 space-y-2.5">
-                                    <div className="text-balance text-lg font-semibold leading-tight md:text-xl">{activeCard.title}</div>
-                                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
-                                        <span>{activeCard.generation_mode === "auto" ? "Auto" : "Manual"} run</span>
-                                        <span>{formatArticleCount(activeCard.used_article_count)}</span>
-                                        <span className="tabular-nums">{formatTimestamp(activeCard.created_at)}</span>
-                                    </div>
-                                </div>
-                            </div>
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => setIsCardDiscussionOpen(true)}
-                                className="shrink-0 self-start"
-                            >
-                                <MessageSquare className="mr-2 h-4 w-4" /> Discuss Card
-                            </Button>
-                        </div>
-                    </div>
-                </div>
-                <div className="flex-1 overflow-y-auto">
-                    <div className="mx-auto w-full max-w-4xl px-4 py-5 md:px-6 md:py-6">
-                        <div className="prose prose-sm max-w-none break-words dark:prose-invert">
-                            <ReactMarkdown>{activeCardBodyMarkdown}</ReactMarkdown>
-                        </div>
-                    </div>
-                </div>
-
-                <Sheet open={isCardDiscussionOpen} onOpenChange={setIsCardDiscussionOpen}>
-                    <SheetContent
-                        side="right"
-                        className="w-full max-w-xl p-0 sm:max-w-xl"
-                        overlayClassName="bg-black/40 backdrop-blur-[1px]"
-                    >
-                        <div className="flex h-full flex-col">
-                            <SheetHeader className="shrink-0 border-b px-5 pb-4 pt-5 text-left">
-                                <SheetTitle>Discuss Card</SheetTitle>
-                                <SheetDescription>Ask follow-up questions or expand the report with AI.</SheetDescription>
-                            </SheetHeader>
-                            <div className="flex-1 space-y-4 overflow-y-auto px-5 py-4 text-sm" ref={cardDiscussionScrollRef}>
-                                {chatMessages.length === 0 && (
-                                    <p className="mt-10 text-center text-muted-foreground">Expand on this report with AI.</p>
-                                )}
-                                {chatMessages.map((message, index) => (
-                                    <div key={index} className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}>
-                                        <div className={`max-w-[88%] rounded-xl px-3 py-2 ${message.role === "user" ? "bg-primary text-primary-foreground" : "border bg-card shadow-sm"}`}>
-                                            {(() => {
-                                                const isLiveAssistantMessage = message.role === "assistant"
-                                                    && isChatStreaming
-                                                    && index === chatMessages.length - 1;
-                                                const isPreparingMessage = isLiveAssistantMessage
-                                                    && chatStreamPhase === "preparing"
-                                                    && message.content.trim().length === 0;
-
-                                                if (isPreparingMessage) {
-                                                    return (
-                                                        <div className="flex items-center gap-3 text-muted-foreground">
-                                                            <span>Connecting to the model...</span>
-                                                            <div className="flex items-center space-x-1">
-                                                                <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-primary/40" />
-                                                                <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-primary/60 [animation-delay:0.2s]" />
-                                                                <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-primary/80 [animation-delay:0.4s]" />
-                                                            </div>
-                                                        </div>
-                                                    );
-                                                }
-
-                                                return (
-                                                    <div className="space-y-2">
-                                                        <ChatMarkdown
-                                                            content={message.content}
-                                                            tone={message.role === "user" ? "inverse" : "default"}
-                                                        />
-                                                        {isLiveAssistantMessage && chatStreamPhase === "streaming" && (
-                                                            <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                                                                <span className="h-2 w-2 rounded-full bg-primary/80 animate-pulse" />
-                                                                <span>Streaming...</span>
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                );
-                                            })()}
+            <div className="flex h-full min-h-0 flex-col gap-4 bg-background p-4 md:p-6 lg:flex-row lg:gap-0">
+                <div className="surface-panel min-h-0 min-w-0 flex-1 overflow-hidden">
+                    <div className="flex h-full min-h-0 flex-col">
+                        <div className="shrink-0 border-b border-border/60 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/85">
+                            <div className="mx-auto flex w-full max-w-4xl flex-col gap-3 px-4 py-3 md:px-6">
+                                <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                                    <div className="min-w-0">
+                                        <Button variant="ghost" size="sm" onClick={() => setActiveCardId(null)} className="-ml-2 w-fit">
+                                            <ArrowLeft className="mr-2 h-4 w-4" /> Back
+                                        </Button>
+                                        <div className="mt-2 space-y-2.5">
+                                            <div className="text-balance text-lg font-semibold leading-tight md:text-xl">{activeCard.title}</div>
+                                            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                                                <span>{activeCard.generation_mode === "auto" ? "Auto" : "Manual"} run</span>
+                                                <span>{formatArticleCount(activeCard.used_article_count)}</span>
+                                                <span className="tabular-nums">{formatTimestamp(activeCard.created_at)}</span>
+                                            </div>
                                         </div>
                                     </div>
-                                ))}
-                            </div>
-                            <div className="shrink-0 border-t bg-background px-5 py-4">
-                                <form onSubmit={handleChat} className="flex items-center gap-2">
-                                    <Input
-                                        value={chatInput}
-                                        onChange={(event) => setChatInput(event.target.value)}
-                                        placeholder="Explore further..."
-                                        disabled={isChatStreaming}
-                                        className="h-9 text-sm"
-                                    />
-                                    <Button type="submit" size="icon" className="h-9 w-9 shrink-0" disabled={isChatStreaming || !chatInput.trim()}>
-                                        <Send className="h-4 w-4" />
+                                    <Button
+                                        ref={cardDiscussionToggleButtonRef}
+                                        variant={isCardDiscussionOpen ? "default" : "outline"}
+                                        size="sm"
+                                        onClick={() => setIsCardDiscussionOpen((open) => !open)}
+                                        className="shrink-0 self-start"
+                                    >
+                                        <MessageSquare className="mr-2 h-4 w-4" />
+                                        {isCardDiscussionOpen ? "Hide Discussion" : "Discuss Card"}
                                     </Button>
-                                </form>
+                                </div>
                             </div>
                         </div>
-                    </SheetContent>
-                </Sheet>
+
+                        <div className="min-h-0 flex-1 overflow-y-auto">
+                            <div className="mx-auto w-full max-w-4xl px-4 py-5 md:px-6 md:py-6">
+                                <div className="prose prose-sm max-w-none break-words dark:prose-invert">
+                                    <ReactMarkdown>{activeCardBodyMarkdown}</ReactMarkdown>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <CreativeCardDiscussionRail open={isDesktopCardDiscussionLayout && isCardDiscussionOpen}>
+                    <CreativeCardDiscussionPanel
+                        variant="inline"
+                        chatMessages={chatMessages}
+                        isChatStreaming={isChatStreaming}
+                        chatStreamPhase={chatStreamPhase}
+                        chatInput={chatInput}
+                        onChatInputChange={setChatInput}
+                        onChatSubmit={handleChat}
+                        onClose={closeCardDiscussion}
+                        showCloseButton
+                        scrollRef={cardDiscussionScrollRef}
+                    />
+                </CreativeCardDiscussionRail>
+
+                {!isDesktopCardDiscussionLayout ? (
+                    <Sheet modal={false} open={isCardDiscussionOpen} onOpenChange={setIsCardDiscussionOpen}>
+                        <SheetContent
+                            side="right"
+                            className="w-full max-w-xl p-0 sm:max-w-xl"
+                            showOverlay={false}
+                        >
+                            <CreativeCardDiscussionPanel
+                                variant="sheet"
+                                chatMessages={chatMessages}
+                                isChatStreaming={isChatStreaming}
+                                chatStreamPhase={chatStreamPhase}
+                                chatInput={chatInput}
+                                onChatInputChange={setChatInput}
+                                onChatSubmit={handleChat}
+                                scrollRef={cardDiscussionScrollRef}
+                            />
+                        </SheetContent>
+                    </Sheet>
+                ) : null}
             </div>
         );
     }
 
     if (activeProject) {
         return (
-            <PageShell variant="workspace" size="wide" className="space-y-3">
-                <div className="space-y-3 rounded-2xl bg-card p-3 shadow-sm">
-                    <div className="flex flex-wrap items-center justify-between gap-3">
-                        <div className="flex min-w-0 items-center gap-2">
-                            <Button variant="ghost" size="sm" onClick={leaveProjectDetail} className="-ml-2 shrink-0">
-                                <ArrowLeft className="mr-2 h-4 w-4" /> Back
-                            </Button>
-                            <h1 className="truncate text-lg font-semibold tracking-tight md:text-xl">{activeProject.name}</h1>
-                        </div>
-                        <div className="flex shrink-0 items-center gap-2">
+            <PageShell
+                variant="workspace"
+                size="wide"
+                contentClassName="space-y-4"
+                header={{
+                    density: "compact",
+                    leading: (
+                        <Button variant="ghost" onClick={leaveProjectDetail}>
+                            <ArrowLeft className="mr-2 h-4 w-4" /> Back
+                        </Button>
+                    ),
+                    eyebrow: "Creative space",
+                    title: activeProject.name,
+                    description: "Turn scoped source material into reusable project cards.",
+                    showDescription: false,
+                    stats: [
+                        { label: "Scope", value: formatProjectScopeSummary(activeProject, sources), tone: "accent" },
+                        { label: "Unread", value: formatUnreadCardCount(activeProjectUnreadCount), tone: activeProjectUnreadCount > 0 ? "warning" : "default" },
+                    ],
+                    actions: (
+                        <div className="flex flex-wrap items-center gap-2">
                             <Button onClick={openManualGenerateDialog} disabled={isGenerating}>
                                 <WandSparkles className="mr-2 h-4 w-4" /> {isGenerating ? "Generating..." : "Generate Card"}
                             </Button>
@@ -1242,7 +1250,7 @@ export default function CreativeSpace() {
                                 </Button>
 
                                 {isProjectActionsOpen && (
-                                    <div className="absolute right-0 top-[calc(100%+0.5rem)] z-20 w-48 rounded-xl border bg-popover p-1.5 shadow-lg">
+                                    <div className="surface-panel-quiet absolute right-0 top-[calc(100%+0.5rem)] z-20 w-48 p-1.5">
                                         <Button
                                             variant="ghost"
                                             size="sm"
@@ -1264,9 +1272,10 @@ export default function CreativeSpace() {
                                 )}
                             </div>
                         </div>
-                    </div>
-
-                    <div className="rounded-xl bg-muted/10 px-3 py-2">
+                    ),
+                }}
+            >
+                <div className="surface-panel-quiet px-4 py-4">
                         <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
                             <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-4 gap-y-1.5 text-sm">
                                 <span className="inline-flex items-center gap-1.5">
@@ -1350,7 +1359,6 @@ export default function CreativeSpace() {
                                 </div>
                             </div>
                         )}
-                    </div>
                 </div>
 
                 <div className={CREATIVE_TILE_GRID_CLASS}>
@@ -1404,7 +1412,7 @@ export default function CreativeSpace() {
                     ))}
 
                     {cards.length === 0 && (
-                        <div className="col-span-full flex flex-col items-center justify-center rounded-xl border-2 border-dashed p-10 text-center text-muted-foreground">
+                        <div className="editor-empty col-span-full">
                             <Lightbulb className="mb-4 h-10 w-10 text-muted-foreground/30" />
                             <p>No creative cards generated yet.</p>
                             <p className="text-sm">Choose news articles and generate the first card for this project.</p>
@@ -1471,13 +1479,13 @@ export default function CreativeSpace() {
                             <div className="min-h-0 flex-1 overflow-y-auto pr-1 pt-4">
                                 <div className="space-y-3">
                                     {isLoadingCandidates && (
-                                        <div className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
+                                        <div className="editor-empty p-6">
                                             Loading candidate articles...
                                         </div>
                                     )}
 
                                     {!isLoadingCandidates && articleCandidates.length === 0 && (
-                                        <div className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
+                                        <div className="editor-empty p-6">
                                             No articles match the current filters.
                                         </div>
                                     )}
@@ -1492,7 +1500,7 @@ export default function CreativeSpace() {
                                                 type="button"
                                                 onClick={() => toggleArticleSelection(article.id)}
                                                 disabled={isSelectionLocked}
-                                                className={`w-full rounded-xl border p-4 text-left transition-colors ${isSelected ? "border-primary bg-primary/5" : "hover:border-primary/40"} ${isSelectionLocked ? "cursor-not-allowed opacity-60" : ""}`}
+                                                className={`w-full rounded-[1.3rem] border p-4 text-left shadow-soft transition-colors ${isSelected ? "border-primary/20 bg-accent/72" : "border-border/60 bg-background/72 hover:border-primary/20 hover:bg-background/90"} ${isSelectionLocked ? "cursor-not-allowed opacity-60" : ""}`}
                                             >
                                                 <div className="flex items-start gap-3">
                                                     <Checkbox
@@ -1541,21 +1549,28 @@ export default function CreativeSpace() {
     }
 
     return (
-        <PageShell variant="workspace" size="wide" className="space-y-8">
-            <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-                <div>
-                    <h1 className="text-3xl font-bold tracking-tight">Creative Space</h1>
-                    <p className="mt-2 text-muted-foreground">
-                        Turn scoped news into repeatable strategy cards with manual and automatic generation.
-                    </p>
-                </div>
-
-                {renderProjectDialog(
+        <PageShell
+            variant="workspace"
+            size="wide"
+            contentClassName="space-y-8"
+            header={{
+                density: "compact",
+                eyebrow: "Creative space",
+                title: "Project board",
+                description: "Transform collected source material into repeatable project cards.",
+                showDescription: false,
+                stats: [
+                    { label: "Projects", value: `${projects.length} total` },
+                    { label: "Unread cards", value: formatUnreadCardCount(totalUnreadCardCount), tone: totalUnreadCardCount > 0 ? "warning" : "default" },
+                    { label: "Auto-enabled", value: `${autoEnabledProjectCount} active`, tone: "accent" },
+                ],
+                actions: renderProjectDialog(
                     <Button onClick={openCreateProjectDialog}>
                         <Plus className="mr-2 h-4 w-4" /> New Project
                     </Button>,
-                )}
-            </div>
+                ),
+            }}
+        >
 
             <div className={CREATIVE_TILE_GRID_CLASS}>
                 {projects.map((project) => (
@@ -1642,7 +1657,7 @@ export default function CreativeSpace() {
                 ))}
 
                 {projects.length === 0 && (
-                    <div className="col-span-full rounded-xl border-2 border-dashed p-12 text-center text-muted-foreground">
+                    <div className="editor-empty col-span-full">
                         No creative projects yet.
                     </div>
                 )}

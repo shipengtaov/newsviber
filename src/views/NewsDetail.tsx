@@ -1,5 +1,5 @@
 import { useState, useEffect, useEffectEvent, useRef } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { ChatMarkdown } from "@/components/chat/ChatMarkdown";
 import { ArticleContent } from "@/components/article/ArticleContent";
@@ -35,6 +35,10 @@ type ArticleDetailViewProps = {
     showAssistant?: boolean;
 };
 
+type NewsDetailLocationState = {
+    returnTo?: string;
+};
+
 export function ArticleDetailView({
     articleId,
     className,
@@ -43,6 +47,7 @@ export function ArticleDetailView({
     showAssistant = true,
 }: ArticleDetailViewProps) {
     const navigate = useNavigate();
+    const location = useLocation();
     const [article, setArticle] = useState<FullArticle | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [loadError, setLoadError] = useState<string | null>(null);
@@ -173,13 +178,15 @@ export function ArticleDetailView({
     }
 
     function handleBack() {
+        const returnTo = (location.state as NewsDetailLocationState | null)?.returnTo;
+
         if (onBack) {
             onBack();
             return;
         }
 
-        if (window.history.length > 1) {
-            navigate(-1);
+        if (typeof returnTo === "string" && returnTo.length > 0) {
+            navigate(returnTo);
             return;
         }
 
@@ -188,40 +195,42 @@ export function ArticleDetailView({
 
     if (isLoading && !article) {
         return (
-            <div className={cn("flex h-full w-full items-center justify-center p-8", className)}>
-                <div className="text-sm text-muted-foreground">Loading article...</div>
+            <div className={cn("flex h-full w-full items-center justify-center p-6", className)}>
+                <div className="surface-panel-quiet px-6 py-10 text-sm text-muted-foreground">Loading article...</div>
             </div>
         );
     }
 
     if (!article) {
         return (
-            <div className={cn("flex h-full w-full flex-col items-center justify-center gap-4 p-8", className)}>
-                <div className="text-sm text-muted-foreground">{loadError ?? "Article not found."}</div>
+            <div className={cn("flex h-full w-full flex-col items-center justify-center gap-4 p-6", className)}>
+                <div className="surface-panel-quiet px-6 py-10 text-center text-sm text-muted-foreground">
+                    {loadError ?? "Article not found."}
+                </div>
                 <Button variant="outline" onClick={handleBack}>
                     <ArrowLeft className="mr-2 h-4 w-4" />
-                    Back to Timeline
+                    Back to News
                 </Button>
             </div>
         );
     }
 
     return (
-        <div className={cn("flex h-full w-full min-h-0", className)}>
-            <div className="min-w-0 flex-1 overflow-y-auto custom-scrollbar">
+        <div className={cn("flex h-full w-full min-h-0 gap-4 p-4 md:p-6", className)}>
+            <div className="surface-panel min-w-0 flex-1 overflow-y-auto">
                 <div className={cn("mx-auto w-full p-6 md:p-8", showAssistant ? "max-w-4xl" : "max-w-5xl")}>
-                    <Button variant="ghost" className="mb-6 -ml-4 text-muted-foreground hover:bg-muted/50 transition-colors" onClick={handleBack}>
-                        <ArrowLeft className="w-4 h-4 mr-2" /> Back to Timeline
+                    <Button variant="ghost" className="mb-5 -ml-1 text-muted-foreground hover:bg-background/80" onClick={handleBack}>
+                        <ArrowLeft className="w-4 h-4 mr-2" /> Back to News
                     </Button>
 
-                    <div className="mb-8">
-                        <h1 className="text-3xl md:text-4xl font-bold tracking-tight mb-4 text-foreground leading-tight">{article.title}</h1>
-                        <div className="flex items-center space-x-4 text-sm text-muted-foreground">
-                            <span className="bg-primary/10 text-primary px-2 py-0.5 font-medium rounded-md">{article.source_name}</span>
+                    <div className="mb-7">
+                        <h1 className="mb-3 font-display text-[2rem] font-semibold leading-tight tracking-[-0.05em] text-foreground md:text-[2.35rem]">{article.title}</h1>
+                        <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
+                            <span className="rounded-full bg-accent/80 px-3 py-1 font-medium text-accent-foreground">{article.source_name}</span>
                             <span>{formatUtcDateTime(article.published_at)}</span>
                             <a
                                 href={article.guid}
-                                className="flex items-center hover:text-primary transition-colors hover:underline cursor-pointer"
+                                className="flex items-center text-primary transition-colors hover:text-accent-foreground hover:underline cursor-pointer"
                                 onClick={(e) => { e.preventDefault(); openUrl(article.guid); }}
                             >
                                 <ExternalLink className="w-3.5 h-3.5 mr-1" /> Original Source
@@ -231,7 +240,7 @@ export function ArticleDetailView({
 
                     {article.summary && (
                         <div
-                            className="mb-6 text-sm text-muted-foreground"
+                            className="surface-panel-quiet mb-6 px-5 py-4 text-sm leading-7 text-muted-foreground"
                             dangerouslySetInnerHTML={{ __html: sanitizeArticleHtml(article.summary) }}
                             onClick={(e) => {
                                 const target = e.target as HTMLElement;
@@ -246,7 +255,7 @@ export function ArticleDetailView({
 
                     <ArticleContent
                         content={article.content}
-                        className="prose prose-neutral dark:prose-invert max-w-none w-full leading-relaxed text-foreground/90"
+                        className="prose prose-neutral dark:prose-invert max-w-none w-full leading-8 text-foreground/90"
                         onClick={(e) => {
                             const target = e.target as HTMLElement;
                             const anchor = target.closest('a');
@@ -260,8 +269,8 @@ export function ArticleDetailView({
             </div>
 
             {showAssistant && (
-                <div className="hidden w-[360px] shrink-0 border-l bg-muted/10 shadow-[-4px_0_24px_-16px_rgba(0,0,0,0.1)] lg:flex lg:flex-col">
-                    <div className="p-4 border-b font-semibold flex items-center bg-card">
+                <div className="surface-panel hidden w-[360px] shrink-0 lg:flex lg:flex-col">
+                    <div className="border-b border-border/60 p-5 font-semibold flex items-center bg-card/60">
                         <Bot className="w-5 h-5 mr-2 text-primary" /> AI Discussion
                     </div>
 
@@ -278,10 +287,10 @@ export function ArticleDetailView({
                         ) : (
                             messages.map((m, i) => (
                                 <div key={i} className={`flex gap-3 ${m.role === "user" ? "flex-row-reverse" : ""}`}>
-                                    <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${m.role === "user" ? "bg-primary text-primary-foreground" : "bg-card border"}`}>
+                                    <div className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 shadow-soft ${m.role === "user" ? "bg-primary text-primary-foreground" : "bg-card border border-border/60"}`}>
                                         {m.role === "user" ? <User className="w-4 h-4" /> : <Bot className="w-4 h-4 text-primary" />}
                                     </div>
-                                    <div className={`px-4 py-2.5 rounded-2xl max-w-[85%] ${m.role === "user" ? "bg-primary text-primary-foreground rounded-tr-sm" : "bg-card border shadow-sm rounded-tl-sm"}`}>
+                                    <div className={`px-4 py-3 rounded-[1.45rem] max-w-[85%] shadow-soft ${m.role === "user" ? "bg-primary text-primary-foreground rounded-tr-sm" : "bg-card/86 border border-border/60 rounded-tl-sm"}`}>
                                         {(() => {
                                             const isLiveAssistantMessage = m.role === "assistant"
                                                 && isStreaming
@@ -324,19 +333,19 @@ export function ArticleDetailView({
                         )}
                     </div>
 
-                    <div className="p-4 border-t bg-card">
-                        <form onSubmit={handleSend} className="relative flex items-center">
+                    <div className="border-t border-border/60 p-4 bg-card/60">
+                        <form onSubmit={handleSend} className="surface-panel-quiet flex items-center gap-2 rounded-[1.35rem] px-2 py-2">
                             <Input
                                 value={input}
                                 onChange={e => setInput(e.target.value)}
                                 placeholder="Ask anything..."
-                                className="pr-12 rounded-full bg-muted/50 border-transparent focus-visible:ring-1 focus-visible:ring-primary/50"
+                                className="h-10 flex-1 border-0 bg-transparent pr-0 shadow-none backdrop-blur-none focus-visible:border-transparent focus-visible:ring-0"
                                 disabled={isStreaming}
                             />
                             <Button
                                 type="submit"
                                 size="icon"
-                                className="absolute right-1 w-8 h-8 rounded-full"
+                                className="h-10 w-10"
                                 disabled={isStreaming || !input.trim()}
                             >
                                 <Send className="w-4 h-4" />
@@ -361,5 +370,5 @@ export default function NewsDetail() {
         );
     }
 
-    return <ArticleDetailView articleId={parsedArticleId} />;
+    return <ArticleDetailView articleId={parsedArticleId} className="min-h-full" />;
 }

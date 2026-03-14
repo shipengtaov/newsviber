@@ -67,12 +67,17 @@ export function MainLayout() {
     };
 
     return (
-        <div className="relative h-screen w-full overflow-hidden bg-background">
-            <div className="absolute inset-x-0 top-0 z-20" style={{ height: TITLEBAR_HEIGHT }}>
+        <div className="relative h-screen w-full overflow-hidden bg-background text-foreground">
+            <div className="pointer-events-none absolute inset-0">
+                <div className="absolute inset-x-0 top-0 h-48 bg-[radial-gradient(circle_at_top_left,_rgba(56,189,248,0.18),_transparent_48%)]" />
+                <div className="absolute right-[-8%] top-[12%] h-64 w-64 rounded-full bg-[radial-gradient(circle,_rgba(251,191,36,0.18),_transparent_68%)] blur-3xl" />
+                <div className="absolute bottom-[-10%] left-[18%] h-72 w-72 rounded-full bg-[radial-gradient(circle,_rgba(14,165,233,0.1),_transparent_72%)] blur-3xl" />
+            </div>
+            <div className="absolute inset-x-0 top-0 z-20 px-3 pt-3 md:px-4" style={{ height: TITLEBAR_HEIGHT + 12 }}>
                 <div
                     data-tauri-drag-region
                     onMouseDown={handleTitlebarMouseDown}
-                    className="absolute inset-0 border-b bg-background/90 backdrop-blur"
+                    className="surface-panel absolute inset-0 rounded-[1.4rem] border-white/50 bg-background/70"
                 />
             </div>
             <Button
@@ -82,14 +87,14 @@ export function MainLayout() {
                 onClick={() => setIsSidebarCollapsed((value) => !value)}
                 data-no-window-drag
                 aria-label={isSidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
-                className="absolute z-30 rounded-xl bg-transparent hover:bg-transparent"
+                className="absolute z-30 border border-border/50 bg-background/60 text-muted-foreground shadow-soft backdrop-blur-sm hover:bg-card/90 hover:text-foreground"
                 style={{ left: TOGGLE_BUTTON_LEFT, top: TOGGLE_BUTTON_TOP, width: TOGGLE_BUTTON_SIZE, height: TOGGLE_BUTTON_SIZE }}
             >
                 {isSidebarCollapsed ? <PanelLeftOpen className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
             </Button>
-            <div className="flex h-full w-full overflow-hidden" style={{ paddingTop: TITLEBAR_HEIGHT }}>
+            <div className="relative z-10 flex h-full w-full overflow-hidden px-3 pb-3 pt-2 md:px-4 md:pb-4" style={{ paddingTop: TITLEBAR_HEIGHT + 10 }}>
                 <Sidebar collapsed={isSidebarCollapsed} />
-                <main ref={mainRef} className="flex-1 overflow-y-auto min-w-0">
+                <main ref={mainRef} className="min-w-0 flex-1 overflow-y-auto pl-3 md:pl-4">
                     <Outlet />
                 </main>
             </div>

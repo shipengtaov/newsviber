@@ -21,6 +21,7 @@ import { useStreamingConversation } from "@/hooks/use-streaming-conversation";
 import type { Message } from "@/lib/ai";
 import { buildGlobalChatSystemPrompt } from "@/lib/chat-prompts";
 import { cn } from "@/lib/utils";
+import { EmptyState, WorkspaceHeader } from "@/components/layout/WorkspaceHeader";
 import {
     buildGlobalChatTitle,
     createDefaultGlobalChatScopeInput,
@@ -208,6 +209,12 @@ export default function GlobalChat() {
     );
     const selectedSourceCount = useAllSources ? sources.length : normalizedScope.source_ids.length;
     const shouldRenderCollapsedScopePanel = isDesktopLayout && isScopePanelCollapsed;
+    const scopeTimeLabel = normalizedScope.time_range_mode === "custom"
+        ? `${normalizedScope.custom_start_date ?? formatLocalDateInputValue(new Date())} - ${normalizedScope.custom_end_date ?? formatLocalDateInputValue(new Date())}`
+        : PRESET_TIME_RANGE_OPTIONS.find((option) => option.value === normalizedScope.preset_days)?.label ?? "Last 7 Days";
+    const scopeSourceSummary = useAllSources
+        ? `All ${sources.length} active source${sources.length === 1 ? "" : "s"}`
+        : `${selectedSourceCount} selected source${selectedSourceCount === 1 ? "" : "s"}`;
 
     activeThreadIdRef.current = currentThreadId;
 
@@ -644,89 +651,24 @@ export default function GlobalChat() {
     }
 
     return (
-        <div className="flex h-full min-h-0 w-full min-w-0 flex-col bg-background lg:flex-row">
-            <div
-                className="relative shrink-0 border-b bg-muted/10 lg:h-full lg:border-b-0 lg:border-r"
-                style={isDesktopLayout ? { width: chatThreadsPanelWidth } : undefined}
-            >
-                <aside className="flex h-full min-h-0 flex-col">
-                    <div className="border-b p-4 lg:pr-5">
-                        <Button className="w-full justify-start" onClick={() => navigate("/chat")}>
-                            <Plus className="h-4 w-4" />
-                            New chat
-                        </Button>
-                    </div>
-                    <ScrollArea className="max-h-72 min-h-0 flex-1 lg:max-h-none">
-                        <div className="space-y-2 p-3 lg:pr-[17px]">
-                            {isLoadingThreads && threads.length === 0 && (
-                                <div className="rounded-lg border border-dashed px-3 py-6 text-center text-sm text-muted-foreground">
-                                    Loading conversations...
-                                </div>
-                            )}
-                            {!isLoadingThreads && threads.length === 0 && (
-                                <div className="rounded-lg border border-dashed px-3 py-6 text-center text-sm text-muted-foreground">
-                                    No saved conversations yet.
-                                </div>
-                            )}
-                            {threads.map((thread) => {
-                                const isActive = thread.id === currentThreadId;
-
-                                return (
-                                    <div
-                                        key={thread.id}
-                                        className={`flex items-start gap-2 rounded-xl border p-2 transition-colors ${isActive ? "border-primary/40 bg-primary/5" : "border-transparent hover:border-border hover:bg-muted/40"}`}
-                                    >
-                                        <button
-                                            type="button"
-                                            className="min-w-0 flex-1 text-left"
-                                            onClick={() => navigate(`/chat/${thread.id}`)}
-                                        >
-                                            <div className="truncate text-sm font-medium text-foreground">{thread.title}</div>
-                                            <div className="mt-1 text-xs text-muted-foreground">{formatUtcDateTime(thread.updated_at, "Unknown")}</div>
-                                        </button>
-                                        <Button
-                                            type="button"
-                                            variant="ghost"
-                                            size="icon"
-                                            className="h-8 w-8 shrink-0 text-muted-foreground hover:text-destructive"
-                                            disabled={isDeletingThreadId === thread.id}
-                                            onClick={(event) => {
-                                                event.preventDefault();
-                                                event.stopPropagation();
-                                                setPendingDeleteThread(thread);
-                                            }}
-                                            aria-label="Delete chat"
-                                            title="Delete chat"
-                                        >
-                                            <Trash2 className="h-4 w-4" />
-                                        </Button>
-                                    </div>
-                                );
-                            })}
-                        </div>
-                    </ScrollArea>
-                </aside>
-                {isDesktopLayout && (
-                    <div
-                        role="separator"
-                        aria-label="Resize chat threads panel"
-                        aria-orientation="vertical"
-                        aria-valuemin={MIN_CHAT_THREADS_PANEL_WIDTH}
-                        aria-valuemax={MAX_CHAT_THREADS_PANEL_WIDTH}
-                        aria-valuenow={chatThreadsPanelWidth}
-                        data-no-window-drag
-                        onPointerDown={handleThreadsResizeStart}
-                        className="absolute inset-y-0 -right-2 z-10 hidden w-4 touch-none cursor-col-resize lg:block"
-                    >
-                        <div
-                            className={cn(
-                                "absolute inset-y-0 left-1/2 w-px -translate-x-1/2 transition-colors",
-                                isResizingThreadsPanel ? "bg-muted-foreground/60" : "bg-border",
-                            )}
-                        />
-                    </div>
+        <div className="flex min-h-full w-full min-w-0 flex-col gap-4 p-4 md:p-6">
+            <WorkspaceHeader
+                density="compact"
+                eyebrow="Global chat"
+                title={activeThread?.title ?? "Cross-source chat"}
+                description="Reuse saved scopes and compare answers across sources."
+                showDescription={false}
+                stats={[
+                    { label: "Time range", value: scopeTimeLabel, tone: "accent" },
+                    { label: "Source scope", value: scopeSourceSummary },
+                ]}
+                actions={(
+                    <Button onClick={() => navigate("/chat")}>
+                        <Plus className="h-4 w-4" />
+                        New chat
+                    </Button>
                 )}
-            </div>
+            />
 
             <Dialog open={pendingDeleteThread !== null} onOpenChange={handleDeleteDialogOpenChange}>
                 <DialogContent>
@@ -765,46 +707,156 @@ export default function GlobalChat() {
                 </DialogContent>
             </Dialog>
 
-            <div className="flex min-h-0 min-w-0 flex-1 flex-col lg:flex-row">
-                <section className="flex min-h-0 min-w-0 flex-1 flex-col">
-                    <div className="border-b px-6 py-4">
-                        <div className="flex items-center justify-between gap-3">
-                            <div className="min-w-0">
-                                <h1 className="truncate text-lg font-semibold">
-                                    {activeThread?.title ?? "New chat"}
-                                </h1>
-                                <p className="mt-1 text-sm text-muted-foreground">
-                                    Global news chat with saved conversations and reusable scope filters.
-                                </p>
+            <div className="flex min-h-0 flex-1 flex-col gap-4 lg:flex-row">
+                <div
+                    className="relative shrink-0"
+                    style={isDesktopLayout ? { width: chatThreadsPanelWidth } : undefined}
+                >
+                    <aside className="surface-panel flex h-full min-h-0 flex-col">
+                        <div className="border-b border-border/60 px-4 py-4 lg:px-5">
+                            <div className="space-y-3">
+                                <div>
+                                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Conversations</p>
+                                    <h2 className="mt-1 font-display text-xl font-semibold tracking-[-0.04em] text-foreground">Saved threads</h2>
+                                </div>
+                                <Button className="w-full justify-start" onClick={() => navigate("/chat")}>
+                                    <Plus className="h-4 w-4" />
+                                    Start a new thread
+                                </Button>
                             </div>
                         </div>
-                    </div>
+                        <ScrollArea className="max-h-72 min-h-0 flex-1 lg:max-h-none">
+                            <div className="space-y-2.5 p-3 lg:pr-[17px]">
+                                {isLoadingThreads && threads.length === 0 && (
+                                    <EmptyState
+                                        title="Loading conversations"
+                                        description="Loading your saved conversations."
+                                        className="px-4 py-10"
+                                    />
+                                )}
+                                {!isLoadingThreads && threads.length === 0 && (
+                                    <EmptyState
+                                        icon={<MessageSquare className="h-8 w-8" />}
+                                        title="No saved conversations"
+                                        description="Start a thread to save a reusable scope and compare information across sources."
+                                        className="px-4 py-10"
+                                    />
+                                )}
+                                {threads.map((thread) => {
+                                    const isActive = thread.id === currentThreadId;
 
-                    <ScrollArea className="min-h-0 flex-1">
-                        <div className="mx-auto flex min-h-full w-full max-w-4xl flex-col px-6 py-6">
-                            {messages.length === 0 && !isLoadingThread && (
-                                <div className="mx-auto mt-20 max-w-md rounded-2xl border bg-card/50 p-8 text-center">
-                                    <MessageSquare className="mx-auto h-12 w-12 text-primary/50" />
-                                    <h2 className="mt-4 text-xl font-semibold">Chat</h2>
+                                    return (
+                                        <div
+                                            key={thread.id}
+                                            className={cn(
+                                                "flex items-start gap-2 rounded-[1.2rem] border p-2 transition-all duration-200",
+                                                isActive
+                                                    ? "border-primary/20 bg-accent/78 shadow-soft"
+                                                    : "border-transparent bg-background/42 hover:border-primary/12 hover:bg-background/78",
+                                            )}
+                                        >
+                                            <button
+                                                type="button"
+                                                className="min-w-0 flex-1 text-left"
+                                                onClick={() => navigate(`/chat/${thread.id}`)}
+                                            >
+                                                <div className="truncate text-sm font-medium text-foreground">{thread.title}</div>
+                                                <div className="mt-1 text-xs text-muted-foreground">{formatUtcDateTime(thread.updated_at, "Unknown")}</div>
+                                            </button>
+                                            <Button
+                                                type="button"
+                                                variant="ghost"
+                                                size="icon"
+                                                className="h-9 w-9 shrink-0 text-muted-foreground hover:text-destructive"
+                                                disabled={isDeletingThreadId === thread.id}
+                                                onClick={(event) => {
+                                                    event.preventDefault();
+                                                    event.stopPropagation();
+                                                    setPendingDeleteThread(thread);
+                                                }}
+                                                aria-label="Delete chat"
+                                                title="Delete chat"
+                                            >
+                                                <Trash2 className="h-4 w-4" />
+                                            </Button>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </ScrollArea>
+                    </aside>
+                    {isDesktopLayout && (
+                        <div
+                            role="separator"
+                            aria-label="Resize chat threads panel"
+                            aria-orientation="vertical"
+                            aria-valuemin={MIN_CHAT_THREADS_PANEL_WIDTH}
+                            aria-valuemax={MAX_CHAT_THREADS_PANEL_WIDTH}
+                            aria-valuenow={chatThreadsPanelWidth}
+                            data-no-window-drag
+                            onPointerDown={handleThreadsResizeStart}
+                            className="absolute inset-y-0 -right-2 z-10 hidden w-4 touch-none cursor-col-resize lg:block"
+                        >
+                            <div
+                                className={cn(
+                                    "absolute inset-y-4 left-1/2 w-px -translate-x-1/2 rounded-full transition-colors",
+                                    isResizingThreadsPanel ? "bg-muted-foreground/60" : "bg-border",
+                                )}
+                            />
+                        </div>
+                    )}
+                </div>
+
+                <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-4 lg:flex-row">
+                    <section className="surface-panel flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+                        <div className="border-b border-border/60 px-6 py-4">
+                            <div className="flex items-center justify-between gap-3">
+                                <div className="min-w-0">
+                                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Live thread</p>
+                                    <h1 className="mt-1 truncate font-display text-2xl font-semibold tracking-[-0.04em] text-foreground">
+                                        {activeThread?.title ?? "New chat"}
+                                    </h1>
                                     <p className="mt-2 text-sm text-muted-foreground">
-                                        Start a new conversation, pick a time range, and narrow the context by active news sources.
+                                        Scope changes apply only to future questions in this thread.
                                     </p>
                                 </div>
-                            )}
+                            </div>
+                        </div>
 
-                            {isLoadingThread && (
-                                <div className="mx-auto mt-20 text-sm text-muted-foreground">
-                                    Loading conversation...
-                                </div>
-                            )}
+                        <ScrollArea className="min-h-0 flex-1">
+                            <div className="mx-auto flex min-h-full w-full max-w-4xl flex-col px-4 py-5 md:px-6 md:py-6">
+                                {messages.length === 0 && !isLoadingThread && (
+                                    <EmptyState
+                                        icon={<MessageSquare className="h-10 w-10" />}
+                                        title="Start a scoped conversation"
+                                        description="Ask for summaries, compare themes across sources, or investigate a developing topic with a saved time window."
+                                        className="mx-auto mt-20 max-w-lg"
+                                    />
+                                )}
+
+                                {isLoadingThread && (
+                                    <div className="mx-auto mt-20 text-sm text-muted-foreground">
+                                        Loading conversation...
+                                    </div>
+                                )}
 
                                 <div className="space-y-6 pb-20">
                                     {messages.map((message, index) => (
                                         <div key={`${message.role}-${index}`} className={`flex gap-4 ${message.role === "user" ? "flex-row-reverse" : ""}`}>
-                                            <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${message.role === "user" ? "bg-primary text-primary-foreground" : "bg-muted"}`}>
+                                            <div className={cn(
+                                                "flex h-10 w-10 shrink-0 items-center justify-center rounded-full shadow-soft",
+                                                message.role === "user"
+                                                    ? "bg-primary text-primary-foreground"
+                                                    : "border border-border/60 bg-background/82 text-primary",
+                                            )}>
                                                 {message.role === "user" ? <User className="h-4 w-4" /> : <Bot className="h-4 w-4" />}
                                             </div>
-                                            <div className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm ${message.role === "user" ? "bg-primary/10" : "border bg-muted/30"}`}>
+                                            <div className={cn(
+                                                "max-w-[88%] rounded-[1.5rem] px-4 py-3 text-sm shadow-soft",
+                                                message.role === "user"
+                                                    ? "bg-primary text-primary-foreground"
+                                                    : "border border-border/60 bg-card/72",
+                                            )}>
                                                 {(() => {
                                                     const isLiveAssistantMessage = message.role === "assistant"
                                                         && isStreaming
@@ -828,7 +880,7 @@ export default function GlobalChat() {
 
                                                     return (
                                                         <div className="space-y-2">
-                                                            <ChatMarkdown content={message.content} />
+                                                            <ChatMarkdown content={message.content} tone={message.role === "user" ? "inverse" : "default"} />
                                                             {isLiveAssistantMessage && streamPhase === "streaming" && (
                                                                 <div className="flex items-center gap-2 text-xs text-muted-foreground">
                                                                     <span className="h-2 w-2 rounded-full bg-primary/80 animate-pulse" />
@@ -841,166 +893,184 @@ export default function GlobalChat() {
                                             </div>
                                         </div>
                                     ))}
-                                <div ref={bottomRef} />
-                            </div>
-                        </div>
-                    </ScrollArea>
-
-                    <div className="border-t bg-background/90 px-6 py-4 backdrop-blur">
-                        <form onSubmit={handleSend} className="mx-auto flex max-w-4xl gap-2">
-                            <Input
-                                value={input}
-                                onChange={(event) => setInput(event.target.value)}
-                                placeholder="Ask about recent news..."
-                                className="flex-1 rounded-full px-5"
-                                autoFocus
-                            />
-                            <Button type="submit" size="icon" className="rounded-full" disabled={isStreaming || isLoadingThread || !input.trim()}>
-                                <Send className="h-4 w-4" />
-                            </Button>
-                        </form>
-                    </div>
-                </section>
-
-                <aside
-                    className={cn(
-                        "flex shrink-0 flex-col border-t bg-muted/10 lg:border-l lg:border-t-0 lg:transition-[width]",
-                        shouldRenderCollapsedScopePanel && "items-center",
-                    )}
-                    style={isDesktopLayout ? { width: shouldRenderCollapsedScopePanel ? COLLAPSED_SCOPE_PANEL_WIDTH : EXPANDED_SCOPE_PANEL_WIDTH } : undefined}
-                >
-                    {shouldRenderCollapsedScopePanel ? (
-                        <div className="flex h-full w-full items-start justify-center px-2 py-4">
-                            <Button
-                                type="button"
-                                variant="ghost"
-                                size="icon"
-                                className="h-9 w-9"
-                                onClick={() => setIsScopePanelCollapsed(false)}
-                                aria-label="Expand thread scope"
-                                title="Expand thread scope"
-                            >
-                                <ChevronLeft className="h-4 w-4" />
-                            </Button>
-                        </div>
-                    ) : (
-                        <>
-                            <div className="border-b px-5 py-4">
-                                <div className="flex items-start justify-between gap-3">
-                                    <div className="min-w-0">
-                                        <h2 className="text-sm font-semibold">Thread scope</h2>
-                                        <p className="mt-1 text-xs text-muted-foreground">
-                                            Changes apply to future questions in this conversation.
-                                        </p>
-                                    </div>
-                                    {isDesktopLayout && (
-                                        <Button
-                                            type="button"
-                                            variant="ghost"
-                                            size="icon"
-                                            className="h-8 w-8 shrink-0"
-                                            onClick={() => setIsScopePanelCollapsed(true)}
-                                            aria-label="Collapse thread scope"
-                                            title="Collapse thread scope"
-                                        >
-                                            <ChevronRight className="h-4 w-4" />
-                                        </Button>
-                                    )}
+                                    <div ref={bottomRef} />
                                 </div>
                             </div>
+                        </ScrollArea>
 
-                            <ScrollArea className="min-h-0 flex-1">
-                                <div className="space-y-6 p-5">
-                                    <div className="space-y-2">
-                                        <Label htmlFor="global-chat-time-range">Time Range</Label>
-                                        <Select value={buildScopeSelectValue(normalizedScope)} onValueChange={handleScopeSelectionChange}>
-                                            <SelectTrigger id="global-chat-time-range">
-                                                <SelectValue />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                {PRESET_TIME_RANGE_OPTIONS.map((option) => (
-                                                    <SelectItem key={option.value} value={`preset:${option.value}`}>
-                                                        {option.label}
-                                                    </SelectItem>
-                                                ))}
-                                                <SelectItem value="custom">Custom Range</SelectItem>
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
+                        <div className="border-t border-border/60 bg-background/70 px-4 py-4 backdrop-blur md:px-6">
+                            <form onSubmit={handleSend} className="mx-auto flex max-w-4xl">
+                                <div className="surface-panel-quiet flex w-full items-center gap-2 rounded-[1.45rem] px-2 py-2">
+                                    <Input
+                                        value={input}
+                                        onChange={(event) => setInput(event.target.value)}
+                                        placeholder="Ask about recent news..."
+                                        className="h-11 flex-1 border-0 bg-transparent shadow-none backdrop-blur-none focus-visible:border-transparent focus-visible:ring-0"
+                                        autoFocus
+                                    />
+                                    <Button type="submit" size="icon" disabled={isStreaming || isLoadingThread || !input.trim()}>
+                                        <Send className="h-4 w-4" />
+                                    </Button>
+                                </div>
+                            </form>
+                        </div>
+                    </section>
 
-                                    {normalizedScope.time_range_mode === "custom" && (
-                                        <div className="grid gap-3">
-                                            <div className="space-y-2">
-                                                <Label htmlFor="global-chat-custom-start">Start Date</Label>
-                                                <Input
-                                                    id="global-chat-custom-start"
-                                                    type="date"
-                                                    value={normalizedScope.custom_start_date ?? formatLocalDateInputValue(new Date())}
-                                                    onChange={(event) => handleCustomStartDateChange(event.target.value)}
-                                                />
-                                            </div>
-                                            <div className="space-y-2">
-                                                <Label htmlFor="global-chat-custom-end">End Date</Label>
-                                                <Input
-                                                    id="global-chat-custom-end"
-                                                    type="date"
-                                                    value={normalizedScope.custom_end_date ?? formatLocalDateInputValue(new Date())}
-                                                    onChange={(event) => handleCustomEndDateChange(event.target.value)}
-                                                />
-                                            </div>
+                    <aside
+                        className={cn(
+                            "surface-panel flex shrink-0 flex-col overflow-hidden lg:transition-[width]",
+                            shouldRenderCollapsedScopePanel && "items-center",
+                        )}
+                        style={isDesktopLayout ? { width: shouldRenderCollapsedScopePanel ? COLLAPSED_SCOPE_PANEL_WIDTH : EXPANDED_SCOPE_PANEL_WIDTH } : undefined}
+                    >
+                        {shouldRenderCollapsedScopePanel ? (
+                            <div className="flex h-full w-full items-start justify-center px-2 py-4">
+                                <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-10 w-10"
+                                    onClick={() => setIsScopePanelCollapsed(false)}
+                                    aria-label="Expand thread scope"
+                                    title="Expand thread scope"
+                                >
+                                    <ChevronLeft className="h-4 w-4" />
+                                </Button>
+                            </div>
+                        ) : (
+                            <>
+                                <div className="border-b border-border/60 px-5 py-4">
+                                    <div className="flex items-start justify-between gap-3">
+                                        <div className="min-w-0">
+                                            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Thread scope</p>
+                                            <h2 className="mt-1 font-display text-xl font-semibold tracking-[-0.04em] text-foreground">Context filters</h2>
+                                            <p className="mt-2 text-xs leading-6 text-muted-foreground">
+                                                Tune the sources and time range that future questions can use.
+                                            </p>
                                         </div>
-                                    )}
+                                        {isDesktopLayout && (
+                                            <Button
+                                                type="button"
+                                                variant="ghost"
+                                                size="icon"
+                                                className="h-9 w-9 shrink-0"
+                                                onClick={() => setIsScopePanelCollapsed(true)}
+                                                aria-label="Collapse thread scope"
+                                                title="Collapse thread scope"
+                                            >
+                                                <ChevronRight className="h-4 w-4" />
+                                            </Button>
+                                        )}
+                                    </div>
+                                </div>
 
-                                    <div className="space-y-3">
-                                        <div className="space-y-1">
-                                            <Label>Data Sources</Label>
-                                            <p className="text-xs text-muted-foreground">
-                                                {useAllSources
-                                                    ? `Using all ${sources.length} active source${sources.length === 1 ? "" : "s"}`
-                                                    : `${selectedSourceCount} selected active source${selectedSourceCount === 1 ? "" : "s"}`}
+                                <ScrollArea className="min-h-0 flex-1">
+                                    <div className="space-y-6 p-5">
+                                        <div className="surface-panel-quiet px-4 py-4">
+                                            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Current scope</p>
+                                            <p className="mt-2 text-sm leading-6 text-foreground">
+                                                {buildScopeSummary(scope, sources)}
                                             </p>
                                         </div>
 
-                                        <label className="flex items-center gap-3 rounded-lg border bg-background px-3 py-2 text-sm">
-                                            <Checkbox
-                                                checked={useAllSources}
-                                                onChange={(event) => handleUseAllSourcesChange(event.target.checked)}
-                                            />
-                                            <span>Use all active sources</span>
-                                        </label>
-
                                         <div className="space-y-2">
-                                            {sourcesLoaded && sources.length === 0 && (
-                                                <div className="rounded-lg border border-dashed px-3 py-6 text-center text-sm text-muted-foreground">
-                                                    No active sources available.
-                                                </div>
-                                            )}
+                                            <Label htmlFor="global-chat-time-range">Time Range</Label>
+                                            <Select value={buildScopeSelectValue(normalizedScope)} onValueChange={handleScopeSelectionChange}>
+                                                <SelectTrigger id="global-chat-time-range">
+                                                    <SelectValue />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    {PRESET_TIME_RANGE_OPTIONS.map((option) => (
+                                                        <SelectItem key={option.value} value={`preset:${option.value}`}>
+                                                            {option.label}
+                                                        </SelectItem>
+                                                    ))}
+                                                    <SelectItem value="custom">Custom Range</SelectItem>
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
 
-                                            {sources.map((source) => (
-                                                <label
-                                                    key={source.id}
-                                                    className={`flex items-center justify-between gap-3 rounded-lg border px-3 py-2 text-sm ${useAllSources ? "bg-muted/40" : "bg-background"}`}
-                                                >
-                                                    <div className="min-w-0">
-                                                        <div className="truncate font-medium">{source.name}</div>
-                                                        <div className="text-xs text-muted-foreground">
-                                                            {source.matching_article_count} in selected time range, {source.article_count} total
-                                                        </div>
-                                                    </div>
-                                                    <Checkbox
-                                                        checked={selectedSourceIds.has(source.id)}
-                                                        disabled={useAllSources}
-                                                        onChange={(event) => handleSourceToggle(source.id, event.target.checked)}
+                                        {normalizedScope.time_range_mode === "custom" && (
+                                            <div className="grid gap-3">
+                                                <div className="space-y-2">
+                                                    <Label htmlFor="global-chat-custom-start">Start Date</Label>
+                                                    <Input
+                                                        id="global-chat-custom-start"
+                                                        type="date"
+                                                        value={normalizedScope.custom_start_date ?? formatLocalDateInputValue(new Date())}
+                                                        onChange={(event) => handleCustomStartDateChange(event.target.value)}
                                                     />
-                                                </label>
-                                            ))}
+                                                </div>
+                                                <div className="space-y-2">
+                                                    <Label htmlFor="global-chat-custom-end">End Date</Label>
+                                                    <Input
+                                                        id="global-chat-custom-end"
+                                                        type="date"
+                                                        value={normalizedScope.custom_end_date ?? formatLocalDateInputValue(new Date())}
+                                                        onChange={(event) => handleCustomEndDateChange(event.target.value)}
+                                                    />
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        <div className="space-y-3">
+                                            <div className="space-y-1">
+                                                <Label>Data Sources</Label>
+                                                <p className="text-xs text-muted-foreground">
+                                                    {useAllSources
+                                                        ? `Using all ${sources.length} active source${sources.length === 1 ? "" : "s"}`
+                                                        : `${selectedSourceCount} selected active source${selectedSourceCount === 1 ? "" : "s"}`}
+                                                </p>
+                                            </div>
+
+                                            <label className="flex items-center gap-3 rounded-[1.15rem] border border-border/60 bg-background/70 px-3.5 py-3 text-sm shadow-soft">
+                                                <Checkbox
+                                                    checked={useAllSources}
+                                                    onChange={(event) => handleUseAllSourcesChange(event.target.checked)}
+                                                />
+                                                <span>Use all active sources</span>
+                                            </label>
+
+                                            <div className="space-y-2">
+                                                {sourcesLoaded && sources.length === 0 && (
+                                                    <EmptyState
+                                                        title="No active sources available"
+                                                        description="Activate or add a source before narrowing the scope."
+                                                        className="px-4 py-10"
+                                                    />
+                                                )}
+
+                                                {sources.map((source) => (
+                                                    <label
+                                                        key={source.id}
+                                                        className={cn(
+                                                            "flex items-center justify-between gap-3 rounded-[1.15rem] border px-3.5 py-3 text-sm shadow-soft transition-colors",
+                                                            useAllSources
+                                                                ? "border-border/50 bg-muted/35"
+                                                                : "border-border/60 bg-background/72 hover:bg-background/86",
+                                                        )}
+                                                    >
+                                                        <div className="min-w-0">
+                                                            <div className="truncate font-medium">{source.name}</div>
+                                                            <div className="text-xs text-muted-foreground">
+                                                                {source.matching_article_count} in selected time range, {source.article_count} total
+                                                            </div>
+                                                        </div>
+                                                        <Checkbox
+                                                            checked={selectedSourceIds.has(source.id)}
+                                                            disabled={useAllSources}
+                                                            onChange={(event) => handleSourceToggle(source.id, event.target.checked)}
+                                                        />
+                                                    </label>
+                                                ))}
+                                            </div>
                                         </div>
                                     </div>
-                                </div>
-                            </ScrollArea>
-                        </>
-                    )}
-                </aside>
+                                </ScrollArea>
+                            </>
+                        )}
+                    </aside>
+                </div>
             </div>
         </div>
     );

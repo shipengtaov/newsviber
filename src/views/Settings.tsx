@@ -169,11 +169,21 @@ export default function Settings() {
     }
 
     return (
-        <PageShell variant="workspace" className="space-y-8">
-            <div>
-                <h1 className="text-3xl font-bold tracking-tight">Settings</h1>
-                <p className="text-muted-foreground mt-2">Configure AI providers and manage local data.</p>
-            </div>
+        <PageShell
+            variant="workspace"
+            contentClassName="space-y-8"
+            header={{
+                density: "compact",
+                eyebrow: "Settings",
+                title: "System configuration",
+                description: "Configure providers, keys, and housekeeping behavior.",
+                showDescription: false,
+                stats: [
+                    { label: "Active provider", value: selectedProvider?.name ?? "Unknown", tone: "accent" },
+                    { label: "Jina key", value: savedJinaKey ? "Configured" : "Not set", tone: savedJinaKey ? "default" : "warning" },
+                ],
+            }}
+        >
 
             <Card>
                 <CardHeader>
