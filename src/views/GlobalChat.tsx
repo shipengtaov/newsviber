@@ -656,6 +656,8 @@ export default function GlobalChat() {
                 density="compact"
                 eyebrow="Global chat"
                 title={activeThread?.title ?? "Cross-source chat"}
+                showTitle={threadIdParam !== undefined}
+                titlelessLayout="compact"
                 description="Reuse saved scopes and compare answers across sources."
                 showDescription={false}
                 stats={[

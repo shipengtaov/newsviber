@@ -734,6 +734,8 @@ export default function NewsList() {
                 density="compact"
                 eyebrow="News"
                 title="News overview"
+                showTitle={false}
+                titlelessLayout="compact"
                 description="Track active sources and scan stored articles."
                 showDescription={false}
                 stats={[

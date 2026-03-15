@@ -176,6 +176,7 @@ export default function Settings() {
                 density: "compact",
                 eyebrow: "Settings",
                 title: "System configuration",
+                showTitle: false,
                 description: "Configure providers, keys, and housekeeping behavior.",
                 showDescription: false,
                 stats: [

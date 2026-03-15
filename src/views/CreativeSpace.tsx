@@ -1557,6 +1557,8 @@ export default function CreativeSpace() {
                 density: "compact",
                 eyebrow: "Creative space",
                 title: "Project board",
+                showTitle: false,
+                titlelessLayout: "compact",
                 description: "Transform collected source material into repeatable project cards.",
                 showDescription: false,
                 stats: [

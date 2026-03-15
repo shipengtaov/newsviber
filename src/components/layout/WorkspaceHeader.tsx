@@ -13,6 +13,8 @@ export type WorkspaceHeaderProps = {
     leading?: ReactNode;
     eyebrow?: ReactNode;
     title: ReactNode;
+    showTitle?: boolean;
+    titlelessLayout?: "default" | "compact";
     description?: ReactNode;
     showDescription?: boolean;
     actions?: ReactNode;
@@ -77,6 +79,8 @@ export function WorkspaceHeader({
     leading,
     eyebrow,
     title,
+    showTitle,
+    titlelessLayout = "default",
     description,
     showDescription,
     actions,
@@ -88,8 +92,54 @@ export function WorkspaceHeader({
     titleClassName,
     descriptionClassName,
 }: WorkspaceHeaderProps) {
+    const shouldRenderVisibleTitle = showTitle ?? true;
     const shouldRenderDescription = showDescription ?? Boolean(description);
     const shouldRenderStats = showStats ?? Boolean(stats && stats.length > 0);
+    const shouldRenderTextBlock = shouldRenderVisibleTitle || Boolean(description && shouldRenderDescription);
+    const shouldUseCompactTitlelessLayout = !shouldRenderVisibleTitle && titlelessLayout === "compact";
+
+    const statsContent = shouldRenderStats && stats && stats.length > 0 ? (
+        <div className={cn("flex flex-wrap", density === "compact" ? "gap-2.5" : "gap-3")}>
+            {stats.map((stat, index) => (
+                <StatPill key={`${String(stat.label)}-${index}`} {...stat} />
+            ))}
+        </div>
+    ) : null;
+
+    const textBlockContent = shouldRenderTextBlock ? (
+        <div
+            className={cn(
+                shouldRenderVisibleTitle && description && shouldRenderDescription
+                    ? density === "compact"
+                        ? "space-y-1.5"
+                        : "space-y-2"
+                    : undefined,
+            )}
+        >
+            {shouldRenderVisibleTitle ? (
+                <h1
+                    className={cn(
+                        "font-display font-semibold tracking-[-0.04em] text-foreground",
+                        density === "compact" ? "text-2xl md:text-[1.9rem]" : "text-3xl md:text-[2.3rem]",
+                        titleClassName,
+                    )}
+                >
+                    {title}
+                </h1>
+            ) : null}
+            {description && shouldRenderDescription ? (
+                <p
+                    className={cn(
+                        "max-w-3xl text-muted-foreground",
+                        density === "compact" ? "text-sm leading-6" : "text-sm leading-7 md:text-base",
+                        descriptionClassName,
+                    )}
+                >
+                    {description}
+                </p>
+            ) : null}
+        </div>
+    ) : null;
 
     return (
         <section
@@ -100,43 +150,41 @@ export function WorkspaceHeader({
             )}
         >
             <div className="absolute inset-x-0 top-0 h-px bg-white/70" aria-hidden="true" />
-            <div className={cn("flex flex-col", density === "compact" ? "gap-3.5" : "gap-5")}>
-                <div className={cn("flex flex-col", density === "compact" ? "gap-3.5 lg:flex-row lg:items-start lg:justify-between" : "gap-5 lg:flex-row lg:items-start lg:justify-between")}>
-                    <div className={cn("min-w-0", density === "compact" ? "space-y-2" : "space-y-3")}>
-                        {leading ? <div className="flex items-center gap-2">{leading}</div> : null}
-                        {eyebrow ? <SectionLabel className={density === "compact" ? "px-2.5 py-0.5 text-[10px]" : undefined}>{eyebrow}</SectionLabel> : null}
-                        <div className={cn(density === "compact" ? "space-y-1.5" : "space-y-2")}>
-                            <h1
-                                className={cn(
-                                    "font-display font-semibold tracking-[-0.04em] text-foreground",
-                                    density === "compact" ? "text-2xl md:text-[1.9rem]" : "text-3xl md:text-[2.3rem]",
-                                    titleClassName,
-                                )}
-                            >
-                                {title}
-                            </h1>
-                            {description && shouldRenderDescription ? (
-                                <p
-                                    className={cn(
-                                        "max-w-3xl text-muted-foreground",
-                                        density === "compact" ? "text-sm leading-6" : "text-sm leading-7 md:text-base",
-                                        descriptionClassName,
-                                    )}
-                                >
-                                    {description}
-                                </p>
-                            ) : null}
+            <div className={cn("flex flex-col", shouldUseCompactTitlelessLayout ? "gap-2.5" : density === "compact" ? "gap-3.5" : "gap-5")}>
+                {shouldUseCompactTitlelessLayout ? (
+                    <div className={cn("flex flex-col gap-2.5", actions ? "lg:flex-row lg:items-start lg:justify-between" : undefined)}>
+                        <div
+                            className={cn(
+                                "min-w-0",
+                                statsContent || textBlockContent || leading || eyebrow
+                                    ? density === "compact"
+                                        ? "space-y-3.5"
+                                        : "space-y-5"
+                                    : undefined,
+                            )}
+                        >
+                            {leading ? <div className="flex items-center gap-2">{leading}</div> : null}
+                            {eyebrow ? <SectionLabel className={density === "compact" ? "px-2.5 py-0.5 text-[10px]" : undefined}>{eyebrow}</SectionLabel> : null}
+                            <h1 className="sr-only">{title}</h1>
+                            {textBlockContent}
+                            {statsContent}
                         </div>
+                        {actions ? <div className="flex shrink-0 flex-wrap items-center gap-2 self-start">{actions}</div> : null}
                     </div>
-                    {actions ? <div className="flex shrink-0 flex-wrap items-center gap-2 self-start">{actions}</div> : null}
-                </div>
-                {shouldRenderStats && stats && stats.length > 0 ? (
-                    <div className={cn("flex flex-wrap", density === "compact" ? "gap-2.5" : "gap-3")}>
-                        {stats.map((stat, index) => (
-                            <StatPill key={`${String(stat.label)}-${index}`} {...stat} />
-                        ))}
-                    </div>
-                ) : null}
+                ) : (
+                    <>
+                        <div className={cn("flex flex-col", density === "compact" ? "gap-3.5 lg:flex-row lg:items-start lg:justify-between" : "gap-5 lg:flex-row lg:items-start lg:justify-between")}>
+                            <div className={cn("min-w-0", density === "compact" ? "space-y-2" : "space-y-3")}>
+                                {leading ? <div className="flex items-center gap-2">{leading}</div> : null}
+                                {eyebrow ? <SectionLabel className={density === "compact" ? "px-2.5 py-0.5 text-[10px]" : undefined}>{eyebrow}</SectionLabel> : null}
+                                {!shouldRenderVisibleTitle ? <h1 className="sr-only">{title}</h1> : null}
+                                {textBlockContent}
+                            </div>
+                            {actions ? <div className="flex shrink-0 flex-wrap items-center gap-2 self-start">{actions}</div> : null}
+                        </div>
+                        {statsContent}
+                    </>
+                )}
                 {children}
             </div>
         </section>

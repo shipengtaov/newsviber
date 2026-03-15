@@ -175,6 +175,8 @@ export default function SourceManager() {
                     density: "compact",
                     eyebrow: "Sources",
                     title: "Source management",
+                    showTitle: false,
+                    titlelessLayout: "compact",
                     description: "Manage the feeds that power your information flow.",
                     showDescription: false,
                     stats: [
