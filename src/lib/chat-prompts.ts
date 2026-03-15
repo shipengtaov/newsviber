@@ -1,5 +1,3 @@
-import { stripHtmlToText } from "@/lib/article-html";
-
 export function getChatMarkdownFormattingInstructions(): string {
   return `Respond in concise markdown.
 
@@ -41,29 +39,6 @@ Relevant news context:
 ${contextLines.join("\n")}
 
 Answer the user's question primarily with the supplied context. If the context is sparse or missing facts, say that clearly instead of inventing details.`);
-}
-
-export type ArticleDiscussionSystemPromptInput = {
-  articleTitle: string;
-  sourceName: string;
-  articleContent: string;
-  relatedContext?: string;
-};
-
-export function buildArticleDiscussionSystemPrompt({
-  articleTitle,
-  sourceName,
-  articleContent,
-  relatedContext,
-}: ArticleDiscussionSystemPromptInput): string {
-  const normalizedArticleContent = stripHtmlToText(articleContent);
-  const normalizedRelatedContext = relatedContext ? stripHtmlToText(relatedContext) : "";
-
-  return appendChatMarkdownFormatting(`You are a helpful reading assistant. The user is reading the following article titled "${articleTitle}" source: ${sourceName}.
-Current Article Content:
-${normalizedArticleContent}${normalizedRelatedContext ? `\n\n${normalizedRelatedContext}` : ""}
-
-Answer the user's questions based primarily on the current article. Use related context if asked for broader info. Be concise.`);
 }
 
 export type CreativeCardDiscussionSystemPromptInput = {
