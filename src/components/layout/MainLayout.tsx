@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState, type MouseEvent } from "react";
-import { Outlet } from "react-router-dom";
+import { useEffect, useRef, useState, type MouseEvent, type RefObject } from "react";
+import { Outlet, useOutletContext } from "react-router-dom";
 import { isTauri } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { Sidebar } from "./Sidebar";
@@ -32,6 +32,14 @@ const NON_DRAGGABLE_TITLEBAR_TARGETS = [
 
 function isNonDraggableTitlebarTarget(target: EventTarget | null): boolean {
     return target instanceof Element && target.closest(NON_DRAGGABLE_TITLEBAR_TARGETS) !== null;
+}
+
+export type MainLayoutOutletContext = {
+    mainScrollRef: RefObject<HTMLElement | null>;
+};
+
+export function useMainLayoutScrollContainer(): RefObject<HTMLElement | null> {
+    return useOutletContext<MainLayoutOutletContext>().mainScrollRef;
 }
 
 export function MainLayout() {
@@ -95,7 +103,7 @@ export function MainLayout() {
             <div className="relative z-10 flex h-full w-full overflow-hidden px-3 pb-3 pt-2 md:px-4 md:pb-4" style={{ paddingTop: TITLEBAR_HEIGHT + 10 }}>
                 <Sidebar collapsed={isSidebarCollapsed} />
                 <main ref={mainRef} className="min-w-0 flex-1 overflow-y-auto pl-3 md:pl-4">
-                    <Outlet />
+                    <Outlet context={{ mainScrollRef: mainRef }} />
                 </main>
             </div>
             <Toaster />

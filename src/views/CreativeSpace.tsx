@@ -36,7 +36,9 @@ import {
 } from "@/lib/creative-service";
 import { optimizeCreativeProjectPrompt, type Message } from "@/lib/ai";
 import { buildCreativeCardDiscussionSystemPrompt } from "@/lib/chat-prompts";
+import { useMainLayoutScrollContainer } from "@/components/layout/MainLayout";
 import { PageShell } from "@/components/layout/PageShell";
+import { useScopedScrollMemory } from "@/hooks/use-scoped-scroll-memory";
 import { useStreamingConversation } from "@/hooks/use-streaming-conversation";
 import { getCreativeCardBodyMarkdown, getCreativeCardPreviewExcerpt } from "@/lib/creative-card";
 import { formatUtcDateTime } from "@/lib/time";
@@ -64,6 +66,12 @@ const PROJECT_TILE_CARD_CLASS = `${CREATIVE_TILE_CARD_BASE_CLASS} h-[296px]`;
 const GENERATED_TILE_CARD_CLASS = `${CREATIVE_TILE_CARD_BASE_CLASS} min-h-[276px]`;
 const CREATIVE_TILE_HEADER_CLASS = "px-6 py-6 pb-3";
 const CREATIVE_TILE_BODY_CLASS = "flex flex-1 flex-col px-6 pb-6 pt-0";
+const CREATIVE_SPACE_SCROLL_STORAGE_KEY = "creativeSpaceScrollPositions_v1";
+const CREATIVE_BOARD_SCROLL_SCOPE_KEY = "creative:board";
+
+function buildCreativeProjectScrollScopeKey(projectId: number): string {
+    return `creative:project:${projectId}`;
+}
 
 function createEmptyProjectFormState(): ProjectFormState {
     return {
@@ -421,6 +429,7 @@ function ProjectDialog({
 
 export default function CreativeSpace() {
     const { toast } = useToast();
+    const mainScrollRef = useMainLayoutScrollContainer();
 
     const [projects, setProjects] = useState<CreativeProject[]>([]);
     const [cards, setCards] = useState<CreativeCard[]>([]);
@@ -488,6 +497,16 @@ export default function CreativeSpace() {
         : [];
     const autoEnabledProjectCount = projects.filter((project) => project.auto_enabled).length;
     const totalUnreadCardCount = projects.reduce((total, project) => total + project.unread_card_count, 0);
+    const creativeScrollScopeKey = activeCardId !== null
+        ? null
+        : activeProject !== null
+            ? buildCreativeProjectScrollScopeKey(activeProject.id)
+            : CREATIVE_BOARD_SCROLL_SCOPE_KEY;
+    const { saveCurrentScopeScroll: saveCreativeScrollPosition } = useScopedScrollMemory({
+        containerRef: mainScrollRef,
+        storageKey: CREATIVE_SPACE_SCROLL_STORAGE_KEY,
+        scopeKey: creativeScrollScopeKey,
+    });
 
     useEffect(() => {
         void loadProjects();
@@ -698,6 +717,7 @@ export default function CreativeSpace() {
 
     function openCreativeCard(cardId: number, cardSnapshot?: CreativeCard) {
         const targetCard = cardSnapshot ?? cards.find((card) => card.id === cardId);
+        saveCreativeScrollPosition();
         setActiveCardId(cardId);
 
         if (!targetCard || targetCard.is_read || markingCardReadIdsRef.current.has(cardId)) {
@@ -752,6 +772,7 @@ export default function CreativeSpace() {
     }
 
     function openProjectDetail(projectId: number) {
+        saveCreativeScrollPosition();
         setActiveProjectId(projectId);
     }
 
@@ -835,7 +856,7 @@ export default function CreativeSpace() {
             closeProjectDialog();
 
             if (!editingProjectId) {
-                setActiveProjectId(savedProject.id);
+                openProjectDetail(savedProject.id);
             }
 
             toast({ title: editingProjectId ? "Project updated" : "Project created" });
@@ -883,6 +904,7 @@ export default function CreativeSpace() {
     }
 
     function leaveProjectDetail() {
+        saveCreativeScrollPosition();
         setManualDialogOpen(false);
         closeProjectDialog();
         setSelectedArticleIds([]);
