@@ -3,6 +3,8 @@ import {
   AI_CURRENT_PROVIDER_STORAGE_KEY,
   AI_PROVIDER_CONFIGS_STORAGE_KEY,
   DEFAULT_AZURE_API_VERSION,
+  PROVIDERS,
+  PROVIDER_ICON_URLS,
   getDefaultProviderConfigs,
   readCurrentProviderId,
   readStoredProviderConfigs,
@@ -105,5 +107,17 @@ describe("AI provider storage helpers", () => {
       model: "news-copilot",
       azureApiVersion: DEFAULT_AZURE_API_VERSION,
     });
+  });
+
+  it("keeps provider icons in a complete local asset mapping", () => {
+    expect(Object.keys(PROVIDER_ICON_URLS).sort()).toEqual(PROVIDERS.map(({ id }) => id).sort());
+  });
+
+  it("uses only local assets for provider icons", () => {
+    for (const provider of PROVIDERS) {
+      expect(provider.iconUrl).toBeTruthy();
+      expect(provider.iconUrl).not.toMatch(/^https?:\/\//);
+      expect(provider.iconUrl).toMatch(/\.png$/);
+    }
   });
 });

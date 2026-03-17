@@ -1,3 +1,18 @@
+import azureIcon from "@/assets/provider-icons/azure.png";
+import claudeIcon from "@/assets/provider-icons/claude.png";
+import customIcon from "@/assets/provider-icons/custom.png";
+import deepseekIcon from "@/assets/provider-icons/deepseek.png";
+import geminiIcon from "@/assets/provider-icons/gemini.png";
+import glmIcon from "@/assets/provider-icons/glm.png";
+import kimiIcon from "@/assets/provider-icons/kimi.png";
+import minimaxIcon from "@/assets/provider-icons/minimax.png";
+import ollamaIcon from "@/assets/provider-icons/ollama.png";
+import openaiIcon from "@/assets/provider-icons/openai.png";
+import openrouterIcon from "@/assets/provider-icons/openrouter.png";
+import qwenIcon from "@/assets/provider-icons/qwen.png";
+import siliconflowIcon from "@/assets/provider-icons/siliconflow.png";
+import vercelIcon from "@/assets/provider-icons/vercel.png";
+
 export type AIProviderConfig = {
   url: string;
   apiKey: string;
@@ -28,11 +43,25 @@ const LEGACY_AI_STORAGE_KEYS = [
   "AZURE_API_VERSION",
 ] as const;
 
-const getFaviconUrl = (domain: string) =>
-  `https://www.google.com/s2/favicons?domain=${domain}&sz=64`;
-
 const AZURE_LEGACY_DEPLOYMENT_PATH_PATTERN =
   /^(.*\/openai)\/deployments\/([^/]+)(?:\/.*)?$/i;
+
+export const PROVIDER_ICON_URLS = {
+  openai: openaiIcon,
+  claude: claudeIcon,
+  gemini: geminiIcon,
+  deepseek: deepseekIcon,
+  qwen: qwenIcon,
+  kimi: kimiIcon,
+  glm: glmIcon,
+  minimax: minimaxIcon,
+  openrouter: openrouterIcon,
+  siliconflow: siliconflowIcon,
+  vercel: vercelIcon,
+  azure: azureIcon,
+  ollama: ollamaIcon,
+  custom: customIcon,
+} as const satisfies Record<string, string>;
 
 export const PROVIDERS: AIProviderDefinition[] = [
   {
@@ -40,70 +69,70 @@ export const PROVIDERS: AIProviderDefinition[] = [
     name: "OpenAI",
     url: "https://api.openai.com/v1",
     models: ["gpt-4o", "gpt-4o-mini", "o1", "o3-mini"],
-    iconUrl: getFaviconUrl("openai.com"),
+    iconUrl: PROVIDER_ICON_URLS.openai,
   },
   {
     id: "claude",
     name: "Anthropic (Claude)",
     url: "https://api.anthropic.com/v1",
     models: ["claude-3-5-sonnet-20241022", "claude-3-haiku-20240307"],
-    iconUrl: getFaviconUrl("anthropic.com"),
+    iconUrl: PROVIDER_ICON_URLS.claude,
   },
   {
     id: "gemini",
     name: "Google (Gemini)",
     url: "https://generativelanguage.googleapis.com/v1beta",
     models: ["gemini-2.5-pro", "gemini-2.5-flash", "gemini-1.5-pro", "gemini-1.5-flash"],
-    iconUrl: getFaviconUrl("gemini.google.com"),
+    iconUrl: PROVIDER_ICON_URLS.gemini,
   },
   {
     id: "deepseek",
     name: "DeepSeek",
     url: "https://api.deepseek.com",
     models: ["deepseek-chat", "deepseek-reasoner"],
-    iconUrl: getFaviconUrl("deepseek.com"),
+    iconUrl: PROVIDER_ICON_URLS.deepseek,
   },
   {
     id: "qwen",
     name: "Aliyun (Qwen)",
     url: "https://dashscope.aliyuncs.com/compatible-mode/v1",
     models: ["qwen-plus", "qwen-max", "qwen-turbo"],
-    iconUrl: getFaviconUrl("tongyi.aliyun.com"),
+    iconUrl: PROVIDER_ICON_URLS.qwen,
   },
   {
     id: "kimi",
     name: "Moonshot (Kimi)",
     url: "https://api.moonshot.ai/v1",
     models: ["moonshot-v1-8k", "moonshot-v1-32k"],
-    iconUrl: getFaviconUrl("moonshot.cn"),
+    iconUrl: PROVIDER_ICON_URLS.kimi,
   },
   {
     id: "glm",
     name: "Zhipu (GLM)",
     url: "https://open.bigmodel.cn/api/paas/v4",
     models: ["glm-4-plus", "glm-4-flash"],
-    iconUrl: getFaviconUrl("zhipuai.cn"),
+    iconUrl: PROVIDER_ICON_URLS.glm,
   },
   {
     id: "minimax",
     name: "MiniMax",
     url: "https://api.minimax.io/anthropic/v1",
     models: ["minimax-text-01", "minimax-text-01v", "abab6.5s-chat"],
-    iconUrl: getFaviconUrl("minimaxi.com"),
+    iconUrl: PROVIDER_ICON_URLS.minimax,
   },
   {
     id: "openrouter",
     name: "OpenRouter",
     url: "https://openrouter.ai/api/v1",
     models: [],
-    iconUrl: getFaviconUrl("openrouter.ai"),
+    iconUrl: PROVIDER_ICON_URLS.openrouter,
   },
   {
     id: "siliconflow",
     name: "SiliconFlow",
     url: "https://api.siliconflow.cn/v1",
     models: ["deepseek-ai/DeepSeek-V3", "Qwen/Qwen2.5-72B-Instruct"],
-    iconUrl: getFaviconUrl("siliconflow.cn"),
+    iconUrl: PROVIDER_ICON_URLS.siliconflow,
   },
   {
     id: "vercel",
@@ -115,28 +144,28 @@ export const PROVIDERS: AIProviderDefinition[] = [
       "google/gemini-2.5-flash",
       "deepseek/deepseek-v3",
     ],
-    iconUrl: getFaviconUrl("vercel.com"),
+    iconUrl: PROVIDER_ICON_URLS.vercel,
   },
   {
     id: "azure",
     name: "Azure OpenAI",
     url: "https://YOUR_RESOURCE_NAME.openai.azure.com/openai",
     models: ["gpt-4o", "gpt-4o-mini"],
-    iconUrl: getFaviconUrl("azure.microsoft.com"),
+    iconUrl: PROVIDER_ICON_URLS.azure,
   },
   {
     id: "ollama",
     name: "Ollama (Local)",
     url: "http://127.0.0.1:11434",
     models: ["llama3", "qwen2", "mistral"],
-    iconUrl: getFaviconUrl("ollama.com"),
+    iconUrl: PROVIDER_ICON_URLS.ollama,
   },
   {
     id: "custom",
     name: "Custom",
     url: "",
     models: [],
-    iconUrl: "https://api.iconify.design/lucide:globe.svg?color=%23888888",
+    iconUrl: PROVIDER_ICON_URLS.custom,
   },
 ];
 
