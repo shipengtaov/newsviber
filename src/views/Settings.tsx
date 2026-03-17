@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import Database from "@tauri-apps/plugin-sql";
 import { Check, Eye, EyeOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -28,6 +29,8 @@ import {
     saveCurrentProviderId,
     saveProviderConfig,
 } from "@/lib/ai-config";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { SUPPORTED_LANGUAGES, AUTO_DETECT_VALUE, getLanguagePreference, setLanguagePreference } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { PageShell } from "@/components/layout/PageShell";
 
@@ -44,6 +47,7 @@ function getProviderConfigSnapshot(providerId: string, providerConfig: AIProvide
 }
 
 export default function Settings() {
+    const { t } = useTranslation("settings");
     const { toast } = useToast();
     const [selectedProviderId, setSelectedProviderId] = useState(DEFAULT_AI_PROVIDER_ID);
     const [providerDrafts, setProviderDrafts] = useState<AIProviderConfigs>(getDefaultProviderConfigs);
@@ -91,7 +95,7 @@ export default function Settings() {
             ...prev,
             [selectedProviderId]: normalizedSelectedConfig,
         }));
-        toast({ title: "Settings Saved", description: "AI provider configuration has been updated." });
+        toast({ title: t("settingsSaved"), description: t("settingsSavedDesc") });
     }
 
     function resetSelectedProviderDraft() {
@@ -149,9 +153,9 @@ export default function Settings() {
             const db = await getDb();
             // SQLite syntax: datetime('now', '-30 days')
             await db.execute(`DELETE FROM articles WHERE published_at < datetime('now', '-${days} days')`);
-            toast({ title: "Data Cleanup Complete", description: `Deleted articles older than ${days} days.` });
+            toast({ title: t("dataCleanupComplete"), description: t("dataCleanupCompleteDesc", { days }) });
         } catch (err: any) {
-            toast({ title: "Cleanup Error", description: String(err), variant: "destructive" });
+            toast({ title: t("cleanupError"), description: String(err), variant: "destructive" });
         }
     }
 
@@ -161,27 +165,56 @@ export default function Settings() {
             contentClassName="space-y-8"
             header={{
                 density: "compact",
-                eyebrow: "Settings",
-                title: "System configuration",
+                eyebrow: t("eyebrow"),
+                title: t("title"),
                 showTitle: false,
-                description: "Configure providers, keys, and housekeeping behavior.",
+                description: t("description"),
                 showDescription: false,
-                stats: [
-                    { label: "Active provider", value: selectedProvider?.name ?? "Unknown", tone: "accent" },
-                ],
             }}
         >
 
             <Card>
                 <CardHeader>
-                    <CardTitle>AI Provider Configuration</CardTitle>
-                    <CardDescription>Configure your AI provider for article chat and summaries.</CardDescription>
+                    <CardTitle>{t("general")}</CardTitle>
+                </CardHeader>
+                <CardContent>
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <Label>{t("language", { ns: "common" })}</Label>
+                            <p className="text-sm text-muted-foreground">{t("languageDesc", { ns: "common" })}</p>
+                        </div>
+                        <Select
+                            value={getLanguagePreference()}
+                            onValueChange={setLanguagePreference}
+                        >
+                            <SelectTrigger className="w-[200px]">
+                                <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value={AUTO_DETECT_VALUE}>
+                                    {t("autoDetect", { ns: "common" })}
+                                </SelectItem>
+                                {SUPPORTED_LANGUAGES.map((lang) => (
+                                    <SelectItem key={lang.code} value={lang.code}>
+                                        {lang.label}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </div>
+                </CardContent>
+            </Card>
+
+            <Card>
+                <CardHeader>
+                    <CardTitle>{t("aiProviderConfig")}</CardTitle>
+                    <CardDescription>{t("aiProviderDesc")}</CardDescription>
                 </CardHeader>
                 <CardContent>
                     <form onSubmit={handleSaveAiSettings} className="space-y-6">
                         <div className="space-y-4">
                             <div className="space-y-2">
-                                <Label>Select Provider</Label>
+                                <Label>{t("selectProvider")}</Label>
                                 <div className="flex flex-wrap gap-2">
                                     {PROVIDERS.map((provider) => {
                                         const isSelected = provider.id === selectedProviderId;
@@ -216,7 +249,7 @@ export default function Settings() {
 
                         <div className="grid gap-4 md:grid-cols-2 pt-4 border-t">
                             <div className="space-y-2 md:col-span-2">
-                                <Label>{selectedProviderId === "azure" ? "Azure Base URL" : "AI Base URL"}</Label>
+                                <Label>{selectedProviderId === "azure" ? t("azureBaseUrl") : t("aiBaseUrl")}</Label>
                                 <Input
                                     value={selectedConfig.url}
                                     onChange={e => updateSelectedProviderConfig({ url: e.target.value })}
@@ -225,29 +258,29 @@ export default function Settings() {
 
                             {selectedProviderId === 'azure' && (
                                 <div className="space-y-2 md:col-span-2">
-                                    <Label>Azure API Version</Label>
+                                    <Label>{t("azureApiVersion")}</Label>
                                     <Input
                                         value={selectedConfig.azureApiVersion || ""}
                                         onChange={e => updateSelectedProviderConfig({ azureApiVersion: e.target.value })}
-                                        placeholder="e.g., 2024-02-15-preview"
+                                        placeholder={t("azureApiVersionPlaceholder")}
                                     />
                                 </div>
                             )}
 
                             <div className="space-y-2">
-                                <Label>AI API Key</Label>
+                                <Label>{t("aiApiKey")}</Label>
                                 <div className="relative">
                                     <Input
                                         type={showAiApiKey ? "text" : "password"}
                                         value={selectedConfig.apiKey}
                                         onChange={e => updateSelectedProviderConfig({ apiKey: e.target.value })}
-                                        placeholder="sk-..."
+                                        placeholder={t("apiKeyPlaceholder")}
                                         className="pr-10"
                                     />
                                     <button
                                         type="button"
                                         onClick={() => setShowAiApiKey((prev) => !prev)}
-                                        aria-label={showAiApiKey ? "Hide API key" : "Show API key"}
+                                        aria-label={showAiApiKey ? t("hideApiKey") : t("showApiKey")}
                                         aria-pressed={showAiApiKey}
                                         className="absolute inset-y-0 right-0 flex w-10 items-center justify-center text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                                     >
@@ -256,12 +289,12 @@ export default function Settings() {
                                 </div>
                             </div>
                             <div className="space-y-2">
-                                <Label>{selectedProviderId === "azure" ? "Deployment Name" : "Model Name"}</Label>
+                                <Label>{selectedProviderId === "azure" ? t("deploymentName") : t("modelName")}</Label>
                                 <Input
                                     list="model-suggestions"
                                     value={selectedConfig.model}
                                     onChange={e => updateSelectedProviderConfig({ model: e.target.value })}
-                                    placeholder={selectedProviderId === "azure" ? "e.g., my-gpt-4o-deployment" : "e.g., gpt-4o-mini"}
+                                    placeholder={selectedProviderId === "azure" ? t("deploymentPlaceholder") : t("modelPlaceholder")}
                                 />
                                 <datalist id="model-suggestions">
                                     {selectedProvider.models.map(model => (
@@ -276,7 +309,7 @@ export default function Settings() {
                             disabled={!isAiDirty}
                             className="disabled:border disabled:border-input disabled:bg-muted disabled:text-muted-foreground disabled:opacity-100 disabled:shadow-none"
                         >
-                            Save
+                            {t("save", { ns: "common" })}
                         </Button>
                     </form>
                 </CardContent>
@@ -285,17 +318,17 @@ export default function Settings() {
             <Dialog open={discardDialogOpen} onOpenChange={handleDiscardDialogOpenChange}>
                 <DialogContent>
                     <DialogHeader>
-                        <DialogTitle>Discard unsaved provider changes?</DialogTitle>
+                        <DialogTitle>{t("discardUnsavedChanges")}</DialogTitle>
                         <DialogDescription>
-                            Your changes for {selectedProvider.name} have not been saved. Discard them and switch providers?
+                            {t("discardUnsavedDesc", { provider: selectedProvider.name })}
                         </DialogDescription>
                     </DialogHeader>
                     <DialogFooter>
                         <Button type="button" variant="outline" onClick={() => handleDiscardDialogOpenChange(false)}>
-                            Cancel
+                            {t("cancel", { ns: "common" })}
                         </Button>
                         <Button type="button" onClick={confirmProviderSwitch}>
-                            Discard and Switch
+                            {t("discardAndSwitch")}
                         </Button>
                     </DialogFooter>
                 </DialogContent>
@@ -303,23 +336,23 @@ export default function Settings() {
 
             <Card>
                 <CardHeader>
-                    <CardTitle>Data Management</CardTitle>
-                    <CardDescription>Clean up your locally stored articles and manage database size.</CardDescription>
+                    <CardTitle>{t("dataManagement")}</CardTitle>
+                    <CardDescription>{t("dataManagementDesc")}</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
                     <div className="bg-muted/40 p-4 border rounded-lg flex items-center justify-between">
                         <div>
-                            <div className="font-medium">Delete Old Articles (30 Days)</div>
-                            <div className="text-sm text-muted-foreground">Remove all articles published more than 30 days ago.</div>
+                            <div className="font-medium">{t("deleteOldArticles30")}</div>
+                            <div className="text-sm text-muted-foreground">{t("deleteOldArticles30Desc")}</div>
                         </div>
-                        <Button variant="destructive" onClick={() => cleanupData(30)}>Run Cleanup</Button>
+                        <Button variant="destructive" onClick={() => cleanupData(30)}>{t("runCleanup")}</Button>
                     </div>
                     <div className="bg-muted/40 p-4 border rounded-lg flex items-center justify-between">
                         <div>
-                            <div className="font-medium">Delete Old Articles (7 Days)</div>
-                            <div className="text-sm text-muted-foreground">Keep your database very lean.</div>
+                            <div className="font-medium">{t("deleteOldArticles7")}</div>
+                            <div className="text-sm text-muted-foreground">{t("deleteOldArticles7Desc")}</div>
                         </div>
-                        <Button variant="destructive" onClick={() => cleanupData(7)}>Run Cleanup</Button>
+                        <Button variant="destructive" onClick={() => cleanupData(7)}>{t("runCleanup")}</Button>
                     </div>
                 </CardContent>
             </Card>

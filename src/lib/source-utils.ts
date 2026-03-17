@@ -1,6 +1,5 @@
+import i18n from "@/lib/i18n";
 import { formatUtcDateTime } from "@/lib/time";
-
-const NEVER_FETCHED_LABEL = "Never fetched";
 
 export function normalizeFetchInterval(value: unknown, fallback: number = 60): number {
     const parsed = Number(value);
@@ -9,23 +8,24 @@ export function normalizeFetchInterval(value: unknown, fallback: number = 60): n
 
 export function formatFetchInterval(value: unknown): string {
     const minutes = normalizeFetchInterval(value, 0);
-    if (minutes <= 0) return "Manual refresh";
-    if (minutes < 60) return `Every ${minutes} min`;
+    if (minutes <= 0) return i18n.t("sources:manualRefresh");
+    if (minutes < 60) return i18n.t("sources:everyNMin", { count: minutes });
     if (minutes % 60 === 0) {
         const hours = minutes / 60;
-        return `Every ${hours} hr${hours === 1 ? "" : "s"}`;
+        return i18n.t("sources:everyNHr", { count: hours });
     }
 
-    return `Every ${minutes} min`;
+    return i18n.t("sources:everyNMin", { count: minutes });
 }
 
 export function formatLastFetch(lastFetch: string | null): string {
-    return formatUtcDateTime(lastFetch, NEVER_FETCHED_LABEL);
+    return formatUtcDateTime(lastFetch, i18n.t("sources:neverFetched"));
 }
 
 export function formatLastFetchSummary(lastFetch: string | null): string {
-    const formattedLastFetch = formatLastFetch(lastFetch);
-    return formattedLastFetch === NEVER_FETCHED_LABEL
+    const neverFetchedLabel = i18n.t("sources:neverFetched");
+    const formattedLastFetch = formatUtcDateTime(lastFetch, neverFetchedLabel);
+    return formattedLastFetch === neverFetchedLabel
         ? formattedLastFetch
-        : `Last fetch ${formattedLastFetch}`;
+        : i18n.t("sources:lastFetch", { date: formattedLastFetch });
 }

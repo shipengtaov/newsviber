@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type MouseEvent, type RefObject } from "react";
+import { useTranslation } from "react-i18next";
 import { Outlet, useOutletContext } from "react-router-dom";
 import { isTauri } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
@@ -43,6 +44,7 @@ export function useMainLayoutScrollContainer(): RefObject<HTMLElement | null> {
 }
 
 export function MainLayout() {
+    const { t } = useTranslation();
     const mainRef = useRef<HTMLElement>(null);
     const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(() => {
         try {
@@ -94,7 +96,7 @@ export function MainLayout() {
                 size="icon"
                 onClick={() => setIsSidebarCollapsed((value) => !value)}
                 data-no-window-drag
-                aria-label={isSidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+                aria-label={isSidebarCollapsed ? t("expandSidebar") : t("collapseSidebar")}
                 className="absolute z-30 border border-border/50 bg-background/60 text-muted-foreground shadow-soft backdrop-blur-sm hover:bg-card/90 hover:text-foreground"
                 style={{ left: TOGGLE_BUTTON_LEFT, top: TOGGLE_BUTTON_TOP, width: TOGGLE_BUTTON_SIZE, height: TOGGLE_BUTTON_SIZE }}
             >

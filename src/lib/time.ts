@@ -1,3 +1,5 @@
+import i18n from "@/lib/i18n";
+
 const DATE_ONLY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 const DATE_TIME_NO_ZONE_PATTERN = /^(\d{4}-\d{2}-\d{2})[ T](\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?)$/;
 const EXPLICIT_TIME_ZONE_PATTERN = /(Z|[+\-]\d{2}:?\d{2})$/i;
@@ -35,10 +37,10 @@ export function parseUtcTimestamp(value: string | null | undefined): Date | null
 
 export function formatUtcDateTime(value: string | null | undefined, fallback = "Unknown"): string {
     const parsed = parseUtcTimestamp(value);
-    return parsed ? parsed.toLocaleString() : fallback;
+    return parsed ? parsed.toLocaleString(i18n.language) : fallback;
 }
 
 export function formatUtcDate(value: string | null | undefined, fallback = "Unknown"): string {
     const parsed = parseUtcTimestamp(value);
-    return parsed ? parsed.toLocaleDateString() : fallback;
+    return parsed ? parsed.toLocaleDateString(i18n.language) : fallback;
 }

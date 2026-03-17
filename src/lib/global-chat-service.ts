@@ -2,6 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 import type { Message } from "@/lib/ai";
 import { compactHtmlText } from "@/lib/article-html";
 import { getDb } from "@/lib/db";
+import i18n from "@/lib/i18n";
 
 export type GlobalChatTimeRangeMode = "preset" | "custom";
 export type GlobalChatMessageRole = Exclude<Message["role"], "system">;
@@ -271,7 +272,7 @@ export function normalizeGlobalChatScopeInput(input: Partial<GlobalChatScopeInpu
 }
 
 export function buildGlobalChatTitle(content: string, maxLength = DEFAULT_GLOBAL_CHAT_TITLE_MAX_LENGTH): string {
-    const normalized = content.replace(/\s+/g, " ").trim() || "New Chat";
+    const normalized = content.replace(/\s+/g, " ").trim() || i18n.t("chat:newChatTitle");
     if (normalized.length <= maxLength) {
         return normalized;
     }
@@ -366,7 +367,7 @@ function buildGlobalChatTimeRangeCondition(
 export function normalizeGlobalChatThread(row: GlobalChatThreadRow): GlobalChatThread {
     return {
         id: row.id,
-        title: row.title.trim() || "Untitled Chat",
+        title: row.title.trim() || i18n.t("chat:untitledChat"),
         time_range_mode: row.time_range_mode === "custom" ? "custom" : "preset",
         preset_days: row.time_range_mode === "custom" ? null : normalizePresetDays(row.preset_days),
         custom_start_date: row.time_range_mode === "custom" && isValidLocalDateInputValue(row.custom_start_date) ? row.custom_start_date : null,

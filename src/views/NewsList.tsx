@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -279,6 +280,7 @@ function SourceFilterRow({
 }
 
 export default function NewsList() {
+    const { t } = useTranslation("news");
     const { toast } = useToast();
     const location = useLocation();
     const navigate = useNavigate();
@@ -395,17 +397,17 @@ export default function NewsList() {
             : articles.length === PAGE_SIZE
     );
     const compactPaginationLabel = totalPages === null
-        ? "Loading pages..."
+        ? t("loadingPages")
         : hasPaginationPages
-            ? `Page ${Math.min(page + 1, totalPages)} / ${totalPages}`
-            : "No more pages";
+            ? t("pageXOfY", { current: Math.min(page + 1, totalPages), total: totalPages })
+            : t("noMorePages");
     const resultSummaryLabel = totalArticleCount === null
-        ? "Loading results..."
-        : `${totalArticleCount} result${totalArticleCount === 1 ? "" : "s"}`;
-    const activeSourceSummaryLabel = `${sources.length} active source${sources.length === 1 ? "" : "s"}`;
+        ? t("loadingResults")
+        : t("nResults", { count: totalArticleCount });
+    const activeSourceSummaryLabel = t("nActiveSources", { count: sources.length });
     const markScopedReadLabel = selectedSource
-        ? `Mark all unread in ${selectedSource.name} as read`
-        : "Mark all unread in all active sources as read";
+        ? t("markScopedReadSource", { name: selectedSource.name })
+        : t("markScopedReadAll");
     const newsListScrollKey = useMemo(
         () => buildNewsListScrollKey(page, search, selectedSourceId),
         [page, search, selectedSourceId],
@@ -649,7 +651,7 @@ export default function NewsList() {
         try {
             await markScopedNewsArticlesAsRead(selectedSourceId);
         } catch (error) {
-            toast({ title: "Failed to mark articles as read", description: String(error), variant: "destructive" });
+            toast({ title: t("failedToMarkArticlesAsRead"), description: String(error), variant: "destructive" });
             await refreshCurrentView();
         } finally {
             setIsMarkingScopedRead(false);
@@ -671,12 +673,12 @@ export default function NewsList() {
 
         if (isAnyFetchInProgress) return;
         if (sources.length === 0) {
-            toast({ title: "No active sources to fetch" });
+            toast({ title: t("noActiveSourceToFetch") });
             return;
         }
 
         setIsFetchingAll(true);
-        toast({ title: `Fetching ${sources.length} active sources...` });
+        toast({ title: t("fetchingNSources", { count: sources.length }) });
 
         try {
             const result = await fetchSources(sources);
@@ -684,11 +686,11 @@ export default function NewsList() {
                 dispatchSourceFetchSyncEvent();
             }
             toast({
-                title: "Fetch All Complete",
-                description: `Fetched ${result.insertedCount} new articles. ${result.successCount} succeeded${result.failCount > 0 ? `, ${result.failCount} failed` : ""}.`,
+                title: t("fetchAllComplete"),
+                description: t("fetchAllCompleteDesc", { inserted: result.insertedCount, succeeded: result.successCount, failedPart: result.failCount > 0 ? `, ${result.failCount} failed` : "" }),
             });
         } catch (err: any) {
-            toast({ title: "Fetch failed", description: String(err), variant: "destructive" });
+            toast({ title: t("fetchFailed"), description: String(err), variant: "destructive" });
         } finally {
             await refreshCurrentView();
             setIsFetchingAll(false);
@@ -702,7 +704,7 @@ export default function NewsList() {
         if (isAnyFetchInProgress) return;
 
         setFetchingSourceId(source.id);
-        toast({ title: `Fetching ${source.name}...` });
+        toast({ title: t("fetchingSource", { name: source.name }) });
 
         try {
             const result = await fetchSource(source);
@@ -710,44 +712,44 @@ export default function NewsList() {
                 dispatchSourceFetchSyncEvent();
             }
             toast({
-                title: "Fetch complete",
-                description: `Fetched ${result.fetchedCount} articles, saved ${result.insertedCount} new.`,
+                title: t("fetchComplete"),
+                description: t("fetchCompleteDesc", { fetched: result.fetchedCount, inserted: result.insertedCount }),
             });
         } catch (err: any) {
-            toast({ title: "Fetch failed", description: String(err), variant: "destructive" });
+            toast({ title: t("fetchFailed"), description: String(err), variant: "destructive" });
         } finally {
             await refreshCurrentView();
             setFetchingSourceId(null);
         }
     }
 
-    let emptyStateMessage = "No articles found.";
+    let emptyStateMessage = t("noArticlesFound");
     if (!hasActiveSources) {
-        emptyStateMessage = "No active sources.";
+        emptyStateMessage = t("noActiveSourcesMsg");
     } else if (selectedSourceId !== null) {
-        emptyStateMessage = "This source has no articles yet.";
+        emptyStateMessage = t("noArticlesForSource");
     }
 
     return (
         <div className="flex min-h-full w-full min-w-0 flex-col gap-4 p-4 md:p-6">
             <WorkspaceHeader
                 density="compact"
-                eyebrow="News"
-                title="News overview"
+                eyebrow={t("eyebrow")}
+                title={t("title")}
                 showTitle={false}
                 titlelessLayout="compact"
-                description="Track active sources and scan stored articles."
+                description={t("description")}
                 showDescription={false}
                 stats={[
-                    { label: "Scope", value: selectedSource?.name ?? "All active sources", tone: selectedSource ? "accent" : "default" },
-                    { label: "Unread", value: `${formatUnreadArticleCount(scopedUnreadCount)} unread`, tone: scopedUnreadCount > 0 ? "warning" : "default" },
+                    { label: t("scope"), value: selectedSource?.name ?? t("allActiveSources"), tone: selectedSource ? "accent" : "default" },
+                    { label: t("unread"), value: t("unreadCount", { count: scopedUnreadCount }), tone: scopedUnreadCount > 0 ? "warning" : "default" },
                 ]}
                 actions={(
                     <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
                         <form onSubmit={handleSearch} className="relative flex min-w-0 flex-1 items-center sm:w-[20rem]">
                             <Search className="absolute left-3 h-4 w-4 text-muted-foreground" />
                             <Input
-                                placeholder="Search articles..."
+                                placeholder={t("searchArticles")}
                                 className="pl-10 sm:w-full"
                                 value={searchInput}
                                 onChange={(e) => setSearchInput(e.target.value)}
@@ -764,12 +766,12 @@ export default function NewsList() {
                             {isMarkingScopedRead ? (
                                 <>
                                     <Loader2 className="h-4 w-4 animate-spin" />
-                                    Marking...
+                                    {t("marking")}
                                 </>
                             ) : (
                                 <>
                                     <CheckCheck className="h-4 w-4" />
-                                    Mark all as read
+                                    {t("markAllAsRead")}
                                 </>
                             )}
                         </Button>
@@ -785,8 +787,8 @@ export default function NewsList() {
                     <div className="surface-panel flex h-full min-h-0 flex-col px-4 py-4">
                         <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
                             <div>
-                                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Sources</p>
-                                <h2 className="mt-1 font-display text-xl font-semibold tracking-[-0.04em] text-foreground">Active sources</h2>
+                                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{t("sources")}</p>
+                                <h2 className="mt-1 font-display text-xl font-semibold tracking-[-0.04em] text-foreground">{t("activeSources")}</h2>
                             </div>
                             <Button
                                 type="button"
@@ -794,8 +796,8 @@ export default function NewsList() {
                                 size="icon"
                                 className={SOURCE_ACTION_BUTTON_CLASS_NAME}
                                 onClick={handleAddSource}
-                                aria-label="Add source"
-                                title="Add source"
+                                aria-label={t("addSource")}
+                                title={t("addSource")}
                             >
                                 <Plus className="h-4 w-4" />
                             </Button>
@@ -803,14 +805,14 @@ export default function NewsList() {
 
                         <div className="mt-4 space-y-1.5 pr-1 lg:flex-1 lg:min-h-0 lg:overflow-y-auto">
                             <SourceFilterRow
-                                label="All Articles"
-                                title={`All Articles (${allArticleCount}${allUnreadCount > 0 ? `, ${formatUnreadArticleCount(allUnreadCount)} unread` : ""})`}
+                                label={t("allArticles")}
+                                title={`${t("allArticles")} (${allArticleCount}${allUnreadCount > 0 ? `, ${t("unreadCount", { count: allUnreadCount })}` : ""})`}
                                 count={allArticleCount}
                                 unreadCount={allUnreadCount}
                                 isSelected={isAllSelected}
                                 isFetching={isFetchingAll}
                                 isDisabled={isAnyFetchInProgress || !hasActiveSources}
-                                fetchAriaLabel="Fetch all active sources"
+                                fetchAriaLabel={t("fetchAllActiveSources")}
                                 onSelect={() => selectSource(null)}
                                 onFetch={handleFetchAll}
                             />
@@ -821,13 +823,13 @@ export default function NewsList() {
                                     <SourceFilterRow
                                         key={source.id}
                                         label={source.name}
-                                        title={`${source.name} (${source.article_count}${source.unread_count > 0 ? `, ${formatUnreadArticleCount(source.unread_count)} unread` : ""})`}
+                                        title={`${source.name} (${source.article_count}${source.unread_count > 0 ? `, ${t("unreadCount", { count: source.unread_count })}` : ""})`}
                                         count={source.article_count}
                                         unreadCount={source.unread_count}
                                         isSelected={isSelected}
                                         isFetching={fetchingSourceId === source.id}
                                         isDisabled={isAnyFetchInProgress}
-                                        fetchAriaLabel={`Fetch ${source.name}`}
+                                        fetchAriaLabel={t("fetchSource", { name: source.name })}
                                         onSelect={() => selectSource(source.id)}
                                         onFetch={(event) => void handleFetchSource(event, source)}
                                     />
@@ -837,8 +839,8 @@ export default function NewsList() {
                             {sourcesLoaded && sources.length === 0 && (
                                 <EmptyState
                                     icon={<Newspaper className="h-8 w-8" />}
-                                    title="No active sources"
-                                    description="Add a source to start collecting articles."
+                                    title={t("noActiveSources")}
+                                    description={t("addSourceToStart")}
                                     className="px-4 py-10"
                                 />
                             )}
@@ -846,7 +848,7 @@ export default function NewsList() {
                     </div>
                     <div
                         role="separator"
-                        aria-label="Resize sources panel"
+                        aria-label={t("resizeSourcesPanel")}
                         aria-orientation="vertical"
                         aria-valuemin={MIN_SOURCES_PANEL_WIDTH}
                         aria-valuemax={MAX_SOURCES_PANEL_WIDTH}
@@ -870,7 +872,7 @@ export default function NewsList() {
                             <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
                                 <div className="min-w-0">
                                     <h2 className="truncate font-display text-xl font-semibold tracking-[-0.04em] text-foreground">
-                                        {selectedSource?.name ?? "All Articles"}
+                                        {selectedSource?.name ?? t("allArticles")}
                                     </h2>
                                     {selectedSource ? (
                                         <div className="mt-1.5 flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
@@ -941,8 +943,8 @@ export default function NewsList() {
                                                     )}
                                                     <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
                                                         <span className="rounded-full bg-accent/80 px-2.5 py-1 text-accent-foreground">{article.source_name}</span>
-                                                        <span>Published {formatUtcDateTime(article.published_at)}</span>
-                                                        <span>Saved {formatUtcDateTime(article.inserted_at)}</span>
+                                                        <span>{t("published", { date: formatUtcDateTime(article.published_at) })}</span>
+                                                        <span>{t("saved", { date: formatUtcDateTime(article.inserted_at) })}</span>
                                                         {article.guid && (
                                                             <a
                                                                 href={article.guid}
@@ -950,7 +952,7 @@ export default function NewsList() {
                                                                 onClick={(e) => handleExternalLink(e, article.guid)}
                                                             >
                                                                 <ExternalLink className="mr-1 h-3 w-3" />
-                                                                Original
+                                                                {t("original")}
                                                             </a>
                                                         )}
                                                     </div>
@@ -965,8 +967,8 @@ export default function NewsList() {
                                         icon={<Newspaper className="h-10 w-10" />}
                                         title={emptyStateMessage}
                                         description={hasActiveSources
-                                            ? "Try changing the source filter or search terms to surface a different slice of coverage."
-                                            : "Add at least one active source to start collecting articles."}
+                                            ? t("emptyHasSourcesDesc")
+                                            : t("emptyNoSourcesDesc")}
                                     />
                                 )}
                             </div>
@@ -981,7 +983,7 @@ export default function NewsList() {
                                     disabled={!canGoToPreviousPage}
                                 >
                                     <ChevronLeft className="h-4 w-4" />
-                                    <span className="sr-only">Previous page</span>
+                                    <span className="sr-only">{t("previousPage", { ns: "common" })}</span>
                                 </Button>
                                 <span className="min-w-0 flex-1 text-center text-sm font-medium text-muted-foreground">
                                     {compactPaginationLabel}
@@ -992,7 +994,7 @@ export default function NewsList() {
                                     onClick={() => goToPage(page + 1)}
                                     disabled={!canGoToNextPage}
                                 >
-                                    <span className="sr-only">Next page</span>
+                                    <span className="sr-only">{t("nextPage", { ns: "common" })}</span>
                                     <ChevronRight className="h-4 w-4" />
                                 </Button>
                             </div>
@@ -1005,11 +1007,11 @@ export default function NewsList() {
                                     disabled={!canGoToPreviousPage}
                                 >
                                     <ChevronLeft className="h-4 w-4" />
-                                    Previous
+                                    {t("previous", { ns: "common" })}
                                 </Button>
 
                                 {totalPages !== null && totalPages > 1 ? (
-                                    <nav aria-label="Pagination" className="flex items-center gap-1.5">
+                                    <nav aria-label={t("pagination", { ns: "common" })} className="flex items-center gap-1.5">
                                         {paginationItems.map((item) => {
                                             if (item.type === "ellipsis") {
                                                 return (
@@ -1055,7 +1057,7 @@ export default function NewsList() {
                                     onClick={() => goToPage(page + 1)}
                                     disabled={!canGoToNextPage}
                                 >
-                                    Next
+                                    {t("next", { ns: "common" })}
                                     <ChevronRight className="h-4 w-4" />
                                 </Button>
                             </div>

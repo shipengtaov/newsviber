@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useTranslation } from "react-i18next";
+import i18n from "@/lib/i18n";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -102,16 +104,16 @@ function createProjectFormState(project?: CreativeProject): ProjectFormState {
 }
 
 function formatTimestamp(value: string | null): string {
-    return formatUtcDateTime(value, "Never");
+    return formatUtcDateTime(value, i18n.t("common:never"));
 }
 
 function formatArticleCount(count: number): string {
-    return `${count} article${count === 1 ? "" : "s"}`;
+    return i18n.t("creative:nArticles", { count });
 }
 
 function formatProjectScope(project: CreativeProject, sources: CreativeSourceOption[]): string {
     if (project.source_ids.length === 0) {
-        return "All sources";
+        return i18n.t("creative:allSources");
     }
 
     const sourceNames = sources
@@ -119,7 +121,7 @@ function formatProjectScope(project: CreativeProject, sources: CreativeSourceOpt
         .map((source) => source.name);
 
     if (sourceNames.length === 0) {
-        return `${project.source_ids.length} selected source${project.source_ids.length === 1 ? "" : "s"}`;
+        return i18n.t("creative:nSelectedSources", { count: project.source_ids.length });
     }
 
     return sourceNames.join(", ");
@@ -127,15 +129,15 @@ function formatProjectScope(project: CreativeProject, sources: CreativeSourceOpt
 
 function formatAutoSummary(project: CreativeProject): string {
     if (!project.auto_enabled) {
-        return "Manual only";
+        return i18n.t("creative:manualOnly");
     }
 
-    return `Every ${project.auto_interval_minutes} minute${project.auto_interval_minutes === 1 ? "" : "s"}`;
+    return i18n.t("creative:everyNMinutes", { count: project.auto_interval_minutes });
 }
 
 function formatCompactAutoSummary(project: CreativeProject): string {
     if (!project.auto_enabled) {
-        return "Manual";
+        return i18n.t("creative:manual");
     }
 
     return `${project.auto_interval_minutes}m`;
@@ -143,7 +145,7 @@ function formatCompactAutoSummary(project: CreativeProject): string {
 
 function formatProjectScopeSummary(project: CreativeProject, sources: CreativeSourceOption[]): string {
     if (project.source_ids.length === 0) {
-        return "All sources";
+        return i18n.t("creative:allSources");
     }
 
     const sourceNames = sources
@@ -154,19 +156,19 @@ function formatProjectScopeSummary(project: CreativeProject, sources: CreativeSo
         return sourceNames[0];
     }
 
-    return `${project.source_ids.length} source${project.source_ids.length === 1 ? "" : "s"}`;
+    return i18n.t("creative:nSelectedSources", { count: project.source_ids.length });
 }
 
 function formatProjectRecentActivitySummary(project: CreativeProject): string {
     if (project.last_auto_generated_at) {
-        return `Generated ${formatTimestamp(project.last_auto_generated_at)}`;
+        return i18n.t("creative:generated", { date: formatTimestamp(project.last_auto_generated_at) });
     }
 
     if (project.last_auto_checked_at) {
-        return `Checked ${formatTimestamp(project.last_auto_checked_at)}`;
+        return i18n.t("creative:checked", { date: formatTimestamp(project.last_auto_checked_at) });
     }
 
-    return "No recent activity";
+    return i18n.t("creative:noRecentActivity");
 }
 
 function formatUnreadCardCount(count: number): string {
@@ -230,39 +232,41 @@ function ProjectDialog({
     onApplyPromptSuggestion,
     trigger,
 }: ProjectDialogProps) {
+    const { t } = useTranslation("creative");
+
     return (
         <>
             <Dialog open={open} onOpenChange={onOpenChange}>
                 {trigger ? <DialogTrigger asChild>{trigger}</DialogTrigger> : null}
                 <DialogContent className="max-h-[90vh] max-w-3xl overflow-y-auto">
                     <DialogHeader>
-                        <DialogTitle>{editingProjectId ? "Edit Creative Project" : "Create Creative Project"}</DialogTitle>
+                        <DialogTitle>{editingProjectId ? t("editCreativeProject") : t("createCreativeProject")}</DialogTitle>
                         <DialogDescription>
-                            Configure the focus prompt, automation interval, and source scope for this project.
+                            {t("projectDialogDesc")}
                         </DialogDescription>
                     </DialogHeader>
 
                     <form onSubmit={onSubmit} className="space-y-6">
                         <div className="space-y-2">
-                            <Label>Project Name</Label>
+                            <Label>{t("projectName")}</Label>
                             <Input
                                 value={projectForm.name}
                                 onChange={(event) => setProjectForm((current) => ({ ...current, name: event.target.value }))}
-                                placeholder="e.g. AI startup opportunities"
+                                placeholder={t("projectNamePlaceholder")}
                                 required
                             />
                         </div>
 
                         <div className="space-y-2">
                             <div className="flex items-center justify-between gap-3">
-                                <Label>Focus Prompt</Label>
-                                <span className="text-xs text-muted-foreground">Use AI to refine the current prompt.</span>
+                                <Label>{t("focusPrompt")}</Label>
+                                <span className="text-xs text-muted-foreground">{t("useAiToRefine")}</span>
                             </div>
                             <div className="relative">
                                 <Textarea
                                     value={projectForm.prompt}
                                     onChange={(event) => setProjectForm((current) => ({ ...current, prompt: event.target.value }))}
-                                    placeholder="Act as a product strategist. Look for product gaps and emerging needs..."
+                                    placeholder={t("promptPlaceholder")}
                                     className="min-h-32 resize-none pb-12 pr-12"
                                     required
                                 />
@@ -273,8 +277,8 @@ function ProjectDialog({
                                     className="absolute bottom-2 right-2 h-8 w-8 rounded-full border bg-background/90 shadow-sm"
                                     onClick={onOptimizePrompt}
                                     disabled={!projectForm.prompt.trim() || isOptimizingPrompt}
-                                    aria-label="Optimize prompt with AI"
-                                    title="Optimize prompt with AI"
+                                    aria-label={t("optimizeWithAi")}
+                                    title={t("optimizeWithAi")}
                                 >
                                     {isOptimizingPrompt ? (
                                         <Loader2 className="h-4 w-4 animate-spin" />
@@ -292,15 +296,15 @@ function ProjectDialog({
                                         checked={projectForm.autoEnabled}
                                         onChange={(event) => setProjectForm((current) => ({ ...current, autoEnabled: event.target.checked }))}
                                     />
-                                    Enable automatic card generation
+                                    {t("enableAutoCardGeneration")}
                                 </label>
                                 <p className="text-sm text-muted-foreground">
-                                    The app checks this project every configured interval and only generates a card when new scoped articles exist.
+                                    {t("autoCardGenDesc")}
                                 </p>
                             </div>
 
                             <div className="space-y-2">
-                                <Label>Auto interval (minutes)</Label>
+                                <Label>{t("autoInterval")}</Label>
                                 <Input
                                     type="number"
                                     min="1"
@@ -308,27 +312,27 @@ function ProjectDialog({
                                     onChange={(event) => setProjectForm((current) => ({ ...current, autoIntervalMinutes: event.target.value }))}
                                     disabled={!projectForm.autoEnabled}
                                 />
-                                <p className="text-xs text-muted-foreground">Example: set to 60 to check once per hour.</p>
+                                <p className="text-xs text-muted-foreground">{t("autoIntervalExample")}</p>
                             </div>
                         </div>
 
                         <div className="space-y-2">
-                            <Label>Max articles per card</Label>
+                            <Label>{t("maxArticlesPerCard")}</Label>
                             <Input
                                 type="number"
                                 min="1"
                                 value={projectForm.maxArticlesPerCard}
                                 onChange={(event) => setProjectForm((current) => ({ ...current, maxArticlesPerCard: event.target.value }))}
                             />
-                            <p className="text-xs text-muted-foreground">Applies to both automatic runs and manual article selection.</p>
+                            <p className="text-xs text-muted-foreground">{t("maxArticlesDesc")}</p>
                         </div>
 
                         <div className="space-y-4 rounded-xl border p-4">
                             <div className="flex items-start justify-between gap-4">
                                 <div>
-                                    <Label>Source scope</Label>
+                                    <Label>{t("sourceScope")}</Label>
                                     <p className="mt-1 text-sm text-muted-foreground">
-                                        Choose which news sources can feed this project.
+                                        {t("chooseSourcesDesc")}
                                     </p>
                                 </div>
                                 <label className="flex items-center gap-2 text-sm">
@@ -340,13 +344,13 @@ function ProjectDialog({
                                             sourceIds: event.target.checked ? [] : current.sourceIds,
                                         }))}
                                     />
-                                    Use all sources
+                                    {t("useAllSources")}
                                 </label>
                             </div>
 
                             {projectForm.useAllSources && (
                                 <div className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
-                                    New and existing articles from every source will be eligible for this project.
+                                    {t("allSourcesEligible")}
                                 </div>
                             )}
 
@@ -354,7 +358,7 @@ function ProjectDialog({
                                 <div className="max-h-64 space-y-2 overflow-y-auto">
                                     {sources.length === 0 && (
                                         <div className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
-                                            No sources available yet.
+                                            {t("noSourcesAvailable")}
                                         </div>
                                     )}
 
@@ -367,7 +371,7 @@ function ProjectDialog({
                                             <div className="min-w-0 flex-1">
                                                 <div className="font-medium">{source.name}</div>
                                                 <div className="text-xs text-muted-foreground">
-                                                    {source.article_count} article{source.article_count === 1 ? "" : "s"} · {source.active ? "Active" : "Inactive"}
+                                                    {t("nArticles", { count: source.article_count })} · {source.active ? t("active", { ns: "common" }) : t("inactive", { ns: "common" })}
                                                 </div>
                                             </div>
                                         </label>
@@ -378,10 +382,10 @@ function ProjectDialog({
 
                         <DialogFooter>
                             <Button type="button" variant="outline" onClick={onCancel}>
-                                Cancel
+                                {t("cancel", { ns: "common" })}
                             </Button>
                             <Button type="submit" disabled={isSavingProject}>
-                                {isSavingProject ? "Saving..." : editingProjectId ? "Save Changes" : "Create Project"}
+                                {isSavingProject ? t("saving") : editingProjectId ? t("saveChanges") : t("createProject")}
                             </Button>
                         </DialogFooter>
                     </form>
@@ -391,20 +395,20 @@ function ProjectDialog({
             <Dialog open={promptSuggestionOpen} onOpenChange={onPromptSuggestionOpenChange}>
                 <DialogContent className="max-h-[90vh] max-w-3xl overflow-y-auto">
                     <DialogHeader>
-                        <DialogTitle>Review Optimized Prompt</DialogTitle>
+                        <DialogTitle>{t("reviewOptimizedPrompt")}</DialogTitle>
                         <DialogDescription>
-                            Compare the original prompt with the AI rewrite, then choose whether to replace it.
+                            {t("reviewOptimizedDesc")}
                         </DialogDescription>
                     </DialogHeader>
 
                     <div className="space-y-4">
                         <div className="space-y-2">
-                            <Label>Original Prompt</Label>
+                            <Label>{t("originalPrompt")}</Label>
                             <Textarea value={promptSuggestionOriginal} readOnly className="min-h-28 resize-none bg-muted/40" />
                         </div>
 
                         <div className="space-y-2">
-                            <Label>Optimized Prompt</Label>
+                            <Label>{t("optimizedPrompt")}</Label>
                             <Textarea
                                 value={promptSuggestionDraft}
                                 onChange={(event) => setPromptSuggestionDraft(event.target.value)}
@@ -415,10 +419,10 @@ function ProjectDialog({
 
                     <DialogFooter>
                         <Button type="button" variant="outline" onClick={() => onPromptSuggestionOpenChange(false)}>
-                            Keep Original
+                            {t("keepOriginal")}
                         </Button>
                         <Button type="button" onClick={onApplyPromptSuggestion} disabled={!promptSuggestionDraft.trim()}>
-                            Replace Prompt
+                            {t("replacePrompt")}
                         </Button>
                     </DialogFooter>
                 </DialogContent>
@@ -428,6 +432,7 @@ function ProjectDialog({
 }
 
 export default function CreativeSpace() {
+    const { t } = useTranslation("creative");
     const { toast } = useToast();
     const mainScrollRef = useMainLayoutScrollContainer();
 
@@ -575,7 +580,7 @@ export default function CreativeSpace() {
                 }
             } catch (error) {
                 if (isSubscribed) {
-                    toast({ title: "Failed to load candidate articles", description: String(error), variant: "destructive" });
+                    toast({ title: t("failedToLoadCandidates"), description: String(error), variant: "destructive" });
                 }
             } finally {
                 if (isSubscribed) {
@@ -732,7 +737,7 @@ export default function CreativeSpace() {
 
         void markCreativeCardAsRead(cardId)
             .catch(async (error) => {
-                toast({ title: "Failed to mark card as read", description: String(error), variant: "destructive" });
+                toast({ title: t("failedToMarkCardAsRead"), description: String(error), variant: "destructive" });
                 await loadProjects();
                 await loadCards(targetCard.project_id);
             })
@@ -827,7 +832,7 @@ export default function CreativeSpace() {
         try {
             await markAllCreativeCardsAsRead(activeProject.id);
         } catch (error) {
-            toast({ title: "Failed to mark all cards as read", description: String(error), variant: "destructive" });
+            toast({ title: t("failedToMarkAllCardsAsRead"), description: String(error), variant: "destructive" });
             await loadProjects();
             await loadCards(activeProject.id);
         } finally {
@@ -859,13 +864,13 @@ export default function CreativeSpace() {
                 openProjectDetail(savedProject.id);
             }
 
-            toast({ title: editingProjectId ? "Project updated" : "Project created" });
+            toast({ title: editingProjectId ? t("projectUpdated") : t("projectCreated") });
             await loadProjects();
             if (activeProjectId === savedProject.id) {
                 await loadCards(savedProject.id);
             }
         } catch (error) {
-            toast({ title: "Failed to save project", description: String(error), variant: "destructive" });
+            toast({ title: t("failedToSaveProject"), description: String(error), variant: "destructive" });
         } finally {
             setIsSavingProject(false);
         }
@@ -876,7 +881,7 @@ export default function CreativeSpace() {
         setIsProjectActionsOpen(false);
         try {
             await deleteCreativeProject(projectId);
-            toast({ title: "Project deleted" });
+            toast({ title: t("projectDeleted") });
             setPendingDeleteProject(null);
 
             if (activeProjectId === projectId) {
@@ -885,7 +890,7 @@ export default function CreativeSpace() {
 
             await loadProjects();
         } catch (error) {
-            toast({ title: "Failed to delete project", description: String(error), variant: "destructive" });
+            toast({ title: t("failedToDeleteProject"), description: String(error), variant: "destructive" });
         } finally {
             setDeletingProjectId(null);
         }
@@ -940,11 +945,11 @@ export default function CreativeSpace() {
             <Dialog open={pendingDeleteProject !== null} onOpenChange={handleDeleteProjectDialogOpenChange}>
                 <DialogContent>
                     <DialogHeader>
-                        <DialogTitle>Delete project?</DialogTitle>
+                        <DialogTitle>{t("deleteProjectDialog")}</DialogTitle>
                         <DialogDescription>
                             {pendingDeleteProject
-                                ? `Delete "${pendingDeleteProject.name}"? This permanently removes the project and all generated cards for it.`
-                                : "Delete this project? This permanently removes the project and all generated cards for it."}
+                                ? t("deleteProjectDesc", { name: pendingDeleteProject.name })
+                                : t("deleteProjectDescGeneric")}
                         </DialogDescription>
                     </DialogHeader>
                     <DialogFooter>
@@ -954,7 +959,7 @@ export default function CreativeSpace() {
                             disabled={deletingProjectId !== null}
                             onClick={() => handleDeleteProjectDialogOpenChange(false)}
                         >
-                            Cancel
+                            {t("cancel", { ns: "common" })}
                         </Button>
                         <Button
                             type="button"
@@ -968,7 +973,7 @@ export default function CreativeSpace() {
                                 void handleDeleteProject(pendingDeleteProject.id);
                             }}
                         >
-                            Delete
+                            {t("delete", { ns: "common" })}
                         </Button>
                     </DialogFooter>
                 </DialogContent>
@@ -1001,7 +1006,7 @@ export default function CreativeSpace() {
 
             if (currentSelectedIds.length >= activeProject.max_articles_per_card) {
                 toast({
-                    title: `Select up to ${formatArticleCount(activeProject.max_articles_per_card)}`,
+                    title: t("selectUpToN", { count: activeProject.max_articles_per_card }),
                     variant: "destructive",
                 });
                 return currentSelectedIds;
@@ -1032,7 +1037,7 @@ export default function CreativeSpace() {
             setPromptSuggestionDialogOpen(true);
         } catch (error) {
             if (promptOptimizationRequestIdRef.current === requestId) {
-                toast({ title: "Failed to optimize prompt", description: String(error), variant: "destructive" });
+                toast({ title: t("failedToOptimizePrompt"), description: String(error), variant: "destructive" });
             }
         } finally {
             if (promptOptimizationRequestIdRef.current === requestId) {
@@ -1072,9 +1077,9 @@ export default function CreativeSpace() {
             openCreativeCard(generatedCard.id, generatedCard);
             setManualDialogOpen(false);
             setSelectedArticleIds([]);
-            toast({ title: "Card generated" });
+            toast({ title: t("cardGenerated") });
         } catch (error) {
-            toast({ title: "Generation failed", description: String(error), variant: "destructive" });
+            toast({ title: t("generationFailed"), description: String(error), variant: "destructive" });
         } finally {
             setIsGenerating(false);
         }
@@ -1147,12 +1152,12 @@ export default function CreativeSpace() {
                                 <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                                     <div className="min-w-0">
                                         <Button variant="ghost" size="sm" onClick={() => setActiveCardId(null)} className="-ml-2 w-fit">
-                                            <ArrowLeft className="mr-2 h-4 w-4" /> Back
+                                            <ArrowLeft className="mr-2 h-4 w-4" /> {t("back", { ns: "common" })}
                                         </Button>
                                         <div className="mt-2 space-y-2.5">
                                             <div className="text-balance text-lg font-semibold leading-tight md:text-xl">{activeCard.title}</div>
                                             <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
-                                                <span>{activeCard.generation_mode === "auto" ? "Auto" : "Manual"} run</span>
+                                                <span>{activeCard.generation_mode === "auto" ? t("auto") : t("manual")} {t("run")}</span>
                                                 <span>{formatArticleCount(activeCard.used_article_count)}</span>
                                                 <span className="tabular-nums">{formatTimestamp(activeCard.created_at)}</span>
                                             </div>
@@ -1166,7 +1171,7 @@ export default function CreativeSpace() {
                                         className="shrink-0 self-start"
                                     >
                                         <MessageSquare className="mr-2 h-4 w-4" />
-                                        {isCardDiscussionOpen ? "Hide Discussion" : "Discuss Card"}
+                                        {isCardDiscussionOpen ? t("hideDiscussion") : t("discussCard")}
                                     </Button>
                                 </div>
                             </div>
@@ -1231,21 +1236,21 @@ export default function CreativeSpace() {
                     density: "compact",
                     leading: (
                         <Button variant="ghost" onClick={leaveProjectDetail}>
-                            <ArrowLeft className="mr-2 h-4 w-4" /> Back
+                            <ArrowLeft className="mr-2 h-4 w-4" /> {t("back", { ns: "common" })}
                         </Button>
                     ),
-                    eyebrow: "Creative space",
+                    eyebrow: t("eyebrow"),
                     title: activeProject.name,
-                    description: "Turn scoped source material into reusable project cards.",
+                    description: t("projectDescription"),
                     showDescription: false,
                     stats: [
-                        { label: "Scope", value: formatProjectScopeSummary(activeProject, sources), tone: "accent" },
-                        { label: "Unread", value: formatUnreadCardCount(activeProjectUnreadCount), tone: activeProjectUnreadCount > 0 ? "warning" : "default" },
+                        { label: t("scopeLabel"), value: formatProjectScopeSummary(activeProject, sources), tone: "accent" },
+                        { label: t("unreadLabel"), value: formatUnreadCardCount(activeProjectUnreadCount), tone: activeProjectUnreadCount > 0 ? "warning" : "default" },
                     ],
                     actions: (
                         <div className="flex flex-wrap items-center gap-2">
                             <Button onClick={openManualGenerateDialog} disabled={isGenerating}>
-                                <WandSparkles className="mr-2 h-4 w-4" /> {isGenerating ? "Generating..." : "Generate Card"}
+                                <WandSparkles className="mr-2 h-4 w-4" /> {isGenerating ? t("generating") : t("generateCard")}
                             </Button>
                             <Button
                                 variant="outline"
@@ -1254,10 +1259,10 @@ export default function CreativeSpace() {
                             >
                                 {isMarkingAllCardsRead ? (
                                     <>
-                                        <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Marking...
+                                        <Loader2 className="mr-2 h-4 w-4 animate-spin" /> {t("marking", { ns: "news" })}
                                     </>
                                 ) : (
-                                    "Mark all as read"
+                                    t("markAllAsRead")
                                 )}
                             </Button>
                             <div className="relative" ref={projectActionsPanelRef}>
@@ -1265,7 +1270,7 @@ export default function CreativeSpace() {
                                     variant="outline"
                                     size="icon"
                                     onClick={() => setIsProjectActionsOpen((current) => !current)}
-                                    aria-label="Open project actions"
+                                    aria-label={t("openProjectActions")}
                                     aria-expanded={isProjectActionsOpen}
                                 >
                                     <Ellipsis className="h-4 w-4" />
@@ -1279,7 +1284,7 @@ export default function CreativeSpace() {
                                             className="w-full justify-start"
                                             onClick={() => openEditProjectDialog(activeProject)}
                                         >
-                                            <Pencil className="mr-2 h-4 w-4" /> Edit Project
+                                            <Pencil className="mr-2 h-4 w-4" /> {t("editProject")}
                                         </Button>
                                         <Button
                                             variant="ghost"
@@ -1288,7 +1293,7 @@ export default function CreativeSpace() {
                                             onClick={() => openDeleteProjectDialog(activeProject)}
                                             disabled={deletingProjectId === activeProject.id}
                                         >
-                                            <Trash2 className="mr-2 h-4 w-4" /> Delete Project
+                                            <Trash2 className="mr-2 h-4 w-4" /> {t("deleteProject")}
                                         </Button>
                                     </div>
                                 )}
@@ -1301,27 +1306,27 @@ export default function CreativeSpace() {
                         <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
                             <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-4 gap-y-1.5 text-sm">
                                 <span className="inline-flex items-center gap-1.5">
-                                    <span className="text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">Auto</span>
+                                    <span className="text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">{t("auto")}</span>
                                     <span className="font-medium text-foreground">{formatCompactAutoSummary(activeProject)}</span>
                                 </span>
                                 <span className="inline-flex min-w-0 items-center gap-1.5">
-                                    <span className="text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">Scope</span>
+                                    <span className="text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">{t("scopeLabel")}</span>
                                     <span className="truncate font-medium text-foreground">{formatProjectScopeSummary(activeProject, sources)}</span>
                                 </span>
                                 <span className="inline-flex items-center gap-1.5">
-                                    <span className="text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">Max</span>
+                                    <span className="text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">{t("maxLabel")}</span>
                                     <span className="font-medium text-foreground">{formatArticleCount(activeProject.max_articles_per_card)}</span>
                                 </span>
                                 <span className="inline-flex items-center gap-1.5">
-                                    <span className="text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">Cards</span>
+                                    <span className="text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">{t("cardsLabel")}</span>
                                     <span className="font-medium text-foreground">{cards.length}</span>
                                 </span>
                                 <span className="inline-flex items-center gap-1.5">
-                                    <span className="text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">Unread</span>
+                                    <span className="text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">{t("unreadLabel")}</span>
                                     <span className="font-medium text-foreground tabular-nums">{formatUnreadCardCount(activeProjectUnreadCount)}</span>
                                 </span>
                                 <span className="inline-flex min-w-0 items-center gap-1.5">
-                                    <span className="text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">Updated</span>
+                                    <span className="text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">{t("updatedLabel")}</span>
                                     <span className="truncate font-medium text-foreground">{formatProjectRecentActivitySummary(activeProject)}</span>
                                 </span>
                             </div>
@@ -1330,9 +1335,9 @@ export default function CreativeSpace() {
                                 size="icon"
                                 onClick={() => setIsProjectInfoOpen((current) => !current)}
                                 className="h-8 w-8 shrink-0 self-start lg:self-center"
-                                aria-label={isProjectInfoOpen ? "Collapse project info" : "Expand project info"}
+                                aria-label={isProjectInfoOpen ? t("collapseProjectInfo") : t("expandProjectInfo")}
                                 aria-expanded={isProjectInfoOpen}
-                                title={isProjectInfoOpen ? "Collapse project info" : "Expand project info"}
+                                title={isProjectInfoOpen ? t("collapseProjectInfo") : t("expandProjectInfo")}
                             >
                                 {isProjectInfoOpen ? (
                                     <ChevronUp className="h-3.5 w-3.5" />
@@ -1345,38 +1350,38 @@ export default function CreativeSpace() {
                         {isProjectInfoOpen && (
                             <div className="mt-3 grid gap-4 pt-1 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]">
                                 <div className="space-y-2">
-                                    <div className="text-sm font-medium">Focus Prompt</div>
+                                    <div className="text-sm font-medium">{t("focusPrompt")}</div>
                                     <p className="break-words text-sm leading-6 text-muted-foreground">{activeProject.prompt}</p>
                                 </div>
 
                                 <div className="grid gap-x-4 gap-y-3 sm:grid-cols-2">
                                     <ProjectOverviewItem
-                                        label="Automation"
-                                        value={activeProject.auto_enabled ? "Enabled" : "Manual only"}
+                                        label={t("automation")}
+                                        value={activeProject.auto_enabled ? t("enabled") : t("manualOnly")}
                                     />
                                     <ProjectOverviewItem
-                                        label="Check Interval"
-                                        value={activeProject.auto_enabled ? formatAutoSummary(activeProject) : "Not scheduled"}
+                                        label={t("checkInterval")}
+                                        value={activeProject.auto_enabled ? formatAutoSummary(activeProject) : t("notScheduled")}
                                     />
                                     <ProjectOverviewItem
-                                        label="Scope"
+                                        label={t("scopeLabel")}
                                         value={formatProjectScope(activeProject, sources)}
                                     />
                                     <ProjectOverviewItem
-                                        label="Last Checked"
+                                        label={t("lastChecked")}
                                         value={formatTimestamp(activeProject.last_auto_checked_at)}
                                     />
                                     <ProjectOverviewItem
-                                        label="Last Generated"
+                                        label={t("lastGenerated")}
                                         value={formatTimestamp(activeProject.last_auto_generated_at)}
                                     />
                                     <ProjectOverviewItem
-                                        label="Unread Cards"
+                                        label={t("unreadCards")}
                                         value={formatUnreadCardCount(activeProjectUnreadCount)}
                                     />
                                     <ProjectOverviewItem
-                                        label="Cards"
-                                        value={`${cards.length} card${cards.length === 1 ? "" : "s"}`}
+                                        label={t("cards")}
+                                        value={t("nCards", { count: cards.length })}
                                     />
                                 </div>
                             </div>
@@ -1416,7 +1421,7 @@ export default function CreativeSpace() {
                                 <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
                                     <span className="tabular-nums">{formatUtcDateTime(card.created_at)}</span>
                                     <span>
-                                        {card.generation_mode === "auto" ? "Auto" : "Manual"} · {formatArticleCount(card.used_article_count)}
+                                        {card.generation_mode === "auto" ? t("auto") : t("manual")} · {formatArticleCount(card.used_article_count)}
                                     </span>
                                 </div>
                             </CardHeader>
@@ -1436,8 +1441,8 @@ export default function CreativeSpace() {
                     {cards.length === 0 && (
                         <div className="editor-empty col-span-full">
                             <Lightbulb className="mb-4 h-10 w-10 text-muted-foreground/30" />
-                            <p>No creative cards generated yet.</p>
-                            <p className="text-sm">Choose news articles and generate the first card for this project.</p>
+                            <p>{t("noCreativeCardsYet")}</p>
+                            <p className="text-sm">{t("generateFirstCard")}</p>
                         </div>
                     )}
                 </div>
@@ -1445,9 +1450,9 @@ export default function CreativeSpace() {
                 <Dialog open={manualDialogOpen} onOpenChange={setManualDialogOpen}>
                     <DialogContent className="flex max-h-[90vh] max-w-4xl flex-col gap-0 overflow-hidden p-0">
                         <DialogHeader className="shrink-0 border-b px-6 pb-4 pt-6">
-                            <DialogTitle>Generate Card</DialogTitle>
+                            <DialogTitle>{t("generateCardDialog")}</DialogTitle>
                             <DialogDescription>
-                                Select up to {formatArticleCount(activeProject.max_articles_per_card)} for this manual run.
+                                {t("selectUpTo", { count: activeProject.max_articles_per_card })}
                             </DialogDescription>
                         </DialogHeader>
 
@@ -1455,21 +1460,21 @@ export default function CreativeSpace() {
                             <div className="shrink-0 space-y-4">
                                 <div className="grid gap-4 border-b pb-4 md:grid-cols-[minmax(0,1fr)_220px]">
                                     <div className="space-y-2">
-                                        <Label>Search articles</Label>
+                                        <Label>{t("searchArticles")}</Label>
                                         <Input
                                             value={candidateSearch}
                                             onChange={(event) => setCandidateSearch(event.target.value)}
-                                            placeholder="Search by title or summary..."
+                                            placeholder={t("searchByTitle")}
                                         />
                                     </div>
                                     <div className="space-y-2">
-                                        <Label>Filter by source</Label>
+                                        <Label>{t("filterBySource")}</Label>
                                         <Select value={candidateSourceId} onValueChange={setCandidateSourceId}>
                                             <SelectTrigger>
-                                                <SelectValue placeholder="All sources" />
+                                                <SelectValue placeholder={t("allSources")} />
                                             </SelectTrigger>
                                             <SelectContent>
-                                                <SelectItem value="all">All scoped sources</SelectItem>
+                                                <SelectItem value="all">{t("allScopedSources")}</SelectItem>
                                                 {scopedSources.map((source) => (
                                                     <SelectItem key={source.id} value={String(source.id)}>
                                                         {source.name}
@@ -1485,15 +1490,15 @@ export default function CreativeSpace() {
                                         checked={includeConsumed}
                                         onChange={(event) => setIncludeConsumed(event.target.checked)}
                                     />
-                                    Include previously used articles for this project
+                                    {t("includePreviouslyUsed")}
                                 </label>
 
                                 <div className="flex items-center justify-between text-sm">
                                     <span className="text-muted-foreground">
-                                        {formatArticleCount(selectedArticleIds.length)} selected / {formatArticleCount(activeProject.max_articles_per_card)} max
+                                        {t("nSelected", { count: selectedArticleIds.length })} / {t("nMax", { count: activeProject.max_articles_per_card })}
                                     </span>
                                     <Button type="button" variant="ghost" size="sm" onClick={() => setSelectedArticleIds([])} disabled={selectedArticleIds.length === 0}>
-                                        Clear selection
+                                        {t("clearSelection")}
                                     </Button>
                                 </div>
                             </div>
@@ -1502,13 +1507,13 @@ export default function CreativeSpace() {
                                 <div className="space-y-3">
                                     {isLoadingCandidates && (
                                         <div className="editor-empty p-6">
-                                            Loading candidate articles...
+                                            {t("loadingCandidates")}
                                         </div>
                                     )}
 
                                     {!isLoadingCandidates && articleCandidates.length === 0 && (
                                         <div className="editor-empty p-6">
-                                            No articles match the current filters.
+                                            {t("noArticlesMatch")}
                                         </div>
                                     )}
 
@@ -1533,16 +1538,16 @@ export default function CreativeSpace() {
                                                     <div className="min-w-0 flex-1 space-y-2">
                                                         <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                                                             <span className="rounded-full bg-primary/10 px-2 py-0.5 text-primary">{article.source_name}</span>
-                                                            <span>Inserted {formatTimestamp(article.inserted_at)}</span>
+                                                            <span>{t("inserted", { date: formatTimestamp(article.inserted_at) })}</span>
                                                             {article.is_consumed && (
                                                                 <span className="rounded-full bg-amber-500/10 px-2 py-0.5 text-amber-700 dark:text-amber-300">
-                                                                    Previously used
+                                                                    {t("previouslyUsed")}
                                                                 </span>
                                                             )}
                                                         </div>
                                                         <div className="text-sm font-semibold">{article.title}</div>
                                                         <p className="line-clamp-3 text-sm text-muted-foreground">
-                                                            {article.summary || "No summary available."}
+                                                            {article.summary || t("noSummaryAvailable")}
                                                         </p>
                                                     </div>
                                                 </div>
@@ -1555,10 +1560,10 @@ export default function CreativeSpace() {
 
                         <DialogFooter className="shrink-0 border-t bg-background px-6 py-4 sm:justify-end">
                             <Button type="button" variant="outline" onClick={() => setManualDialogOpen(false)}>
-                                Cancel
+                                {t("cancel", { ns: "common" })}
                             </Button>
                             <Button type="button" onClick={handleManualGenerate} disabled={selectedArticleIds.length === 0 || isGenerating}>
-                                {isGenerating ? "Generating..." : "Generate Card"}
+                                {isGenerating ? t("generating") : t("generateCard")}
                             </Button>
                         </DialogFooter>
                     </DialogContent>
@@ -1577,20 +1582,20 @@ export default function CreativeSpace() {
             contentClassName="space-y-8"
             header={{
                 density: "compact",
-                eyebrow: "Creative space",
-                title: "Project board",
+                eyebrow: t("eyebrow"),
+                title: t("projectBoard"),
                 showTitle: false,
                 titlelessLayout: "compact",
-                description: "Transform collected source material into repeatable project cards.",
+                description: t("boardDescription"),
                 showDescription: false,
                 stats: [
-                    { label: "Projects", value: `${projects.length} total` },
-                    { label: "Unread cards", value: formatUnreadCardCount(totalUnreadCardCount), tone: totalUnreadCardCount > 0 ? "warning" : "default" },
-                    { label: "Auto-enabled", value: `${autoEnabledProjectCount} active`, tone: "accent" },
+                    { label: t("projects"), value: t("nTotal", { count: projects.length }) },
+                    { label: t("unreadCards"), value: formatUnreadCardCount(totalUnreadCardCount), tone: totalUnreadCardCount > 0 ? "warning" : "default" },
+                    { label: t("autoEnabled"), value: t("nActive", { count: autoEnabledProjectCount }), tone: "accent" },
                 ],
                 actions: renderProjectDialog(
                     <Button onClick={openCreateProjectDialog}>
-                        <Plus className="mr-2 h-4 w-4" /> New Project
+                        <Plus className="mr-2 h-4 w-4" /> {t("newProject")}
                     </Button>,
                 ),
             }}
@@ -1633,17 +1638,17 @@ export default function CreativeSpace() {
                             <div className="mt-auto border-t border-border/60 pt-4">
                                 <div className="grid grid-cols-3 gap-3 text-left">
                                     <div>
-                                        <div className="text-[10px] font-medium uppercase tracking-[0.16em] text-muted-foreground">Auto</div>
+                                        <div className="text-[10px] font-medium uppercase tracking-[0.16em] text-muted-foreground">{t("auto")}</div>
                                         <div className="mt-1 text-sm font-medium text-foreground">{formatCompactAutoSummary(project)}</div>
                                     </div>
                                     <div>
-                                        <div className="text-[10px] font-medium uppercase tracking-[0.16em] text-muted-foreground">Scope</div>
+                                        <div className="text-[10px] font-medium uppercase tracking-[0.16em] text-muted-foreground">{t("scopeLabel")}</div>
                                         <div className="mt-1 truncate text-sm font-medium text-foreground">
                                             {formatProjectScopeSummary(project, sources)}
                                         </div>
                                     </div>
                                     <div>
-                                        <div className="text-[10px] font-medium uppercase tracking-[0.16em] text-muted-foreground">Max</div>
+                                        <div className="text-[10px] font-medium uppercase tracking-[0.16em] text-muted-foreground">{t("maxLabel")}</div>
                                         <div className="mt-1 text-sm font-medium text-foreground">{formatArticleCount(project.max_articles_per_card)}</div>
                                     </div>
                                 </div>
@@ -1659,7 +1664,7 @@ export default function CreativeSpace() {
                                     }}
                                 >
                                     <Pencil className="mr-2 h-4 w-4" />
-                                    Edit
+                                    {t("edit", { ns: "common" })}
                                 </Button>
                                 <Button
                                     variant="ghost"
@@ -1670,8 +1675,8 @@ export default function CreativeSpace() {
                                         openDeleteProjectDialog(project);
                                     }}
                                     disabled={deletingProjectId === project.id}
-                                    aria-label={deletingProjectId === project.id ? `Deleting ${project.name}` : `Delete ${project.name}`}
-                                    title={deletingProjectId === project.id ? "Deleting..." : "Delete"}
+                                    aria-label={deletingProjectId === project.id ? t("deletingName", { name: project.name }) : t("deleteName", { name: project.name })}
+                                    title={deletingProjectId === project.id ? t("deleting") : t("delete", { ns: "common" })}
                                 >
                                     <Trash2 className="h-4 w-4" />
                                 </Button>
@@ -1682,7 +1687,7 @@ export default function CreativeSpace() {
 
                 {projects.length === 0 && (
                     <div className="editor-empty col-span-full">
-                        No creative projects yet.
+                        {t("noCreativeProjectsYet")}
                     </div>
                 )}
             </div>

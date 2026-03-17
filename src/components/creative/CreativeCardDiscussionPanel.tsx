@@ -1,4 +1,5 @@
 import type { FormEvent, ReactNode, RefObject } from "react";
+import { useTranslation } from "react-i18next";
 import { X, Send } from "lucide-react";
 import { ChatMarkdown } from "@/components/chat/ChatMarkdown";
 import { Button } from "@/components/ui/button";
@@ -33,11 +34,13 @@ function CreativeCardDiscussionHeader({
     onClose,
     showCloseButton,
 }: Pick<CreativeCardDiscussionPanelProps, "variant" | "onClose" | "showCloseButton">) {
+    const { t } = useTranslation("creative");
+
     if (variant === "sheet") {
         return (
             <SheetHeader className="shrink-0 border-b border-border/60 px-5 pb-4 pt-5 text-left">
-                <SheetTitle>Discuss Card</SheetTitle>
-                <SheetDescription>Ask follow-up questions or expand the report with AI.</SheetDescription>
+                <SheetTitle>{t("discussCard")}</SheetTitle>
+                <SheetDescription>{t("discussCardDesc")}</SheetDescription>
             </SheetHeader>
         );
     }
@@ -46,8 +49,8 @@ function CreativeCardDiscussionHeader({
         <div className="shrink-0 border-b border-border/60 px-5 pb-4 pt-5">
             <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0 space-y-2">
-                    <h2 className="text-lg font-semibold text-foreground">Discuss Card</h2>
-                    <p className="text-sm text-muted-foreground">Ask follow-up questions or expand the report with AI.</p>
+                    <h2 className="text-lg font-semibold text-foreground">{t("discussCard")}</h2>
+                    <p className="text-sm text-muted-foreground">{t("discussCardDesc")}</p>
                 </div>
                 {showCloseButton && onClose ? (
                     <Button
@@ -56,8 +59,8 @@ function CreativeCardDiscussionHeader({
                         size="icon"
                         className="h-9 w-9 shrink-0 rounded-full"
                         onClick={onClose}
-                        aria-label="Close discussion"
-                        title="Close discussion"
+                        aria-label={t("closeDiscussion")}
+                        title={t("closeDiscussion")}
                     >
                         <X className="h-4 w-4" />
                     </Button>
@@ -80,6 +83,8 @@ export function CreativeCardDiscussionPanel({
     scrollRef,
     className,
 }: CreativeCardDiscussionPanelProps) {
+    const { t } = useTranslation("creative");
+
     return (
         <div className={cn("flex h-full min-h-0 flex-col", className)}>
             <CreativeCardDiscussionHeader
@@ -90,7 +95,7 @@ export function CreativeCardDiscussionPanel({
 
             <div className="flex-1 space-y-4 overflow-y-auto px-5 py-4 text-sm" ref={scrollRef}>
                 {chatMessages.length === 0 && (
-                    <p className="mt-10 text-center text-muted-foreground">Expand on this report with AI.</p>
+                    <p className="mt-10 text-center text-muted-foreground">{t("expandReport")}</p>
                 )}
                 {chatMessages.map((message, index) => (
                     <div key={index} className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}>
@@ -106,7 +111,7 @@ export function CreativeCardDiscussionPanel({
                                 if (isPreparingMessage) {
                                     return (
                                         <div className="flex items-center gap-3 text-muted-foreground">
-                                            <span>Connecting to the model...</span>
+                                            <span>{t("connectingToModel")}</span>
                                             <div className="flex items-center space-x-1">
                                                 <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-primary/40" />
                                                 <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-primary/60 [animation-delay:0.2s]" />
@@ -125,7 +130,7 @@ export function CreativeCardDiscussionPanel({
                                         {isLiveAssistantMessage && chatStreamPhase === "streaming" && (
                                             <div className="flex items-center gap-2 text-xs text-muted-foreground">
                                                 <span className="h-2 w-2 rounded-full bg-primary/80 animate-pulse" />
-                                                <span>Streaming...</span>
+                                                <span>{t("streaming")}</span>
                                             </div>
                                         )}
                                     </div>
@@ -141,7 +146,7 @@ export function CreativeCardDiscussionPanel({
                     <Input
                         value={chatInput}
                         onChange={(event) => onChatInputChange(event.target.value)}
-                        placeholder="Explore further..."
+                        placeholder={t("exploreFurther")}
                         disabled={isChatStreaming}
                         className="h-9 text-sm"
                     />

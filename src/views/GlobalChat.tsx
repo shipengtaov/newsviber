@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { useTranslation } from "react-i18next";
 import { useNavigate, useParams } from "react-router-dom";
 import { Bot, ChevronLeft, ChevronRight, MessageSquare, Plus, Send, Trash2, User } from "lucide-react";
 import { ChatMarkdown } from "@/components/chat/ChatMarkdown";
@@ -49,10 +50,10 @@ type ParsedThreadParam = {
 };
 
 const PRESET_TIME_RANGE_OPTIONS = [
-    { value: 1, label: "Last 24 Hours" },
-    { value: 3, label: "Last 3 Days" },
-    { value: 7, label: "Last 7 Days" },
-    { value: 30, label: "Last 30 Days" },
+    { value: 1, key: "last24Hours" },
+    { value: 3, key: "last3Days" },
+    { value: 7, key: "last7Days" },
+    { value: 30, key: "last30Days" },
 ] as const;
 const DESKTOP_LAYOUT_MEDIA_QUERY = "(min-width: 1024px)";
 const CHAT_THREADS_PANEL_WIDTH_STORAGE_KEY = "globalChatThreadsPanelWidth_v1";
@@ -123,20 +124,21 @@ function buildScopeSelectValue(scope: GlobalChatScopeInput): string {
         : `preset:${scope.preset_days ?? 7}`;
 }
 
-function buildScopeSummary(scope: GlobalChatScopeInput, sources: GlobalChatSourceOption[]): string {
+function buildScopeSummary(scope: GlobalChatScopeInput, sources: GlobalChatSourceOption[], t: (key: string, options?: Record<string, unknown>) => string): string {
     const normalizedScope = normalizeGlobalChatScopeInput(scope);
+    const presetOption = PRESET_TIME_RANGE_OPTIONS.find((option) => option.value === normalizedScope.preset_days);
     const timeLabel = normalizedScope.time_range_mode === "custom"
         ? `${normalizedScope.custom_start_date} to ${normalizedScope.custom_end_date}`
-        : PRESET_TIME_RANGE_OPTIONS.find((option) => option.value === normalizedScope.preset_days)?.label ?? "Last 7 Days";
+        : presetOption ? t(presetOption.key) : t("last7Days");
 
     const selectedSourceNames = sources
         .filter((source) => normalizedScope.source_ids.includes(source.id))
         .map((source) => source.name);
     const sourceLabel = normalizedScope.source_ids.length === 0
-        ? "All active sources"
+        ? t("allActiveSources")
         : selectedSourceNames.length > 0
             ? selectedSourceNames.join(", ")
-            : "All active sources";
+            : t("allActiveSources");
 
     return `Time range: ${timeLabel}. Data sources: ${sourceLabel}.`;
 }
@@ -159,6 +161,7 @@ function pruneInactiveSourceIds(scope: GlobalChatScopeInput, sources: GlobalChat
 }
 
 export default function GlobalChat() {
+    const { t } = useTranslation("chat");
     const navigate = useNavigate();
     const { toast } = useToast();
     const { threadId: threadIdParam } = useParams();
@@ -209,12 +212,13 @@ export default function GlobalChat() {
     );
     const selectedSourceCount = useAllSources ? sources.length : normalizedScope.source_ids.length;
     const shouldRenderCollapsedScopePanel = isDesktopLayout && isScopePanelCollapsed;
+    const presetOptionForLabel = PRESET_TIME_RANGE_OPTIONS.find((option) => option.value === normalizedScope.preset_days);
     const scopeTimeLabel = normalizedScope.time_range_mode === "custom"
         ? `${normalizedScope.custom_start_date ?? formatLocalDateInputValue(new Date())} - ${normalizedScope.custom_end_date ?? formatLocalDateInputValue(new Date())}`
-        : PRESET_TIME_RANGE_OPTIONS.find((option) => option.value === normalizedScope.preset_days)?.label ?? "Last 7 Days";
+        : presetOptionForLabel ? t(presetOptionForLabel.key) : t("last7Days");
     const scopeSourceSummary = useAllSources
-        ? `All ${sources.length} active source${sources.length === 1 ? "" : "s"}`
-        : `${selectedSourceCount} selected source${selectedSourceCount === 1 ? "" : "s"}`;
+        ? t("allNActiveSources", { count: sources.length })
+        : t("nSelectedSources", { count: selectedSourceCount });
 
     activeThreadIdRef.current = currentThreadId;
 
@@ -330,7 +334,7 @@ export default function GlobalChat() {
         try {
             setThreads(await listGlobalChatThreads());
         } catch (error) {
-            toast({ title: "Failed to load chats", description: String(error), variant: "destructive" });
+            toast({ title: t("failedToLoadChats"), description: String(error), variant: "destructive" });
         } finally {
             setIsLoadingThreads(false);
         }
@@ -340,7 +344,7 @@ export default function GlobalChat() {
         try {
             setSources(await listGlobalChatSources(normalizedScope));
         } catch (error) {
-            toast({ title: "Failed to load sources", description: String(error), variant: "destructive" });
+            toast({ title: t("failedToLoadSources"), description: String(error), variant: "destructive" });
         } finally {
             setSourcesLoaded(true);
         }
@@ -361,7 +365,7 @@ export default function GlobalChat() {
             }
 
             if (!thread) {
-                toast({ title: "Chat not found", description: "The selected conversation no longer exists.", variant: "destructive" });
+                toast({ title: t("chatNotFound"), description: t("chatNotFoundDesc"), variant: "destructive" });
                 navigate("/chat", { replace: true });
                 return;
             }
@@ -372,7 +376,7 @@ export default function GlobalChat() {
             replaceMessages(toChatMessageArray(persistedMessages));
         } catch (error) {
             if (threadLoadRequestIdRef.current === requestId) {
-                toast({ title: "Failed to load chat", description: String(error), variant: "destructive" });
+                toast({ title: t("failedToLoadChat"), description: String(error), variant: "destructive" });
             }
         } finally {
             if (threadLoadRequestIdRef.current === requestId) {
@@ -411,7 +415,7 @@ export default function GlobalChat() {
                 setActiveThread(savedThread);
                 await refreshThreads();
             } catch (error) {
-                toast({ title: "Failed to update chat scope", description: String(error), variant: "destructive" });
+                toast({ title: t("failedToUpdateChatScope"), description: String(error), variant: "destructive" });
             }
         })();
     }
@@ -543,7 +547,7 @@ export default function GlobalChat() {
 
             await refreshThreads();
         } catch (error) {
-            toast({ title: "Failed to delete chat", description: String(error), variant: "destructive" });
+            toast({ title: t("failedToDeleteChat"), description: String(error), variant: "destructive" });
         } finally {
             setIsDeletingThreadId(null);
         }
@@ -602,7 +606,7 @@ export default function GlobalChat() {
                     ? ["- No articles matched the current thread filters."]
                     : articles.map((article) => formatGlobalChatContextLine(article));
                 const systemPrompt = buildGlobalChatSystemPrompt({
-                    scopeSummary: buildScopeSummary(scopeSnapshot, sources),
+                    scopeSummary: buildScopeSummary(scopeSnapshot, sources, t),
                     sourceCoverageLines,
                     contextLines,
                 });
@@ -627,7 +631,7 @@ export default function GlobalChat() {
                     await refreshActiveThread(targetThread.id);
                     await refreshThreads();
                 } catch (error) {
-                    toast({ title: "Failed to save assistant reply", description: String(error), variant: "destructive" });
+                    toast({ title: t("failedToSaveAssistantReply"), description: String(error), variant: "destructive" });
                 }
             },
             onAssistantError: async ({ assistantMessage }) => {
@@ -644,7 +648,7 @@ export default function GlobalChat() {
                     await refreshActiveThread(targetThread.id);
                     await refreshThreads();
                 } catch (error) {
-                    toast({ title: "Failed to save assistant error", description: String(error), variant: "destructive" });
+                    toast({ title: t("failedToSaveAssistantError"), description: String(error), variant: "destructive" });
                 }
             },
         });
@@ -654,20 +658,20 @@ export default function GlobalChat() {
         <div className="flex min-h-full w-full min-w-0 flex-col gap-4 p-4 md:p-6">
             <WorkspaceHeader
                 density="compact"
-                eyebrow="Global chat"
-                title={activeThread?.title ?? "Cross-source chat"}
+                eyebrow={t("eyebrow")}
+                title={activeThread?.title ?? t("title")}
                 showTitle={threadIdParam !== undefined}
                 titlelessLayout="compact"
-                description="Reuse saved scopes and compare answers across sources."
+                description={t("description")}
                 showDescription={false}
                 stats={[
-                    { label: "Time range", value: scopeTimeLabel, tone: "accent" },
-                    { label: "Source scope", value: scopeSourceSummary },
+                    { label: t("timeRangeLabel"), value: scopeTimeLabel, tone: "accent" },
+                    { label: t("sourceScopeLabel"), value: scopeSourceSummary },
                 ]}
                 actions={(
                     <Button onClick={() => navigate("/chat")}>
                         <Plus className="h-4 w-4" />
-                        New chat
+                        {t("newChat")}
                     </Button>
                 )}
             />
@@ -675,11 +679,11 @@ export default function GlobalChat() {
             <Dialog open={pendingDeleteThread !== null} onOpenChange={handleDeleteDialogOpenChange}>
                 <DialogContent>
                     <DialogHeader>
-                        <DialogTitle>Delete chat conversation?</DialogTitle>
+                        <DialogTitle>{t("deleteChatDialog")}</DialogTitle>
                         <DialogDescription>
                             {pendingDeleteThread
-                                ? `Delete "${pendingDeleteThread.title}"? This will permanently remove the conversation and its saved messages.`
-                                : "Delete this conversation? This will permanently remove the conversation and its saved messages."}
+                                ? t("deleteChatDesc", { title: pendingDeleteThread.title })
+                                : t("deleteChatDescGeneric")}
                         </DialogDescription>
                     </DialogHeader>
                     <DialogFooter>
@@ -689,7 +693,7 @@ export default function GlobalChat() {
                             disabled={isDeletingThreadId !== null}
                             onClick={() => handleDeleteDialogOpenChange(false)}
                         >
-                            Cancel
+                            {t("cancel", { ns: "common" })}
                         </Button>
                         <Button
                             type="button"
@@ -703,7 +707,7 @@ export default function GlobalChat() {
                                 void handleDeleteThread(pendingDeleteThread.id);
                             }}
                         >
-                            Delete
+                            {t("delete", { ns: "common" })}
                         </Button>
                     </DialogFooter>
                 </DialogContent>
@@ -718,12 +722,12 @@ export default function GlobalChat() {
                         <div className="border-b border-border/60 px-4 py-4 lg:px-5">
                             <div className="space-y-3">
                                 <div>
-                                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Conversations</p>
-                                    <h2 className="mt-1 font-display text-xl font-semibold tracking-[-0.04em] text-foreground">Saved threads</h2>
+                                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{t("conversations")}</p>
+                                    <h2 className="mt-1 font-display text-xl font-semibold tracking-[-0.04em] text-foreground">{t("savedThreads")}</h2>
                                 </div>
                                 <Button className="w-full justify-start" onClick={() => navigate("/chat")}>
                                     <Plus className="h-4 w-4" />
-                                    Start a new thread
+                                    {t("startNewThread")}
                                 </Button>
                             </div>
                         </div>
@@ -731,16 +735,16 @@ export default function GlobalChat() {
                             <div className="space-y-2.5 p-3 lg:pr-[17px]">
                                 {isLoadingThreads && threads.length === 0 && (
                                     <EmptyState
-                                        title="Loading conversations"
-                                        description="Loading your saved conversations."
+                                        title={t("loadingConversations")}
+                                        description={t("loadingConversationsDesc")}
                                         className="px-4 py-10"
                                     />
                                 )}
                                 {!isLoadingThreads && threads.length === 0 && (
                                     <EmptyState
                                         icon={<MessageSquare className="h-8 w-8" />}
-                                        title="No saved conversations"
-                                        description="Start a thread to save a reusable scope and compare information across sources."
+                                        title={t("noSavedConversations")}
+                                        description={t("noSavedConversationsDesc")}
                                         className="px-4 py-10"
                                     />
                                 )}
@@ -763,7 +767,7 @@ export default function GlobalChat() {
                                                 onClick={() => navigate(`/chat/${thread.id}`)}
                                             >
                                                 <div className="truncate text-sm font-medium text-foreground">{thread.title}</div>
-                                                <div className="mt-1 text-xs text-muted-foreground">{formatUtcDateTime(thread.updated_at, "Unknown")}</div>
+                                                <div className="mt-1 text-xs text-muted-foreground">{formatUtcDateTime(thread.updated_at, t("unknown", { ns: "common" }))}</div>
                                             </button>
                                             <Button
                                                 type="button"
@@ -776,8 +780,8 @@ export default function GlobalChat() {
                                                     event.stopPropagation();
                                                     setPendingDeleteThread(thread);
                                                 }}
-                                                aria-label="Delete chat"
-                                                title="Delete chat"
+                                                aria-label={t("deleteChat")}
+                                                title={t("deleteChat")}
                                             >
                                                 <Trash2 className="h-4 w-4" />
                                             </Button>
@@ -790,7 +794,7 @@ export default function GlobalChat() {
                     {isDesktopLayout && (
                         <div
                             role="separator"
-                            aria-label="Resize chat threads panel"
+                            aria-label={t("resizeChatThreadsPanel")}
                             aria-orientation="vertical"
                             aria-valuemin={MIN_CHAT_THREADS_PANEL_WIDTH}
                             aria-valuemax={MAX_CHAT_THREADS_PANEL_WIDTH}
@@ -814,12 +818,12 @@ export default function GlobalChat() {
                         <div className="border-b border-border/60 px-6 py-4">
                             <div className="flex items-center justify-between gap-3">
                                 <div className="min-w-0">
-                                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Live thread</p>
+                                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{t("liveThread")}</p>
                                     <h1 className="mt-1 truncate font-display text-2xl font-semibold tracking-[-0.04em] text-foreground">
-                                        {activeThread?.title ?? "New chat"}
+                                        {activeThread?.title ?? t("newChat")}
                                     </h1>
                                     <p className="mt-2 text-sm text-muted-foreground">
-                                        Scope changes apply only to future questions in this thread.
+                                        {t("scopeChangesNote")}
                                     </p>
                                 </div>
                             </div>
@@ -830,15 +834,15 @@ export default function GlobalChat() {
                                 {messages.length === 0 && !isLoadingThread && (
                                     <EmptyState
                                         icon={<MessageSquare className="h-10 w-10" />}
-                                        title="Start a scoped conversation"
-                                        description="Ask for summaries, compare themes across sources, or investigate a developing topic with a saved time window."
+                                        title={t("startScopedConversation")}
+                                        description={t("startScopedDesc")}
                                         className="mx-auto mt-20 max-w-lg"
                                     />
                                 )}
 
                                 {isLoadingThread && (
                                     <div className="mx-auto mt-20 text-sm text-muted-foreground">
-                                        Loading conversation...
+                                        {t("loadingConversation")}
                                     </div>
                                 )}
 
@@ -870,7 +874,7 @@ export default function GlobalChat() {
                                                     if (isPreparingMessage) {
                                                         return (
                                                             <div className="flex items-center gap-3 text-muted-foreground">
-                                                                <span>Connecting to the model...</span>
+                                                                <span>{t("connectingToModel")}</span>
                                                                 <div className="flex items-center space-x-1">
                                                                     <span className="h-2 w-2 animate-bounce rounded-full bg-primary/40" />
                                                                     <span className="h-2 w-2 animate-bounce rounded-full bg-primary/60 [animation-delay:0.2s]" />
@@ -886,7 +890,7 @@ export default function GlobalChat() {
                                                             {isLiveAssistantMessage && streamPhase === "streaming" && (
                                                                 <div className="flex items-center gap-2 text-xs text-muted-foreground">
                                                                     <span className="h-2 w-2 rounded-full bg-primary/80 animate-pulse" />
-                                                                    <span>Streaming...</span>
+                                                                    <span>{t("streaming")}</span>
                                                                 </div>
                                                             )}
                                                         </div>
@@ -906,7 +910,7 @@ export default function GlobalChat() {
                                     <Input
                                         value={input}
                                         onChange={(event) => setInput(event.target.value)}
-                                        placeholder="Ask about recent news..."
+                                        placeholder={t("askAboutRecentNews")}
                                         className="h-11 flex-1 border-0 bg-transparent shadow-none backdrop-blur-none focus-visible:border-transparent focus-visible:ring-0"
                                         autoFocus
                                     />
@@ -933,8 +937,8 @@ export default function GlobalChat() {
                                     size="icon"
                                     className="h-10 w-10"
                                     onClick={() => setIsScopePanelCollapsed(false)}
-                                    aria-label="Expand thread scope"
-                                    title="Expand thread scope"
+                                    aria-label={t("expandThreadScope")}
+                                    title={t("expandThreadScope")}
                                 >
                                     <ChevronLeft className="h-4 w-4" />
                                 </Button>
@@ -944,10 +948,10 @@ export default function GlobalChat() {
                                 <div className="border-b border-border/60 px-5 py-4">
                                     <div className="flex items-start justify-between gap-3">
                                         <div className="min-w-0">
-                                            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Thread scope</p>
-                                            <h2 className="mt-1 font-display text-xl font-semibold tracking-[-0.04em] text-foreground">Context filters</h2>
+                                            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{t("threadScope")}</p>
+                                            <h2 className="mt-1 font-display text-xl font-semibold tracking-[-0.04em] text-foreground">{t("contextFilters")}</h2>
                                             <p className="mt-2 text-xs leading-6 text-muted-foreground">
-                                                Tune the sources and time range that future questions can use.
+                                                {t("tuneDescription")}
                                             </p>
                                         </div>
                                         {isDesktopLayout && (
@@ -957,8 +961,8 @@ export default function GlobalChat() {
                                                 size="icon"
                                                 className="h-9 w-9 shrink-0"
                                                 onClick={() => setIsScopePanelCollapsed(true)}
-                                                aria-label="Collapse thread scope"
-                                                title="Collapse thread scope"
+                                                aria-label={t("collapseThreadScope")}
+                                                title={t("collapseThreadScope")}
                                             >
                                                 <ChevronRight className="h-4 w-4" />
                                             </Button>
@@ -969,14 +973,14 @@ export default function GlobalChat() {
                                 <ScrollArea className="min-h-0 flex-1">
                                     <div className="space-y-6 p-5">
                                         <div className="surface-panel-quiet px-4 py-4">
-                                            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Current scope</p>
+                                            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{t("currentScope")}</p>
                                             <p className="mt-2 text-sm leading-6 text-foreground">
-                                                {buildScopeSummary(scope, sources)}
+                                                {buildScopeSummary(scope, sources, t)}
                                             </p>
                                         </div>
 
                                         <div className="space-y-2">
-                                            <Label htmlFor="global-chat-time-range">Time Range</Label>
+                                            <Label htmlFor="global-chat-time-range">{t("timeRange")}</Label>
                                             <Select value={buildScopeSelectValue(normalizedScope)} onValueChange={handleScopeSelectionChange}>
                                                 <SelectTrigger id="global-chat-time-range">
                                                     <SelectValue />
@@ -984,10 +988,10 @@ export default function GlobalChat() {
                                                 <SelectContent>
                                                     {PRESET_TIME_RANGE_OPTIONS.map((option) => (
                                                         <SelectItem key={option.value} value={`preset:${option.value}`}>
-                                                            {option.label}
+                                                            {t(option.key)}
                                                         </SelectItem>
                                                     ))}
-                                                    <SelectItem value="custom">Custom Range</SelectItem>
+                                                    <SelectItem value="custom">{t("customRange")}</SelectItem>
                                                 </SelectContent>
                                             </Select>
                                         </div>
@@ -995,7 +999,7 @@ export default function GlobalChat() {
                                         {normalizedScope.time_range_mode === "custom" && (
                                             <div className="grid gap-3">
                                                 <div className="space-y-2">
-                                                    <Label htmlFor="global-chat-custom-start">Start Date</Label>
+                                                    <Label htmlFor="global-chat-custom-start">{t("startDate")}</Label>
                                                     <Input
                                                         id="global-chat-custom-start"
                                                         type="date"
@@ -1004,7 +1008,7 @@ export default function GlobalChat() {
                                                     />
                                                 </div>
                                                 <div className="space-y-2">
-                                                    <Label htmlFor="global-chat-custom-end">End Date</Label>
+                                                    <Label htmlFor="global-chat-custom-end">{t("endDate")}</Label>
                                                     <Input
                                                         id="global-chat-custom-end"
                                                         type="date"
@@ -1017,11 +1021,11 @@ export default function GlobalChat() {
 
                                         <div className="space-y-3">
                                             <div className="space-y-1">
-                                                <Label>Data Sources</Label>
+                                                <Label>{t("dataSources")}</Label>
                                                 <p className="text-xs text-muted-foreground">
                                                     {useAllSources
-                                                        ? `Using all ${sources.length} active source${sources.length === 1 ? "" : "s"}`
-                                                        : `${selectedSourceCount} selected active source${selectedSourceCount === 1 ? "" : "s"}`}
+                                                        ? t("usingAllActiveSources", { count: sources.length })
+                                                        : t("selectedActiveSources", { count: selectedSourceCount })}
                                                 </p>
                                             </div>
 
@@ -1030,14 +1034,14 @@ export default function GlobalChat() {
                                                     checked={useAllSources}
                                                     onChange={(event) => handleUseAllSourcesChange(event.target.checked)}
                                                 />
-                                                <span>Use all active sources</span>
+                                                <span>{t("useAllActiveSources")}</span>
                                             </label>
 
                                             <div className="space-y-2">
                                                 {sourcesLoaded && sources.length === 0 && (
                                                     <EmptyState
-                                                        title="No active sources available"
-                                                        description="Activate or add a source before narrowing the scope."
+                                                        title={t("noActiveSourcesAvailable")}
+                                                        description={t("activateOrAddSource")}
                                                         className="px-4 py-10"
                                                     />
                                                 )}
@@ -1055,7 +1059,7 @@ export default function GlobalChat() {
                                                         <div className="min-w-0">
                                                             <div className="truncate font-medium">{source.name}</div>
                                                             <div className="text-xs text-muted-foreground">
-                                                                {source.matching_article_count} in selected time range, {source.article_count} total
+                                                                {t("sourceMatchingInfo", { matching: source.matching_article_count, total: source.article_count })}
                                                             </div>
                                                         </div>
                                                         <Checkbox

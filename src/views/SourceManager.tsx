@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import Database from "@tauri-apps/plugin-sql";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -31,16 +32,8 @@ async function getDb() {
     return db;
 }
 
-function formatSourceTypeLabel(sourceType: string): string {
-    switch (sourceType) {
-        case "rss":
-            return "RSS/Atom Feed";
-        default:
-            return sourceType;
-    }
-}
-
 export default function SourceManager() {
+    const { t } = useTranslation("sources");
     const { toast } = useToast();
     const navigate = useNavigate();
     const [sources, setSources] = useState<Source[]>([]);
@@ -48,6 +41,15 @@ export default function SourceManager() {
     const [fetchingSourceId, setFetchingSourceId] = useState<number | null>(null);
     const [pendingDeleteSource, setPendingDeleteSource] = useState<Source | null>(null);
     const [deletingSourceId, setDeletingSourceId] = useState<number | null>(null);
+
+    function formatSourceTypeLabel(sourceType: string): string {
+        switch (sourceType) {
+            case "rss":
+                return t("rssAtomFeed");
+            default:
+                return sourceType;
+        }
+    }
 
     const activeSourceCount = sources.filter((source) => Boolean(source.active)).length;
     const inactiveSourceCount = Math.max(0, sources.length - activeSourceCount);
@@ -79,10 +81,10 @@ export default function SourceManager() {
             const newActive = source.active ? 0 : 1;
             const db = await getDb();
             await db.execute("UPDATE sources SET active = $1 WHERE id = $2", [newActive, source.id]);
-            toast({ title: newActive ? "Source activated" : "Source deactivated" });
+            toast({ title: newActive ? t("sourceActivated") : t("sourceDeactivated") });
             loadSources();
         } catch (err: any) {
-            toast({ title: "Error", description: String(err), variant: "destructive" });
+            toast({ title: t("error", { ns: "common" }), description: String(err), variant: "destructive" });
         }
     }
 
@@ -101,11 +103,11 @@ export default function SourceManager() {
         try {
             const db = await getDb();
             await db.execute("DELETE FROM sources WHERE id = $1", [id]);
-            toast({ title: "Source deleted" });
+            toast({ title: t("sourceDeleted") });
             setPendingDeleteSource(null);
             await loadSources();
         } catch (err: any) {
-            toast({ title: "Error", description: String(err), variant: "destructive" });
+            toast({ title: t("error", { ns: "common" }), description: String(err), variant: "destructive" });
         } finally {
             setDeletingSourceId(null);
         }
@@ -114,12 +116,12 @@ export default function SourceManager() {
     async function fetchAll() {
         const activeSources = sources.filter((source) => Boolean(source.active));
         if (activeSources.length === 0) {
-            toast({ title: "No active sources to fetch" });
+            toast({ title: t("noActiveSourceToFetch") });
             return;
         }
 
         setIsFetchingAll(true);
-        toast({ title: `Fetching ${activeSources.length} active sources...` });
+        toast({ title: t("fetchingNSources", { count: activeSources.length }) });
 
         try {
             const result = await fetchSources(activeSources);
@@ -127,11 +129,11 @@ export default function SourceManager() {
                 dispatchSourceFetchSyncEvent();
             }
             toast({
-                title: "Fetch All Complete",
-                description: `Fetched ${result.insertedCount} new articles. ${result.successCount} succeeded${result.failCount > 0 ? `, ${result.failCount} failed` : ""}.`,
+                title: t("fetchAllComplete"),
+                description: t("fetchAllCompleteDesc", { inserted: result.insertedCount, succeeded: result.successCount, failedPart: result.failCount > 0 ? `, ${result.failCount} failed` : "" }),
             });
         } catch (err: any) {
-            toast({ title: "Fetch failed", description: String(err), variant: "destructive" });
+            toast({ title: t("fetchFailed"), description: String(err), variant: "destructive" });
         } finally {
             await loadSources();
             setIsFetchingAll(false);
@@ -145,17 +147,17 @@ export default function SourceManager() {
 
         setFetchingSourceId(source.id);
         try {
-            toast({ title: `Fetching ${source.name}...` });
+            toast({ title: t("fetchingSource", { name: source.name }) });
             const result = await fetchSource(source);
             if (result.insertedCount > 0) {
                 dispatchSourceFetchSyncEvent();
             }
             toast({
-                title: "Fetch complete",
-                description: `Fetched ${result.fetchedCount} articles, saved ${result.insertedCount} new.`,
+                title: t("fetchComplete"),
+                description: t("fetchCompleteDesc", { fetched: result.fetchedCount, inserted: result.insertedCount }),
             });
         } catch (err: any) {
-            toast({ title: "Fetch failed", description: String(err), variant: "destructive" });
+            toast({ title: t("fetchFailed"), description: String(err), variant: "destructive" });
         } finally {
             await loadSources();
             setFetchingSourceId(null);
@@ -169,25 +171,25 @@ export default function SourceManager() {
                 contentClassName="space-y-8"
                 header={{
                     density: "compact",
-                    eyebrow: "Sources",
-                    title: "Source management",
+                    eyebrow: t("eyebrow"),
+                    title: t("title"),
                     showTitle: false,
                     titlelessLayout: "compact",
-                    description: "Manage the feeds that power your information flow.",
+                    description: t("description"),
                     showDescription: false,
                     stats: [
-                        { label: "Active", value: `${activeSourceCount} running`, tone: "accent" },
-                        { label: "Inactive", value: `${inactiveSourceCount} paused` },
+                        { label: t("active", { ns: "common" }), value: t("activeCount", { count: activeSourceCount }), tone: "accent" },
+                        { label: t("inactive", { ns: "common" }), value: t("inactiveCount", { count: inactiveSourceCount }) },
                     ],
                     actions: (
                         <div className="flex flex-wrap gap-2">
                             <Button variant="outline" onClick={fetchAll} disabled={isAnyFetchInProgress || activeSourceCount === 0}>
                                 <RefreshCcw className={`mr-2 h-4 w-4 ${isFetchingAll ? "animate-spin" : ""}`} />
-                                {isFetchingAll ? "Fetching All..." : "Fetch All"}
+                                {isFetchingAll ? t("fetchingAll") : t("fetchAll")}
                             </Button>
                             <Button onClick={() => navigate("/sources/add")}>
                                 <Plus className="mr-2 h-4 w-4" />
-                                Add Source
+                                {t("addSource")}
                             </Button>
                         </div>
                     ),
@@ -195,7 +197,7 @@ export default function SourceManager() {
             >
 
                 <div className="space-y-4">
-                    <h2 className="font-display text-2xl font-semibold tracking-[-0.04em]">Connected sources</h2>
+                    <h2 className="font-display text-2xl font-semibold tracking-[-0.04em]">{t("connectedSources")}</h2>
                     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                         {sources.map((source) => (
                             <Card
@@ -212,19 +214,19 @@ export default function SourceManager() {
                                 </CardHeader>
                                 <CardContent className="flex flex-1 flex-col px-4 pb-4 pt-0 text-sm text-muted-foreground">
                                     <div className="space-y-1.5">
-                                        <p>Type: {formatSourceTypeLabel(source.source_type)}</p>
-                                        <p>Status: {source.active ? "Active" : "Inactive"}</p>
+                                        <p>{t("type")} {formatSourceTypeLabel(source.source_type)}</p>
+                                        <p>{t("status")} {source.active ? t("active", { ns: "common" }) : t("inactive", { ns: "common" })}</p>
                                         <p>{formatFetchInterval(source.fetch_interval)}</p>
                                         <p>{formatLastFetchSummary(source.last_fetch)}</p>
                                     </div>
                                     <div className="mt-4 flex flex-wrap gap-2">
                                         <Button variant="outline" size="sm" onClick={() => fetchNow(source)} disabled={!source.active || isAnyFetchInProgress}>
-                                            <RefreshCcw className={`mr-2 h-4 w-4 ${fetchingSourceId === source.id ? "animate-spin" : ""}`} /> Fetch
+                                            <RefreshCcw className={`mr-2 h-4 w-4 ${fetchingSourceId === source.id ? "animate-spin" : ""}`} /> {t("fetch")}
                                         </Button>
                                         <Button variant="outline" size="sm" onClick={() => navigate(`/sources/edit/${source.id}`)}>
-                                            <Edit className="mr-2 h-4 w-4" /> Edit
+                                            <Edit className="mr-2 h-4 w-4" /> {t("edit", { ns: "common" })}
                                         </Button>
-                                        <Button variant="outline" size="sm" onClick={() => toggleActive(source)} title={source.active ? "Deactivate source" : "Activate source"}>
+                                        <Button variant="outline" size="sm" onClick={() => toggleActive(source)} title={source.active ? t("deactivateSource") : t("activateSource")}>
                                             {source.active ? <PowerOff className="h-4 w-4" /> : <Power className="h-4 w-4" />}
                                         </Button>
                                         <Button
@@ -232,7 +234,7 @@ export default function SourceManager() {
                                             size="sm"
                                             onClick={() => setPendingDeleteSource(source)}
                                             className="ml-auto text-destructive"
-                                            title="Delete source"
+                                            title={t("deleteSourceTitle")}
                                         >
                                             <Trash2 className="h-4 w-4" />
                                         </Button>
@@ -242,7 +244,7 @@ export default function SourceManager() {
                         ))}
                         {sources.length === 0 && (
                             <div className="editor-empty col-span-full">
-                                No sources added yet.
+                                {t("noSourcesAdded")}
                             </div>
                         )}
                     </div>
@@ -252,11 +254,11 @@ export default function SourceManager() {
             <Dialog open={pendingDeleteSource !== null} onOpenChange={handleDeleteDialogOpenChange}>
                 <DialogContent>
                     <DialogHeader>
-                        <DialogTitle>Delete source?</DialogTitle>
+                        <DialogTitle>{t("deleteSourceDialog")}</DialogTitle>
                         <DialogDescription>
                             {pendingDeleteSource
-                                ? `Delete "${pendingDeleteSource.name}"? This permanently removes the source, its fetched articles, and any saved source scope references that point to it.`
-                                : "Delete this source? This permanently removes the source, its fetched articles, and any saved source scope references that point to it."}
+                                ? t("deleteSourceDesc", { name: pendingDeleteSource.name })
+                                : t("deleteSourceDescGeneric")}
                         </DialogDescription>
                     </DialogHeader>
                     <DialogFooter>
@@ -266,7 +268,7 @@ export default function SourceManager() {
                             disabled={deletingSourceId !== null}
                             onClick={() => handleDeleteDialogOpenChange(false)}
                         >
-                            Cancel
+                            {t("cancel", { ns: "common" })}
                         </Button>
                         <Button
                             type="button"
@@ -280,7 +282,7 @@ export default function SourceManager() {
                                 void deleteSource(pendingDeleteSource.id);
                             }}
                         >
-                            Delete
+                            {t("delete", { ns: "common" })}
                         </Button>
                     </DialogFooter>
                 </DialogContent>

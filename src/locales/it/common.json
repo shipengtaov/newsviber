@@ -1,0 +1,33 @@
+{
+    "appName": "GetNews",
+    "nav": {
+        "news": "News",
+        "creativeSpace": "Spazio creativo",
+        "chat": "Chat",
+        "sources": "Fonti",
+        "settings": "Impostazioni"
+    },
+    "save": "Salva",
+    "cancel": "Annulla",
+    "delete": "Elimina",
+    "edit": "Modifica",
+    "back": "Indietro",
+    "close": "Chiudi",
+    "error": "Errore",
+    "loading": "Caricamento...",
+    "unknown": "Sconosciuto",
+    "active": "Attivo",
+    "inactive": "Inattivo",
+    "previous": "Precedente",
+    "next": "Successivo",
+    "previousPage": "Pagina precedente",
+    "nextPage": "Pagina successiva",
+    "expandSidebar": "Espandi barra laterale",
+    "collapseSidebar": "Comprimi barra laterale",
+    "footer": "Warm paper UI · Beta v0.1",
+    "language": "Lingua",
+    "languageDesc": "Seleziona la lingua di visualizzazione dell'applicazione.",
+    "never": "Mai",
+    "pagination": "Impaginazione",
+    "autoDetect": "Rilevamento automatico"
+}

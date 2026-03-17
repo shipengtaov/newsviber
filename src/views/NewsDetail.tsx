@@ -1,4 +1,5 @@
 import { useState, useEffect, useEffectEvent } from "react";
+import { useTranslation } from "react-i18next";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { ArticleContent } from "@/components/article/ArticleContent";
@@ -39,6 +40,7 @@ export function ArticleDetailView({
     onBack,
     onMarkAsRead,
 }: ArticleDetailViewProps) {
+    const { t } = useTranslation("news");
     const navigate = useNavigate();
     const location = useLocation();
     const [article, setArticle] = useState<FullArticle | null>(null);
@@ -70,13 +72,13 @@ export function ArticleDetailView({
 
                 setArticle(result[0] ?? null);
                 if (!result[0]) {
-                    setLoadError("Article not found.");
+                    setLoadError(t("articleNotFound"));
                 }
             } catch (err) {
                 console.error(err);
                 if (!isDisposed) {
                     setArticle(null);
-                    setLoadError("Failed to load article.");
+                    setLoadError(t("failedToLoadArticle"));
                 }
             } finally {
                 if (!isDisposed) {
@@ -121,7 +123,7 @@ export function ArticleDetailView({
     if (isLoading && !article) {
         return (
             <div className={cn("flex h-full w-full items-center justify-center p-6", className)}>
-                <div className="surface-panel-quiet px-6 py-10 text-sm text-muted-foreground">Loading article...</div>
+                <div className="surface-panel-quiet px-6 py-10 text-sm text-muted-foreground">{t("loadingArticle")}</div>
             </div>
         );
     }
@@ -130,11 +132,11 @@ export function ArticleDetailView({
         return (
             <div className={cn("flex h-full w-full flex-col items-center justify-center gap-4 p-6", className)}>
                 <div className="surface-panel-quiet px-6 py-10 text-center text-sm text-muted-foreground">
-                    {loadError ?? "Article not found."}
+                    {loadError ?? t("articleNotFound")}
                 </div>
                 <Button variant="outline" onClick={handleBack}>
                     <ArrowLeft className="mr-2 h-4 w-4" />
-                    Back to News
+                    {t("backToNews")}
                 </Button>
             </div>
         );
@@ -145,7 +147,7 @@ export function ArticleDetailView({
             <div className="surface-panel min-w-0 flex-1 overflow-y-auto">
                 <div className="mx-auto w-full max-w-5xl p-6 md:p-8">
                     <Button variant="ghost" className="mb-5 -ml-1 text-muted-foreground hover:bg-background/80" onClick={handleBack}>
-                        <ArrowLeft className="w-4 h-4 mr-2" /> Back to News
+                        <ArrowLeft className="w-4 h-4 mr-2" /> {t("backToNews")}
                     </Button>
 
                     <div className="mb-7">
@@ -158,7 +160,7 @@ export function ArticleDetailView({
                                 className="flex items-center text-primary transition-colors hover:text-accent-foreground hover:underline cursor-pointer"
                                 onClick={(e) => { e.preventDefault(); openUrl(article.guid); }}
                             >
-                                <ExternalLink className="w-3.5 h-3.5 mr-1" /> Original Source
+                                <ExternalLink className="w-3.5 h-3.5 mr-1" /> {t("originalSource")}
                             </a>
                         </div>
                     </div>
@@ -197,13 +199,14 @@ export function ArticleDetailView({
 }
 
 export default function NewsDetail() {
+    const { t } = useTranslation("news");
     const { id } = useParams();
     const parsedArticleId = Number.parseInt(id ?? "", 10);
 
     if (!Number.isFinite(parsedArticleId) || parsedArticleId <= 0) {
         return (
             <div className="flex h-full w-full items-center justify-center p-8">
-                <div className="text-sm text-muted-foreground">Article not found.</div>
+                <div className="text-sm text-muted-foreground">{t("articleNotFound")}</div>
             </div>
         );
     }

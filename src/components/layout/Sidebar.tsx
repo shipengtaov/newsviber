@@ -1,4 +1,5 @@
 import { Link, useLocation } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/utils";
 import { Newspaper, Rss, MessageSquare, Lightbulb, Settings } from "lucide-react";
 
@@ -7,13 +8,14 @@ type SidebarProps = {
 };
 
 export function Sidebar({ collapsed }: SidebarProps) {
+    const { t } = useTranslation();
     const location = useLocation();
     const navItems = [
-        { name: "News", path: "/", icon: Newspaper },
-        { name: "Creative Space", path: "/creative", icon: Lightbulb },
-        { name: "Chat", path: "/chat", icon: MessageSquare },
-        { name: "Sources", path: "/sources", icon: Rss },
-        { name: "Settings", path: "/settings", icon: Settings },
+        { name: t("nav.news"), path: "/", icon: Newspaper },
+        { name: t("nav.creativeSpace"), path: "/creative", icon: Lightbulb },
+        { name: t("nav.chat"), path: "/chat", icon: MessageSquare },
+        { name: t("nav.sources"), path: "/sources", icon: Rss },
+        { name: t("nav.settings"), path: "/settings", icon: Settings },
     ];
     const contentTransitionClass = collapsed
         ? "pointer-events-none -translate-x-2 opacity-0"
@@ -42,7 +44,7 @@ export function Sidebar({ collapsed }: SidebarProps) {
                             contentTransitionClass,
                         )}
                     >
-                        <div className="font-display text-[1.45rem] font-semibold tracking-[-0.05em] text-foreground">GetNews</div>
+                        <div className="font-display text-[1.45rem] font-semibold tracking-[-0.05em] text-foreground">{t("appName")}</div>
                     </div>
                 </div>
             </div>
@@ -89,7 +91,7 @@ export function Sidebar({ collapsed }: SidebarProps) {
                         contentTransitionClass,
                     )}
                 >
-                    Warm paper UI · Beta v0.1
+                    {t("footer")}
                 </div>
             </div>
         </aside>
