@@ -7,7 +7,6 @@
     "fetchAll": "すべて取得",
     "fetchingAll": "取得中...",
     "addSource": "ソースを追加",
-    "connectedSources": "接続済みソース",
     "type": "タイプ:",
     "status": "ステータス:",
     "fetch": "取得",

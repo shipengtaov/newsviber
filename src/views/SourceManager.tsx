@@ -197,7 +197,6 @@ export default function SourceManager() {
             >
 
                 <div className="space-y-4">
-                    <h2 className="font-display text-2xl font-semibold tracking-[-0.04em]">{t("connectedSources")}</h2>
                     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                         {sources.map((source) => (
                             <Card

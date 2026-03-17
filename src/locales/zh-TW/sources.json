@@ -7,7 +7,6 @@
     "fetchAll": "全部擷取",
     "fetchingAll": "正在全部擷取...",
     "addSource": "新增來源",
-    "connectedSources": "已連接來源",
     "type": "類型：",
     "status": "狀態：",
     "fetch": "擷取",

@@ -7,7 +7,6 @@
     "fetchAll": "全部获取",
     "fetchingAll": "正在全部获取...",
     "addSource": "添加来源",
-    "connectedSources": "已连接来源",
     "type": "类型：",
     "status": "状态：",
     "fetch": "获取",
