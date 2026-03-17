@@ -116,7 +116,7 @@ export const PROVIDERS: AIProviderDefinition[] = [
   {
     id: "minimax",
     name: "MiniMax",
-    url: "https://api.minimax.io/anthropic/v1",
+    url: "https://api.minimax.io/anthropic",
     models: ["minimax-text-01", "minimax-text-01v", "abab6.5s-chat"],
     iconUrl: PROVIDER_ICON_URLS.minimax,
   },
@@ -139,7 +139,7 @@ export const PROVIDERS: AIProviderDefinition[] = [
     name: "Vercel AI Gateway",
     url: "https://ai-gateway.vercel.sh/v3/ai",
     models: [
-      "openai/gpt-4o",
+      "openai/gpt-5-mini",
       "anthropic/claude-sonnet-4",
       "google/gemini-2.5-flash",
       "deepseek/deepseek-v3",
@@ -156,7 +156,7 @@ export const PROVIDERS: AIProviderDefinition[] = [
   {
     id: "ollama",
     name: "Ollama (Local)",
-    url: "http://127.0.0.1:11434",
+    url: "http://127.0.0.1:11434/api",
     models: ["llama3", "qwen2", "mistral"],
     iconUrl: PROVIDER_ICON_URLS.ollama,
   },
