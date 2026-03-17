@@ -12,7 +12,6 @@
     "markScopedReadSource": "將 {{name}} 中所有未讀標為已讀",
     "markScopedReadAll": "將所有活躍來源中未讀標為已讀",
     "sources": "來源",
-    "activeSources": "活躍來源",
     "addSource": "新增來源",
     "allArticles": "所有文章",
     "fetchAllActiveSources": "擷取所有活躍來源",

@@ -788,7 +788,6 @@ export default function NewsList() {
                         <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
                             <div>
                                 <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{t("sources")}</p>
-                                <h2 className="mt-1 font-display text-xl font-semibold tracking-[-0.04em] text-foreground">{t("activeSources")}</h2>
                             </div>
                             <Button
                                 type="button"

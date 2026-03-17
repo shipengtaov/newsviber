@@ -12,7 +12,6 @@
     "markScopedReadSource": "{{name}} の未読をすべて既読にする",
     "markScopedReadAll": "全アクティブソースの未読をすべて既読にする",
     "sources": "ソース",
-    "activeSources": "アクティブソース",
     "addSource": "ソースを追加",
     "allArticles": "すべての記事",
     "fetchAllActiveSources": "全アクティブソースを取得",

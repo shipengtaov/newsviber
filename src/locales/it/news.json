@@ -12,7 +12,6 @@
     "markScopedReadSource": "Segna tutti i non letti in {{name}} come letti",
     "markScopedReadAll": "Segna tutti i non letti in tutte le fonti attive come letti",
     "sources": "Fonti",
-    "activeSources": "Fonti attive",
     "addSource": "Aggiungi fonte",
     "allArticles": "Tutti gli articoli",
     "fetchAllActiveSources": "Recupera tutte le fonti attive",

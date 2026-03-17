@@ -12,7 +12,6 @@
     "markScopedReadSource": "Marquer tous les non lus dans {{name}} comme lus",
     "markScopedReadAll": "Marquer tous les non lus dans toutes les sources actives comme lus",
     "sources": "Sources",
-    "activeSources": "Sources actives",
     "addSource": "Ajouter une source",
     "allArticles": "Tous les articles",
     "fetchAllActiveSources": "Récupérer toutes les sources actives",

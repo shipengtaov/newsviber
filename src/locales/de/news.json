@@ -12,7 +12,6 @@
     "markScopedReadSource": "Alle ungelesenen in {{name}} als gelesen markieren",
     "markScopedReadAll": "Alle ungelesenen in allen aktiven Quellen als gelesen markieren",
     "sources": "Quellen",
-    "activeSources": "Aktive Quellen",
     "addSource": "Quelle hinzufügen",
     "allArticles": "Alle Artikel",
     "fetchAllActiveSources": "Alle aktiven Quellen abrufen",

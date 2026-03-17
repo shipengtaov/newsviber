@@ -12,7 +12,6 @@
     "markScopedReadSource": "Mark all unread in {{name}} as read",
     "markScopedReadAll": "Mark all unread in all active sources as read",
     "sources": "Sources",
-    "activeSources": "Active sources",
     "addSource": "Add source",
     "allArticles": "All Articles",
     "fetchAllActiveSources": "Fetch all active sources",
