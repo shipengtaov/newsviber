@@ -8,11 +8,6 @@ async fn fetch_rss_cmd(url: String) -> Result<Vec<fetchers::rss::ParsedArticle>,
     fetchers::rss::fetch_rss(&url).await.map_err(|e| e.to_string())
 }
 
-#[tauri::command]
-async fn fetch_jina_cmd(url: String, api_key: Option<String>) -> Result<fetchers::jina::JinaResponse, String> {
-    fetchers::jina::fetch_jina_url(&url, api_key.as_deref()).await.map_err(|e| e.to_string())
-}
-
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -21,7 +16,6 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![
             fetch_rss_cmd,
-            fetch_jina_cmd,
             chat::save_chat_thread_scope_cmd,
             chat::persist_chat_message_cmd,
             chat::delete_chat_thread_cmd,

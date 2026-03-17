@@ -35,10 +35,6 @@ function formatSourceTypeLabel(sourceType: string): string {
     switch (sourceType) {
         case "rss":
             return "RSS/Atom Feed";
-        case "jina_url":
-            return "Jina URL Scrape";
-        case "twitter":
-            return "Twitter (/X)";
         default:
             return sourceType;
     }

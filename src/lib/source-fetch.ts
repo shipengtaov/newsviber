@@ -30,13 +30,6 @@ type RemoteArticle = {
     author?: string | null;
 };
 
-type JinaResponse = {
-    title?: string;
-    url?: string;
-    content?: string;
-    description?: string;
-};
-
 let db: Database | null = null;
 const inFlightSourceFetches = new Map<number, Promise<FetchResult>>();
 
@@ -53,21 +46,7 @@ async function loadRemoteArticles(source: FetchableSource): Promise<RemoteArticl
         return Array.isArray(articles) ? articles : [];
     }
 
-    const jinaData = await invoke<JinaResponse | null>("fetch_jina_cmd", { url: source.url, apiKey: null });
-    if (!jinaData) {
-        return [];
-    }
-
-    return [
-        {
-            title: jinaData.title || "Untitled",
-            link: jinaData.url || source.url,
-            content: jinaData.content || "",
-            description: jinaData.description || "",
-            pub_date: new Date().toISOString(),
-            author: "",
-        },
-    ];
+    throw new Error(`Unsupported source type: ${source.source_type}`);
 }
 
 async function insertArticles(sourceId: number, articles: RemoteArticle[]) {

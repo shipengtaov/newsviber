@@ -9,7 +9,7 @@ pub fn get_migrations() -> Vec<Migration> {
                 CREATE TABLE IF NOT EXISTS sources (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     name TEXT NOT NULL,
-                    source_type TEXT NOT NULL, /* 'rss', 'jina_url', 'jina_search', 'twitter', 'custom' */
+                    source_type TEXT NOT NULL, /* 'rss' */
                     url TEXT NOT NULL,
                     config TEXT, /* JSON config */
                     fetch_interval INTEGER NOT NULL DEFAULT 60, /* minutes */
@@ -259,6 +259,15 @@ pub fn get_migrations() -> Vec<Migration> {
             sql: "
                 ALTER TABLE creative_cards ADD COLUMN is_read BOOLEAN NOT NULL DEFAULT 0;
                 UPDATE creative_cards SET is_read = 1;
+            ",
+            kind: MigrationKind::Up,
+        },
+        Migration {
+            version: 8,
+            description: "remove_jina_and_twitter_sources",
+            sql: "
+                DELETE FROM sources
+                WHERE source_type IN ('jina_url', 'twitter');
             ",
             kind: MigrationKind::Up,
         }

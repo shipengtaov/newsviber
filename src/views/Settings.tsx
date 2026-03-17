@@ -45,25 +45,19 @@ function getProviderConfigSnapshot(providerId: string, providerConfig: AIProvide
 
 export default function Settings() {
     const { toast } = useToast();
-    const [jinaKey, setJinaKey] = useState("");
-    const [savedJinaKey, setSavedJinaKey] = useState("");
     const [selectedProviderId, setSelectedProviderId] = useState(DEFAULT_AI_PROVIDER_ID);
     const [providerDrafts, setProviderDrafts] = useState<AIProviderConfigs>(getDefaultProviderConfigs);
     const [savedProviderDrafts, setSavedProviderDrafts] = useState<AIProviderConfigs>(getDefaultProviderConfigs);
     const [showAiApiKey, setShowAiApiKey] = useState(false);
-    const [showJinaApiKey, setShowJinaApiKey] = useState(false);
     const [pendingProviderId, setPendingProviderId] = useState<string | null>(null);
     const [discardDialogOpen, setDiscardDialogOpen] = useState(false);
 
     useEffect(() => {
         // In a real app, these should be securely stored in tauri-plugin-store or OS keyring.
         // For this prototype, we'll use localStorage or standard db.
-        const storedJinaKey = localStorage.getItem("JINA_API_KEY") || "";
         const storedProviderId = readCurrentProviderId();
         const storedProviderConfigs = readStoredProviderConfigs();
 
-        setJinaKey(storedJinaKey);
-        setSavedJinaKey(storedJinaKey);
         setSelectedProviderId(storedProviderId);
         setProviderDrafts(storedProviderConfigs);
         setSavedProviderDrafts(storedProviderConfigs);
@@ -76,7 +70,6 @@ export default function Settings() {
     const savedSelectedConfigSnapshot = getProviderConfigSnapshot(selectedProviderId, savedSelectedConfig);
     const normalizedSelectedConfig = normalizeProviderConfig(selectedProviderId, selectedConfig);
     const isAiDirty = selectedConfigSnapshot !== savedSelectedConfigSnapshot;
-    const isJinaDirty = jinaKey !== savedJinaKey;
 
     function updateSelectedProviderConfig(updates: Partial<AIProviderConfig>) {
         setProviderDrafts((prev) => ({
@@ -146,12 +139,6 @@ export default function Settings() {
         setDiscardDialogOpen(false);
     }
 
-    function persistJinaSettings() {
-        localStorage.setItem("JINA_API_KEY", jinaKey);
-        setSavedJinaKey(jinaKey);
-        toast({ title: "Settings Saved", description: "Jina configuration has been updated." });
-    }
-
     function handleSaveAiSettings(e: React.FormEvent) {
         e.preventDefault();
         persistAiSettings();
@@ -181,7 +168,6 @@ export default function Settings() {
                 showDescription: false,
                 stats: [
                     { label: "Active provider", value: selectedProvider?.name ?? "Unknown", tone: "accent" },
-                    { label: "Jina key", value: savedJinaKey ? "Configured" : "Not set", tone: savedJinaKey ? "default" : "warning" },
                 ],
             }}
         >
@@ -314,45 +300,6 @@ export default function Settings() {
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
-
-            <Card>
-                <CardHeader>
-                    <CardTitle>Jina AI Configuration</CardTitle>
-                    <CardDescription>Setup your API keys for Jina (Web Scraping).</CardDescription>
-                </CardHeader>
-                <CardContent>
-                    <div className="space-y-4 max-w-lg">
-                        <div className="space-y-2">
-                            <Label>Jina AI API Key (r.jina.ai / s.jina.ai)</Label>
-                            <div className="relative">
-                                <Input
-                                    type={showJinaApiKey ? "text" : "password"}
-                                    value={jinaKey}
-                                    onChange={e => setJinaKey(e.target.value)}
-                                    placeholder="jina_..."
-                                    className="pr-10"
-                                />
-                                <button
-                                    type="button"
-                                    onClick={() => setShowJinaApiKey((prev) => !prev)}
-                                    aria-label={showJinaApiKey ? "Hide API key" : "Show API key"}
-                                    aria-pressed={showJinaApiKey}
-                                    className="absolute inset-y-0 right-0 flex w-10 items-center justify-center text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                                >
-                                    {showJinaApiKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                                </button>
-                            </div>
-                        </div>
-                        <Button
-                            onClick={persistJinaSettings}
-                            disabled={!isJinaDirty}
-                            className="disabled:border disabled:border-input disabled:bg-muted disabled:text-muted-foreground disabled:opacity-100 disabled:shadow-none"
-                        >
-                            Save
-                        </Button>
-                    </div>
-                </CardContent>
-            </Card>
 
             <Card>
                 <CardHeader>
