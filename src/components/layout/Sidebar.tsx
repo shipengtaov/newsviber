@@ -1,6 +1,7 @@
 import { Link, useLocation } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/utils";
+import { APP_VERSION } from "@/lib/version";
 import { Newspaper, Rss, MessageSquare, Lightbulb, Settings } from "lucide-react";
 
 type SidebarProps = {
@@ -91,7 +92,7 @@ export function Sidebar({ collapsed }: SidebarProps) {
                         contentTransitionClass,
                     )}
                 >
-                    {t("footer")}
+                    v{APP_VERSION}
                 </div>
             </div>
         </aside>
