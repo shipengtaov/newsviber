@@ -1,7 +1,22 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { MemoryRouter } from "react-router-dom";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { Sidebar } from "@/components/layout/Sidebar";
+
+const translations: Record<string, string> = {
+    appName: "Stream Deck",
+    "nav.news": "News",
+    "nav.creativeSpace": "Creative Space",
+    "nav.chat": "Chat",
+    "nav.sources": "Sources",
+    "nav.settings": "Settings",
+};
+
+vi.mock("react-i18next", () => ({
+    useTranslation: () => ({
+        t: (key: string) => translations[key] ?? key,
+    }),
+}));
 
 function renderSidebar(pathname: string, collapsed = false): string {
     return renderToStaticMarkup(
@@ -14,7 +29,13 @@ function renderSidebar(pathname: string, collapsed = false): string {
 describe("Sidebar", () => {
     it("renders navigation items in the expected order", () => {
         const markup = renderSidebar("/");
-        const labels = ["News", "Creative Space", "Chat", "Sources", "Settings"];
+        const labels = [
+            translations["nav.news"],
+            translations["nav.creativeSpace"],
+            translations["nav.chat"],
+            translations["nav.sources"],
+            translations["nav.settings"],
+        ];
         const positions = labels.map((label) => markup.indexOf(`>${label}<`));
 
         positions.forEach((position) => {
@@ -29,7 +50,16 @@ describe("Sidebar", () => {
         expect(markup).not.toContain("Signal Hub");
         expect(markup).not.toContain("Information workspace");
         expect(markup).not.toContain("Navigate");
-        expect(markup).toContain(">Stream Deck<");
+        expect(markup).toContain(`>${translations.appName}<`);
+    });
+
+    it("uses the updated expanded width while preserving the collapsed width", () => {
+        const expandedMarkup = renderSidebar("/");
+        const collapsedMarkup = renderSidebar("/", true);
+
+        expect(expandedMarkup).toContain("w-64");
+        expect(expandedMarkup).not.toContain("w-[18.75rem]");
+        expect(collapsedMarkup).toContain("w-20");
     });
 
     it("keeps the icon rail anchored in collapsed mode", () => {
@@ -46,8 +76,8 @@ describe("Sidebar", () => {
     it("keeps the active state logic for non-root routes", () => {
         const markup = renderSidebar("/creative");
 
-        expect(markup).toContain('title="Creative Space" aria-current="page"');
-        expect(markup).toContain('title="Creative Space" aria-current="page" data-active="true"');
-        expect(markup).toContain('title="Sources" data-active="false"');
+        expect(markup).toContain(`title="${translations["nav.creativeSpace"]}" aria-current="page"`);
+        expect(markup).toContain(`title="${translations["nav.creativeSpace"]}" aria-current="page" data-active="true"`);
+        expect(markup).toContain(`title="${translations["nav.sources"]}" data-active="false"`);
     });
 });

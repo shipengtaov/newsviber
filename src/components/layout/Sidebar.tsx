@@ -26,7 +26,7 @@ export function Sidebar({ collapsed }: SidebarProps) {
         <aside
             className={cn(
                 "surface-panel flex h-full shrink-0 flex-col overflow-hidden px-2 py-3 transition-[width] duration-200 ease-out motion-reduce:transition-none",
-                collapsed ? "w-20" : "w-[18.75rem]",
+                collapsed ? "w-20" : "w-64",
             )}
         >
             <div className="overflow-hidden rounded-[1.35rem] border border-white/60 bg-background/56 px-2 py-4 shadow-soft backdrop-blur-sm">
