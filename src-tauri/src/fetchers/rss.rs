@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use std::error::Error;
 use std::io;
 
-const RSS_USER_AGENT: &str = "GetNews/1.0 (Tauri RSS Fetcher)";
+const RSS_USER_AGENT: &str = "Stream Deck/26.3.0 (Tauri RSS Fetcher)";
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ParsedArticle {

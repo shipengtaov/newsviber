@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "GetNews",
+  "productName": "Stream Deck",
   "version": "26.3.0",
   "identifier": "com.shipengtao.get-news",
   "build": {
@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "GetNews",
+        "title": "Stream Deck",
         "titleBarStyle": "Overlay",
         "hiddenTitle": true,
         "trafficLightPosition": {

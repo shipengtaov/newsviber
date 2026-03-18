@@ -1,7 +1,7 @@
 [package]
-name = "get-news"
+name = "StreamDeck"
 version = "0.1.0"
-description = "GetNews"
+description = "Stream Deck"
 authors = ["Pengtao Shi"]
 edition = "2021"
 

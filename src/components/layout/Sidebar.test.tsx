@@ -29,7 +29,7 @@ describe("Sidebar", () => {
         expect(markup).not.toContain("Signal Hub");
         expect(markup).not.toContain("Information workspace");
         expect(markup).not.toContain("Navigate");
-        expect(markup).toContain(">GetNews<");
+        expect(markup).toContain(">Stream Deck<");
     });
 
     it("keeps the icon rail anchored in collapsed mode", () => {

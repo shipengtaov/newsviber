@@ -1,6 +1,6 @@
-# GetNews
+# Stream Deck
 
-GetNews is a desktop news reader built with Tauri, React, and TypeScript using Vite.
+Stream Deck is a desktop news reader built with Tauri, React, and TypeScript using Vite.
 
 ## Recommended IDE Setup
 
