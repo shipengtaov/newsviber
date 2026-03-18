@@ -813,10 +813,10 @@ export default function NewsList() {
 
             <div className="flex min-h-0 flex-1 flex-col gap-4 lg:flex-row">
                 <div
-                    className="relative min-w-0 lg:h-full lg:shrink-0"
+                    className="relative min-w-0 lg:sticky lg:top-6 lg:self-start lg:shrink-0"
                     style={isDesktopLayout ? { width: sourcesPanelWidth } : undefined}
                 >
-                    <div className="surface-panel flex h-full min-h-0 flex-col px-4 py-4">
+                    <div className="surface-panel flex min-h-0 flex-col px-4 py-4 lg:max-h-[calc(100vh-8rem)]">
                         <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
                             <div>
                                 <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{t("sources")}</p>

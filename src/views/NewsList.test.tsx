@@ -308,6 +308,38 @@ describe("NewsList pagination scroll reset", () => {
         return form;
     }
 
+    function getSourcesPanelElements() {
+        const sourcesLabel = Array.from(container.querySelectorAll("p")).find((candidate) => (
+            candidate.textContent?.trim() === "news:sources"
+        ));
+
+        if (!(sourcesLabel instanceof HTMLParagraphElement)) {
+            throw new Error("Sources panel label not found.");
+        }
+
+        const headerRow = sourcesLabel.parentElement?.parentElement;
+        if (!(headerRow instanceof HTMLDivElement)) {
+            throw new Error("Sources panel header row not found.");
+        }
+
+        const panelCard = headerRow.parentElement;
+        if (!(panelCard instanceof HTMLDivElement)) {
+            throw new Error("Sources panel card not found.");
+        }
+
+        const stickyWrapper = panelCard.parentElement;
+        if (!(stickyWrapper instanceof HTMLDivElement)) {
+            throw new Error("Sources panel wrapper not found.");
+        }
+
+        const listContainer = headerRow.nextElementSibling;
+        if (!(listContainer instanceof HTMLDivElement)) {
+            throw new Error("Sources list container not found.");
+        }
+
+        return { stickyWrapper, panelCard, listContainer };
+    }
+
     function setInputValue(input: HTMLInputElement, value: string) {
         const valueSetter = Object.getOwnPropertyDescriptor(
             HTMLInputElement.prototype,
@@ -352,6 +384,25 @@ describe("NewsList pagination scroll reset", () => {
         expect(storedScrollMap["/?page=2"]).toBe(0);
         expect(mainScrollContainer.scrollTop).toBe(0);
         expect(getArticlesScrollContainer().scrollTop).toBe(0);
+    });
+
+    it("uses a sticky desktop sources panel with an internal scroll region", async () => {
+        renderNewsList("/");
+        await settleNewsList();
+
+        const { stickyWrapper, panelCard, listContainer } = getSourcesPanelElements();
+
+        expect(stickyWrapper.className).toContain("lg:sticky");
+        expect(stickyWrapper.className).toContain("lg:top-6");
+        expect(stickyWrapper.className).toContain("lg:self-start");
+        expect(stickyWrapper.className).not.toContain("lg:h-full");
+
+        expect(panelCard.className).toContain("lg:max-h-[calc(100vh-8rem)]");
+        expect(panelCard.className).not.toContain("h-full");
+
+        expect(listContainer.className).toContain("lg:flex-1");
+        expect(listContainer.className).toContain("lg:min-h-0");
+        expect(listContainer.className).toContain("lg:overflow-y-auto");
     });
 
     it("reuses the same reset behavior for the next-page control", async () => {
