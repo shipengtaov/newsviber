@@ -3,11 +3,69 @@ mod creative;
 mod db;
 pub mod fetchers;
 
-#[cfg(target_os = "macos")]
+#[cfg(not(mobile))]
 use tauri::{
-    menu::{AboutMetadata, Menu, PredefinedMenuItem, Submenu, HELP_SUBMENU_ID, WINDOW_SUBMENU_ID},
+    menu::{
+        AboutMetadata, Menu, MenuItem, PredefinedMenuItem, Submenu, HELP_SUBMENU_ID,
+        WINDOW_SUBMENU_ID,
+    },
     AppHandle, Runtime,
 };
+#[cfg(not(mobile))]
+use tauri_plugin_opener::OpenerExt;
+
+#[cfg(not(mobile))]
+const HELP_MENU_ID_TWITTER: &str = "help.twitter";
+#[cfg(not(mobile))]
+const HELP_MENU_ID_GITHUB: &str = "help.github";
+#[cfg(not(mobile))]
+const HELP_MENU_ID_ISSUES: &str = "help.issues";
+
+#[cfg(not(mobile))]
+fn help_menu_url(menu_id: &str) -> Option<&'static str> {
+    match menu_id {
+        HELP_MENU_ID_TWITTER => Some("https://x.com/shipengtao"),
+        HELP_MENU_ID_GITHUB => Some("https://github.com/shipengtaov"),
+        HELP_MENU_ID_ISSUES => Some("https://github.com/shipengtaov/stream-deck-support"),
+        _ => None,
+    }
+}
+
+#[cfg(not(mobile))]
+const HELP_MENU_RIGHT_PADDING: usize = 22;
+#[cfg(not(mobile))]
+fn padded_help_menu_label(label: &str) -> String {
+    format!("{label}{}", " ".repeat(HELP_MENU_RIGHT_PADDING))
+}
+
+#[cfg(not(mobile))]
+fn build_help_link_items<R: Runtime>(
+    app_handle: &AppHandle<R>,
+) -> tauri::Result<[MenuItem<R>; 3]> {
+    let twitter_item = MenuItem::with_id(
+        app_handle,
+        HELP_MENU_ID_TWITTER,
+        padded_help_menu_label("Open Twitter"),
+        true,
+        None::<&str>,
+    )?;
+    let github_item = MenuItem::with_id(
+        app_handle,
+        HELP_MENU_ID_GITHUB,
+        padded_help_menu_label("Open GitHub"),
+        true,
+        None::<&str>,
+    )?;
+    let issues_item = MenuItem::with_id(
+        app_handle,
+        HELP_MENU_ID_ISSUES,
+        padded_help_menu_label("Report an Issue"),
+        true,
+        None::<&str>,
+    )?;
+
+    Ok([twitter_item, github_item, issues_item])
+}
 
 #[tauri::command]
 async fn fetch_rss_cmd(url: String) -> Result<Vec<fetchers::rss::ParsedArticle>, String> {
@@ -45,7 +103,14 @@ fn build_macos_menu<R: Runtime>(app_handle: &AppHandle<R>) -> tauri::Result<Menu
         ],
     )?;
 
-    let help_menu = Submenu::with_id_and_items(app_handle, HELP_SUBMENU_ID, "Help", true, &[])?;
+    let [twitter_item, github_item, issues_item] = build_help_link_items(app_handle)?;
+    let help_menu = Submenu::with_id_and_items(
+        app_handle,
+        HELP_SUBMENU_ID,
+        "Help",
+        true,
+        &[&twitter_item, &github_item, &issues_item],
+    )?;
 
     Menu::with_items(
         app_handle,
@@ -101,6 +166,30 @@ fn build_macos_menu<R: Runtime>(app_handle: &AppHandle<R>) -> tauri::Result<Menu
     )
 }
 
+#[cfg(not(any(target_os = "macos", mobile)))]
+fn build_default_desktop_menu<R: Runtime>(app_handle: &AppHandle<R>) -> tauri::Result<Menu<R>> {
+    let menu = Menu::default(app_handle)?;
+    let [twitter_item, github_item, issues_item] = build_help_link_items(app_handle)?;
+
+    let help_menu = match menu.get(&HELP_SUBMENU_ID).and_then(|item| item.as_submenu().cloned()) {
+        Some(help_menu) => help_menu,
+        None => {
+            let help_menu =
+                Submenu::with_id_and_items(app_handle, HELP_SUBMENU_ID, "Help", true, &[])?;
+            menu.append(&help_menu)?;
+            help_menu
+        }
+    };
+
+    if !help_menu.items()?.is_empty() {
+        help_menu.append(&PredefinedMenuItem::separator(app_handle)?)?;
+    }
+
+    help_menu.append_items(&[&twitter_item, &github_item, &issues_item])?;
+
+    Ok(menu)
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -110,9 +199,22 @@ pub fn run() {
                 build_macos_menu(app_handle)
             }
 
-            #[cfg(not(target_os = "macos"))]
+            #[cfg(not(any(target_os = "macos", mobile)))]
+            {
+                build_default_desktop_menu(app_handle)
+            }
+
+            #[cfg(mobile)]
             {
                 tauri::menu::Menu::default(app_handle)
+            }
+        })
+        .on_menu_event(|app, event| {
+            #[cfg(not(mobile))]
+            if let Some(url) = help_menu_url(event.id().as_ref()) {
+                if let Err(error) = app.opener().open_url(url, None::<&str>) {
+                    eprintln!("failed to open help menu URL {url}: {error}");
+                }
             }
         })
         .plugin(tauri_plugin_http::init())
