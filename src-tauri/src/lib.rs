@@ -87,6 +87,7 @@ fn build_macos_menu<R: Runtime>(app_handle: &AppHandle<R>) -> tauri::Result<Menu
             .publisher
             .clone()
             .map(|publisher| vec![publisher]),
+        icon: app_handle.default_window_icon().cloned(),
         ..Default::default()
     };
 

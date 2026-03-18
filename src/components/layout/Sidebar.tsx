@@ -37,7 +37,11 @@ export function Sidebar({ collapsed }: SidebarProps) {
                     )}
                 >
                     <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[1.1rem] bg-primary text-primary-foreground shadow-glow">
-                        <Newspaper className="h-5 w-5" />
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="42" strokeLinecap="round">
+                            <path d="M 120 200 C 180 150, 240 250, 300 200 C 350 160, 392 200, 392 200" />
+                            <path d="M 120 280 C 180 230, 240 330, 300 280 C 350 240, 392 280, 392 280" />
+                            <path d="M 120 360 C 180 310, 240 410, 300 360 C 350 320, 392 360, 392 360" />
+                        </svg>
                     </div>
                     <div
                         className={cn(

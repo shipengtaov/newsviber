@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="114" fill="#0f172a"/>
+  <!-- Minimal S shape -->
+  <path d="M 330 180 C 330 130, 180 130, 180 190 C 180 250, 330 250, 330 320 C 330 380, 180 380, 180 330" fill="none" stroke="#38bdf8" stroke-width="48" stroke-linecap="round"/>
+</svg>
