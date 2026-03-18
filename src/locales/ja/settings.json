@@ -34,5 +34,9 @@
     "dataCleanupCompleteDesc": "{{days}} 日以上前の記事を削除しました。",
     "cleanupError": "クリーンアップエラー",
     "general": "一般",
-    "generalDesc": "基本的なアプリ設定。"
+    "generalDesc": "基本的なアプリ設定。",
+    "about": "このアプリについて",
+    "aboutTwitter": "Twitter",
+    "aboutGithub": "GitHub",
+    "aboutFeedback": "不具合報告"
 }

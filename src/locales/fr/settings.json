@@ -34,5 +34,9 @@
     "dataCleanupCompleteDesc": "Articles de plus de {{days}} jours supprimés.",
     "cleanupError": "Erreur de nettoyage",
     "general": "Général",
-    "generalDesc": "Préférences générales de l'application."
+    "generalDesc": "Préférences générales de l'application.",
+    "about": "À propos",
+    "aboutTwitter": "Twitter",
+    "aboutGithub": "GitHub",
+    "aboutFeedback": "Issues"
 }

@@ -34,5 +34,9 @@
     "dataCleanupCompleteDesc": "已刪除超過 {{days}} 天的文章。",
     "cleanupError": "清理錯誤",
     "general": "一般",
-    "generalDesc": "基本應用程式偏好設定。"
+    "generalDesc": "基本應用程式偏好設定。",
+    "about": "關於",
+    "aboutTwitter": "Twitter",
+    "aboutGithub": "GitHub",
+    "aboutFeedback": "問題回報"
 }

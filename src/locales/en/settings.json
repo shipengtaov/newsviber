@@ -34,5 +34,9 @@
     "dataCleanupCompleteDesc": "Deleted articles older than {{days}} days.",
     "cleanupError": "Cleanup Error",
     "general": "General",
-    "generalDesc": "Basic application preferences."
+    "generalDesc": "Basic application preferences.",
+    "about": "About",
+    "aboutTwitter": "Twitter",
+    "aboutGithub": "GitHub",
+    "aboutFeedback": "Issues"
 }
