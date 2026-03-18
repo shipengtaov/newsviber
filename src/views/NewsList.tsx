@@ -15,6 +15,7 @@ import { formatFetchInterval, formatLastFetchSummary } from "@/lib/source-utils"
 import { formatUtcDateTime } from "@/lib/time";
 import { resolveArticlePreview, sanitizeArticleHtml } from "@/lib/article-html";
 import { listNewsSources, markScopedNewsArticlesAsRead, type NewsSource } from "@/lib/news-service";
+import { useMainLayoutScrollContainer } from "@/components/layout/MainLayout";
 import { EmptyState, WorkspaceHeader } from "@/components/layout/WorkspaceHeader";
 
 type Article = {
@@ -282,6 +283,7 @@ function SourceFilterRow({
 export default function NewsList() {
     const { t } = useTranslation("news");
     const { toast } = useToast();
+    const mainScrollRef = useMainLayoutScrollContainer();
     const location = useLocation();
     const navigate = useNavigate();
     const [articles, setArticles] = useState<Article[]>([]);
@@ -305,6 +307,7 @@ export default function NewsList() {
     const resizeStartXRef = useRef(0);
     const resizeStartWidthRef = useRef(DEFAULT_SOURCES_PANEL_WIDTH);
     const articlesScrollRef = useRef<HTMLDivElement>(null);
+    const pendingPaginationScrollResetRef = useRef(false);
 
     useEffect(() => {
         setSearchInput(search);
@@ -459,6 +462,24 @@ export default function NewsList() {
     }, [articles.length, newsListScrollKey]);
 
     useEffect(() => {
+        if (!pendingPaginationScrollResetRef.current) return;
+
+        const mainContainer = mainScrollRef.current;
+        if (mainContainer) {
+            mainContainer.scrollTop = 0;
+            mainContainer.dispatchEvent(new Event("scroll"));
+        }
+
+        const articlesContainer = articlesScrollRef.current;
+        if (articlesContainer) {
+            articlesContainer.scrollTop = 0;
+            articlesContainer.dispatchEvent(new Event("scroll"));
+        }
+
+        pendingPaginationScrollResetRef.current = false;
+    }, [mainScrollRef, newsListScrollKey]);
+
+    useEffect(() => {
         void loadSources();
     }, []);
 
@@ -568,7 +589,18 @@ export default function NewsList() {
     }
 
     function goToPage(p: number) {
-        setSearchParams(buildListParams(p, search, selectedSourceId));
+        const nextPage = Math.max(0, p);
+
+        if (nextPage === page) {
+            return;
+        }
+
+        persistNewsListScroll(
+            buildNewsListScrollKey(nextPage, search, selectedSourceId),
+            0,
+        );
+        pendingPaginationScrollResetRef.current = true;
+        setSearchParams(buildListParams(nextPage, search, selectedSourceId));
     }
 
     function selectSource(sourceId: number | null) {
