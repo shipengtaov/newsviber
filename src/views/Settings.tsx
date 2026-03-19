@@ -1,4 +1,4 @@
-import { useEffect, useState, type ComponentType } from "react";
+import { useState, type ComponentType } from "react";
 import { useTranslation } from "react-i18next";
 import Database from "@tauri-apps/plugin-sql";
 import { openUrl } from "@tauri-apps/plugin-opener";
@@ -17,12 +17,10 @@ import {
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import {
-    DEFAULT_AI_PROVIDER_ID,
     AIProviderConfig,
     AIProviderConfigs,
     PROVIDERS,
     getDefaultProviderConfig,
-    getDefaultProviderConfigs,
     getProviderById,
     normalizeProviderConfig,
     readCurrentProviderId,
@@ -104,23 +102,12 @@ const ABOUT_LINKS: AboutLink[] = [
 export default function Settings() {
     const { t } = useTranslation("settings");
     const { toast } = useToast();
-    const [selectedProviderId, setSelectedProviderId] = useState(DEFAULT_AI_PROVIDER_ID);
-    const [providerDrafts, setProviderDrafts] = useState<AIProviderConfigs>(getDefaultProviderConfigs);
-    const [savedProviderDrafts, setSavedProviderDrafts] = useState<AIProviderConfigs>(getDefaultProviderConfigs);
+    const [selectedProviderId, setSelectedProviderId] = useState(readCurrentProviderId);
+    const [providerDrafts, setProviderDrafts] = useState<AIProviderConfigs>(readStoredProviderConfigs);
+    const [savedProviderDrafts, setSavedProviderDrafts] = useState<AIProviderConfigs>(readStoredProviderConfigs);
     const [showAiApiKey, setShowAiApiKey] = useState(false);
     const [pendingProviderId, setPendingProviderId] = useState<string | null>(null);
     const [discardDialogOpen, setDiscardDialogOpen] = useState(false);
-
-    useEffect(() => {
-        // In a real app, these should be securely stored in tauri-plugin-store or OS keyring.
-        // For this prototype, we'll use localStorage or standard db.
-        const storedProviderId = readCurrentProviderId();
-        const storedProviderConfigs = readStoredProviderConfigs();
-
-        setSelectedProviderId(storedProviderId);
-        setProviderDrafts(storedProviderConfigs);
-        setSavedProviderDrafts(storedProviderConfigs);
-    }, []);
 
     const selectedProvider = getProviderById(selectedProviderId);
     const selectedConfig = providerDrafts[selectedProviderId] || getDefaultProviderConfig(selectedProviderId);

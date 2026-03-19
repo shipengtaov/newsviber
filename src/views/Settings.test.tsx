@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import Settings from "@/views/Settings";
 
 const translations: Record<string, Record<string, string>> = {
@@ -48,6 +48,49 @@ const translations: Record<string, Record<string, string>> = {
     },
 };
 
+const {
+    openaiProvider,
+    geminiProvider,
+    providerConfigs,
+    readCurrentProviderIdMock,
+    readStoredProviderConfigsMock,
+} = vi.hoisted(() => {
+    const openaiProvider = {
+        id: "openai",
+        name: "OpenAI",
+        url: "https://api.openai.com/v1",
+        models: ["gpt-4o-mini"],
+        iconUrl: "/openai.png",
+    };
+
+    const geminiProvider = {
+        id: "gemini",
+        name: "Google (Gemini)",
+        url: "https://generativelanguage.googleapis.com/v1beta",
+        models: ["gemini-2.5-pro"],
+        iconUrl: "/gemini.png",
+    };
+
+    return {
+        openaiProvider,
+        geminiProvider,
+        providerConfigs: {
+            [openaiProvider.id]: {
+                url: openaiProvider.url,
+                apiKey: "openai-key",
+                model: openaiProvider.models[0],
+            },
+            [geminiProvider.id]: {
+                url: geminiProvider.url,
+                apiKey: "gemini-key",
+                model: geminiProvider.models[0],
+            },
+        },
+        readCurrentProviderIdMock: vi.fn<() => string>(),
+        readStoredProviderConfigsMock: vi.fn(),
+    };
+});
+
 vi.mock("@tauri-apps/plugin-sql", () => ({
     default: {
         load: vi.fn(),
@@ -81,31 +124,33 @@ vi.mock("@/lib/i18n", () => ({
 }));
 
 vi.mock("@/lib/ai-config", () => {
-    const provider = {
-        id: "openai",
-        name: "OpenAI",
-        url: "https://api.openai.com/v1",
-        models: ["gpt-4o-mini"],
-        iconUrl: "/openai.png",
-    };
-    const defaultConfig = {
-        url: provider.url,
-        apiKey: "",
-        model: provider.models[0],
+    const providers = [openaiProvider, geminiProvider];
+    const getProviderById = (providerId: string) =>
+        providers.find((provider) => provider.id === providerId) ?? openaiProvider;
+    const getDefaultProviderConfig = (providerId: string) => {
+        const provider = getProviderById(providerId);
+        return {
+            url: provider.url,
+            apiKey: "",
+            model: provider.models[0],
+        };
     };
 
     return {
-        DEFAULT_AI_PROVIDER_ID: provider.id,
-        PROVIDERS: [provider],
-        getDefaultProviderConfig: () => ({ ...defaultConfig }),
-        getDefaultProviderConfigs: () => ({ [provider.id]: { ...defaultConfig } }),
-        getProviderById: () => provider,
-        normalizeProviderConfig: (_providerId: string, value?: Partial<typeof defaultConfig>) => ({
-            ...defaultConfig,
+        DEFAULT_AI_PROVIDER_ID: openaiProvider.id,
+        PROVIDERS: providers,
+        getDefaultProviderConfig,
+        getDefaultProviderConfigs: () => ({
+            [openaiProvider.id]: getDefaultProviderConfig(openaiProvider.id),
+            [geminiProvider.id]: getDefaultProviderConfig(geminiProvider.id),
+        }),
+        getProviderById,
+        normalizeProviderConfig: (providerId: string, value?: Partial<ReturnType<typeof getDefaultProviderConfig>>) => ({
+            ...getDefaultProviderConfig(providerId),
             ...value,
         }),
-        readCurrentProviderId: () => provider.id,
-        readStoredProviderConfigs: () => ({ [provider.id]: { ...defaultConfig } }),
+        readCurrentProviderId: readCurrentProviderIdMock,
+        readStoredProviderConfigs: readStoredProviderConfigsMock,
         saveCurrentProviderId: vi.fn(),
         saveProviderConfig: vi.fn(),
     };
@@ -133,6 +178,16 @@ vi.mock("@/components/ui/dialog", () => ({
 }));
 
 describe("Settings", () => {
+    beforeEach(() => {
+        readCurrentProviderIdMock.mockReset();
+        readStoredProviderConfigsMock.mockReset();
+        readCurrentProviderIdMock.mockReturnValue(openaiProvider.id);
+        readStoredProviderConfigsMock.mockImplementation(() => ({
+            [openaiProvider.id]: { ...providerConfigs[openaiProvider.id] },
+            [geminiProvider.id]: { ...providerConfigs[geminiProvider.id] },
+        }));
+    });
+
     it("renders the about card after data management with the expected external links", () => {
         const markup = renderToStaticMarkup(<Settings />);
         const dataManagementIndex = markup.indexOf(">Data Management<");
@@ -148,5 +203,16 @@ describe("Settings", () => {
         expect(markup).toContain('href="https://github.com/shipengtaov/stream-deck-support"');
         expect(markup).not.toContain(">https://x.com/shipengtao<");
         expect(markup).not.toContain(">https://github.com/shipengtaov<");
+    });
+
+    it("renders the saved provider selection on the first render", () => {
+        readCurrentProviderIdMock.mockReturnValue(geminiProvider.id);
+
+        const markup = renderToStaticMarkup(<Settings />);
+
+        expect(markup).toMatch(/aria-pressed="true"[^>]*>.*Google \(Gemini\)/s);
+        expect(markup).toContain(`value="${geminiProvider.url}"`);
+        expect(markup).toContain('value="gemini-key"');
+        expect(markup).toContain(`value="${geminiProvider.models[0]}"`);
     });
 });
