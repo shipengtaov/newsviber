@@ -23,6 +23,7 @@ import type { Message } from "@/lib/ai";
 import { buildGlobalChatSystemPrompt } from "@/lib/chat-prompts";
 import { cn } from "@/lib/utils";
 import { EmptyState, WorkspaceHeader } from "@/components/layout/WorkspaceHeader";
+import { PAGE_GUTTER_X_CLASS } from "@/components/layout/layout-spacing";
 import {
     buildGlobalChatTitle,
     createDefaultGlobalChatScopeInput,
@@ -655,7 +656,7 @@ export default function GlobalChat() {
     }
 
     return (
-        <div className="flex min-h-full w-full min-w-0 flex-col gap-4 p-4 md:p-6">
+        <div className={cn("flex min-h-full w-full min-w-0 flex-col gap-4 py-4 md:py-6", PAGE_GUTTER_X_CLASS)}>
             <WorkspaceHeader
                 density="compact"
                 eyebrow={t("eyebrow")}

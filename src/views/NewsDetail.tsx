@@ -10,6 +10,7 @@ import { markNewsArticleAsRead } from "@/lib/news-service";
 import { cn } from "@/lib/utils";
 import { getDb } from "@/lib/db";
 import { formatUtcDateTime } from "@/lib/time";
+import { PAGE_GUTTER_X_CLASS } from "@/components/layout/layout-spacing";
 
 type FullArticle = {
     id: number;
@@ -122,7 +123,7 @@ export function ArticleDetailView({
 
     if (isLoading && !article) {
         return (
-            <div className={cn("flex h-full w-full items-center justify-center p-6", className)}>
+            <div className={cn("flex h-full w-full items-center justify-center py-6", PAGE_GUTTER_X_CLASS, className)}>
                 <div className="surface-panel-quiet px-6 py-10 text-sm text-muted-foreground">{t("loadingArticle")}</div>
             </div>
         );
@@ -130,7 +131,7 @@ export function ArticleDetailView({
 
     if (!article) {
         return (
-            <div className={cn("flex h-full w-full flex-col items-center justify-center gap-4 p-6", className)}>
+            <div className={cn("flex h-full w-full flex-col items-center justify-center gap-4 py-6", PAGE_GUTTER_X_CLASS, className)}>
                 <div className="surface-panel-quiet px-6 py-10 text-center text-sm text-muted-foreground">
                     {loadError ?? t("articleNotFound")}
                 </div>
@@ -143,7 +144,7 @@ export function ArticleDetailView({
     }
 
     return (
-        <div className={cn("flex h-full w-full min-h-0 p-4 md:p-6", className)}>
+        <div className={cn("flex h-full w-full min-h-0 py-4 md:py-6", PAGE_GUTTER_X_CLASS, className)}>
             <div className="surface-panel min-w-0 flex-1 overflow-y-auto">
                 <div className="mx-auto w-full max-w-5xl p-6 md:p-8">
                     <Button variant="ghost" className="mb-5 -ml-1 text-muted-foreground hover:bg-background/80" onClick={handleBack}>
@@ -205,7 +206,7 @@ export default function NewsDetail() {
 
     if (!Number.isFinite(parsedArticleId) || parsedArticleId <= 0) {
         return (
-            <div className="flex h-full w-full items-center justify-center p-8">
+            <div className={cn("flex h-full w-full items-center justify-center py-8", PAGE_GUTTER_X_CLASS)}>
                 <div className="text-sm text-muted-foreground">{t("articleNotFound")}</div>
             </div>
         );

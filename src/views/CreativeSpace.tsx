@@ -40,6 +40,7 @@ import { optimizeCreativeProjectPrompt, type Message } from "@/lib/ai";
 import { buildCreativeCardDiscussionSystemPrompt } from "@/lib/chat-prompts";
 import { useMainLayoutScrollContainer } from "@/components/layout/MainLayout";
 import { PageShell } from "@/components/layout/PageShell";
+import { PAGE_GUTTER_X_CLASS } from "@/components/layout/layout-spacing";
 import { useScopedScrollMemory } from "@/hooks/use-scoped-scroll-memory";
 import { useStreamingConversation } from "@/hooks/use-streaming-conversation";
 import { getCreativeCardBodyMarkdown, getCreativeCardPreviewExcerpt } from "@/lib/creative-card";
@@ -1144,7 +1145,7 @@ export default function CreativeSpace() {
 
     if (activeCard) {
         return (
-            <div className="flex h-full min-h-0 flex-col gap-4 bg-background p-4 md:p-6 lg:flex-row lg:gap-0">
+            <div className={cn("flex h-full min-h-0 flex-col gap-4 bg-background py-4 md:py-6 lg:flex-row lg:gap-0", PAGE_GUTTER_X_CLASS)}>
                 <div className="surface-panel min-h-0 min-w-0 flex-1 overflow-hidden">
                     <div className="flex h-full min-h-0 flex-col">
                         <div className="shrink-0 border-b border-border/60 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/85">

@@ -8,6 +8,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { useMainMenuScrollMemory } from "@/hooks/use-main-menu-scroll-memory";
 import { Button } from "@/components/ui/button";
 import { PanelLeftClose, PanelLeftOpen } from "lucide-react";
+import { PAGE_GUTTER_LEFT_CLASS, PAGE_GUTTER_X_CLASS } from "@/components/layout/layout-spacing";
 
 const SIDEBAR_COLLAPSED_STORAGE_KEY = "sidebarCollapsed_v1";
 const TITLEBAR_HEIGHT = 46;
@@ -83,7 +84,7 @@ export function MainLayout() {
                 <div className="absolute right-[-8%] top-[12%] h-64 w-64 rounded-full bg-[radial-gradient(circle,_rgba(251,191,36,0.18),_transparent_68%)] blur-3xl" />
                 <div className="absolute bottom-[-10%] left-[18%] h-72 w-72 rounded-full bg-[radial-gradient(circle,_rgba(14,165,233,0.1),_transparent_72%)] blur-3xl" />
             </div>
-            <div className="absolute inset-x-0 top-0 z-20 px-3 pt-3 md:px-4" style={{ height: TITLEBAR_HEIGHT + 12 }}>
+            <div className={`absolute inset-x-0 top-0 z-20 ${PAGE_GUTTER_X_CLASS} pt-3`} style={{ height: TITLEBAR_HEIGHT + 12 }}>
                 <div
                     data-tauri-drag-region
                     onMouseDown={handleTitlebarMouseDown}
@@ -102,9 +103,9 @@ export function MainLayout() {
             >
                 {isSidebarCollapsed ? <PanelLeftOpen className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
             </Button>
-            <div className="relative z-10 flex h-full w-full overflow-hidden px-3 pb-3 pt-2 md:px-4 md:pb-4" style={{ paddingTop: TITLEBAR_HEIGHT + 10 }}>
+            <div className={`relative z-10 flex h-full w-full overflow-hidden ${PAGE_GUTTER_X_CLASS} pb-3 pt-2 md:pb-4`} style={{ paddingTop: TITLEBAR_HEIGHT + 10 }}>
                 <Sidebar collapsed={isSidebarCollapsed} />
-                <main ref={mainRef} className="min-w-0 flex-1 overflow-y-auto pl-3 md:pl-4">
+                <main ref={mainRef} className={`min-w-0 flex-1 overflow-y-auto ${PAGE_GUTTER_LEFT_CLASS}`}>
                     <Outlet context={{ mainScrollRef: mainRef }} />
                 </main>
             </div>

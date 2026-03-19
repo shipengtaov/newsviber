@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import { type WorkspaceHeaderProps, WorkspaceHeader } from "@/components/layout/WorkspaceHeader";
+import { PAGE_GUTTER_X_CLASS } from "@/components/layout/layout-spacing";
 
 type PageShellProps = {
     children: ReactNode;
@@ -26,8 +27,8 @@ const SIZE_CLASS_MAP: Record<
 };
 
 const PADDING_CLASS_MAP: Record<NonNullable<PageShellProps["variant"]>, string> = {
-    default: "px-4 py-5 md:px-8 md:py-7",
-    workspace: "px-4 py-3 md:px-6 md:py-4 lg:px-8 lg:py-5",
+    default: `${PAGE_GUTTER_X_CLASS} py-5 md:py-7`,
+    workspace: `${PAGE_GUTTER_X_CLASS} py-3 md:py-4 lg:py-5`,
 };
 
 export function PageShell({
