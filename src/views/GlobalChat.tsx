@@ -89,9 +89,14 @@ function readStoredChatThreadsPanelWidth(): number {
 
 function readStoredScopePanelCollapsed(): boolean {
     try {
-        return localStorage.getItem(SCOPE_PANEL_COLLAPSED_STORAGE_KEY) === "true";
+        const raw = localStorage.getItem(SCOPE_PANEL_COLLAPSED_STORAGE_KEY);
+        if (raw === null) {
+            return true;
+        }
+
+        return raw === "true";
     } catch {
-        return false;
+        return true;
     }
 }
 
