@@ -1,6 +1,20 @@
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { CreativeCardDiscussionPanel, CreativeCardDiscussionRail } from "@/components/creative/CreativeCardDiscussionPanel";
+
+vi.mock("react-i18next", () => ({
+    useTranslation: () => ({
+        t: (key: string) => ({
+            discussCard: "Discuss Card",
+            discussCardDesc: "Ask follow-up questions or expand the report with AI.",
+            expandReport: "Expand on this report with AI.",
+            exploreFurther: "Explore further...",
+            closeDiscussion: "Close discussion",
+            connectingToModel: "Connecting to model...",
+            streaming: "Streaming...",
+        }[key] ?? key),
+    }),
+}));
 
 describe("CreativeCardDiscussionPanel", () => {
     it("renders the inline panel without requiring sheet context", () => {

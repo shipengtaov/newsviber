@@ -1,6 +1,5 @@
 import { useState, type ComponentType } from "react";
 import { useTranslation } from "react-i18next";
-import Database from "@tauri-apps/plugin-sql";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { Bug, Check, Eye, EyeOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -16,6 +15,7 @@ import {
     DialogTitle,
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
+import { getDb } from "@/lib/db";
 import {
     AIProviderConfig,
     AIProviderConfigs,
@@ -32,14 +32,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { SUPPORTED_LANGUAGES, AUTO_DETECT_VALUE, getLanguagePreference, setLanguagePreference } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { PageShell } from "@/components/layout/PageShell";
-
-let db: Database | null = null;
-async function getDb() {
-    if (!db) {
-        db = await Database.load("sqlite:getnews.db");
-    }
-    return db;
-}
 
 function getProviderConfigSnapshot(providerId: string, providerConfig: AIProviderConfig) {
     return JSON.stringify(normalizeProviderConfig(providerId, providerConfig));
@@ -128,7 +120,18 @@ export default function Settings() {
     }
 
     function persistAiSettings() {
-        saveProviderConfig(selectedProviderId, selectedConfig);
+        return saveProviderConfig(selectedProviderId, selectedConfig);
+    }
+
+    function showPersistenceError(error: unknown) {
+        toast({
+            title: t("error", { ns: "common" }),
+            description: String(error),
+            variant: "destructive",
+        });
+    }
+
+    function markSelectedProviderDraftSaved() {
         setProviderDrafts((prev) => ({
             ...prev,
             [selectedProviderId]: normalizedSelectedConfig,
@@ -137,7 +140,6 @@ export default function Settings() {
             ...prev,
             [selectedProviderId]: normalizedSelectedConfig,
         }));
-        toast({ title: t("settingsSaved"), description: t("settingsSavedDesc") });
     }
 
     function resetSelectedProviderDraft() {
@@ -147,12 +149,12 @@ export default function Settings() {
         }));
     }
 
-    function switchProvider(nextProviderId: string) {
-        saveCurrentProviderId(nextProviderId);
+    async function switchProvider(nextProviderId: string) {
+        await saveCurrentProviderId(nextProviderId);
         setSelectedProviderId(nextProviderId);
     }
 
-    function handleProviderChange(nextProviderId: string) {
+    async function handleProviderChange(nextProviderId: string) {
         if (nextProviderId === selectedProviderId) {
             return;
         }
@@ -163,7 +165,11 @@ export default function Settings() {
             return;
         }
 
-        switchProvider(nextProviderId);
+        try {
+            await switchProvider(nextProviderId);
+        } catch (error) {
+            showPersistenceError(error);
+        }
     }
 
     function handleDiscardDialogOpenChange(open: boolean) {
@@ -174,20 +180,39 @@ export default function Settings() {
         }
     }
 
-    function confirmProviderSwitch() {
+    async function confirmProviderSwitch() {
         if (!pendingProviderId) {
             return;
         }
 
-        resetSelectedProviderDraft();
-        switchProvider(pendingProviderId);
-        setPendingProviderId(null);
-        setDiscardDialogOpen(false);
+        try {
+            resetSelectedProviderDraft();
+            await switchProvider(pendingProviderId);
+            setPendingProviderId(null);
+            setDiscardDialogOpen(false);
+        } catch (error) {
+            showPersistenceError(error);
+        }
     }
 
-    function handleSaveAiSettings(e: React.FormEvent) {
+    async function handleSaveAiSettings(e: React.FormEvent) {
         e.preventDefault();
-        persistAiSettings();
+
+        try {
+            await persistAiSettings();
+            markSelectedProviderDraftSaved();
+            toast({ title: t("settingsSaved"), description: t("settingsSavedDesc") });
+        } catch (error) {
+            showPersistenceError(error);
+        }
+    }
+
+    async function handleLanguageChange(value: string) {
+        try {
+            await setLanguagePreference(value);
+        } catch (error) {
+            showPersistenceError(error);
+        }
     }
 
     async function cleanupData(days: number) {
@@ -231,7 +256,9 @@ export default function Settings() {
                         </div>
                         <Select
                             value={getLanguagePreference()}
-                            onValueChange={setLanguagePreference}
+                            onValueChange={(value) => {
+                                void handleLanguageChange(value);
+                            }}
                         >
                             <SelectTrigger className="w-[200px]">
                                 <SelectValue />
@@ -269,7 +296,9 @@ export default function Settings() {
                                             <button
                                                 key={provider.id}
                                                 type="button"
-                                                onClick={() => handleProviderChange(provider.id)}
+                                                onClick={() => {
+                                                    void handleProviderChange(provider.id);
+                                                }}
                                                 aria-pressed={isSelected}
                                                 className={cn(
                                                     "inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm transition-colors",
@@ -373,7 +402,9 @@ export default function Settings() {
                         <Button type="button" variant="outline" onClick={() => handleDiscardDialogOpenChange(false)}>
                             {t("cancel", { ns: "common" })}
                         </Button>
-                        <Button type="button" onClick={confirmProviderSwitch}>
+                        <Button type="button" onClick={() => {
+                            void confirmProviderSwitch();
+                        }}>
                             {t("discardAndSwitch")}
                         </Button>
                     </DialogFooter>

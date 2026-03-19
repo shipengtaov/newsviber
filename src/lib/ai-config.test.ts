@@ -1,84 +1,69 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
-  AI_CURRENT_PROVIDER_STORAGE_KEY,
-  AI_PROVIDER_CONFIGS_STORAGE_KEY,
   DEFAULT_AZURE_API_VERSION,
   PROVIDERS,
   PROVIDER_ICON_URLS,
-  getDefaultProviderConfigs,
   readCurrentProviderId,
   readStoredProviderConfigs,
   saveCurrentProviderId,
   saveProviderConfig,
 } from "@/lib/ai-config";
+import {
+  bootstrapAppSettings,
+  resetAppSettingsForTests,
+} from "@/lib/app-settings";
 
-function createStorageMock(): Storage {
-  const store = new Map<string, string>();
+function createDbMock(initialRows?: Record<string, string>) {
+  const rows = new Map(Object.entries(initialRows ?? {}));
 
   return {
-    get length() {
-      return store.size;
-    },
-    clear() {
-      store.clear();
-    },
-    getItem(key) {
-      return store.has(key) ? store.get(key)! : null;
-    },
-    key(index) {
-      return Array.from(store.keys())[index] ?? null;
-    },
-    removeItem(key) {
-      store.delete(key);
-    },
-    setItem(key, value) {
-      store.set(key, String(value));
-    },
+    rows,
+    select: vi.fn(async () =>
+      Array.from(rows.entries()).map(([key, value]) => ({ key, value })),
+    ),
+    execute: vi.fn(async (query: string, params?: unknown[]) => {
+      if (query.includes("CREATE TABLE IF NOT EXISTS app_settings")) {
+        return;
+      }
+
+      const [key, value] = (params ?? []) as [string, string];
+      rows.set(key, value);
+    }),
   };
 }
 
-const localStorageDescriptor = Object.getOwnPropertyDescriptor(globalThis, "localStorage");
+const { getDbMock } = vi.hoisted(() => ({
+  getDbMock: vi.fn(),
+}));
+
+vi.mock("@/lib/db", () => ({
+  getDb: getDbMock,
+}));
 
 describe("AI provider storage helpers", () => {
   beforeEach(() => {
-    Object.defineProperty(globalThis, "localStorage", {
-      value: createStorageMock(),
-      configurable: true,
-      writable: true,
-    });
+    getDbMock.mockReset();
+    getDbMock.mockResolvedValue(createDbMock());
+    resetAppSettingsForTests();
   });
 
-  afterEach(() => {
-    if (localStorageDescriptor) {
-      Object.defineProperty(globalThis, "localStorage", localStorageDescriptor);
-      return;
-    }
-
-    delete (globalThis as { localStorage?: Storage }).localStorage;
-  });
-
-  it("saves the current provider without changing stored provider configs", () => {
-    const initialConfigs = getDefaultProviderConfigs();
-    initialConfigs.openai = {
-      ...initialConfigs.openai,
+  it("saves the current provider without changing stored provider configs", async () => {
+    await bootstrapAppSettings();
+    await saveProviderConfig("openai", {
       apiKey: "openai-key",
-    };
+    });
 
-    localStorage.setItem(AI_PROVIDER_CONFIGS_STORAGE_KEY, JSON.stringify(initialConfigs));
+    await saveCurrentProviderId("gemini");
 
-    saveCurrentProviderId("gemini");
-
-    expect(localStorage.getItem(AI_CURRENT_PROVIDER_STORAGE_KEY)).toBe("gemini");
-    expect(readStoredProviderConfigs()).toEqual(initialConfigs);
+    expect(readCurrentProviderId()).toBe("gemini");
+    expect(readStoredProviderConfigs().openai.apiKey).toBe("openai-key");
   });
 
-  it("saves only the selected provider config and preserves the active provider", () => {
-    const initialConfigs = getDefaultProviderConfigs();
+  it("saves only the selected provider config and preserves the active provider", async () => {
+    await bootstrapAppSettings();
+    await saveCurrentProviderId("openai");
 
-    localStorage.setItem(AI_PROVIDER_CONFIGS_STORAGE_KEY, JSON.stringify(initialConfigs));
-    saveCurrentProviderId("openai");
-
-    saveProviderConfig("gemini", {
+    await saveProviderConfig("gemini", {
       url: " https://example.test/gemini ",
       apiKey: " gemini-secret ",
       model: " gemini-2.5-pro ",
@@ -92,11 +77,12 @@ describe("AI provider storage helpers", () => {
       apiKey: "gemini-secret",
       model: "gemini-2.5-pro",
     });
-    expect(storedConfigs.openai).toEqual(initialConfigs.openai);
+    expect(storedConfigs.openai.apiKey).toBe("");
   });
 
-  it("normalizes Azure config when saving a single provider", () => {
-    saveProviderConfig("azure", {
+  it("normalizes Azure config when saving a single provider", async () => {
+    await bootstrapAppSettings();
+    await saveProviderConfig("azure", {
       url: "https://example-resource.openai.azure.com/openai/deployments/news-copilot",
       model: "gpt-4o",
     });

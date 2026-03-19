@@ -270,6 +270,18 @@ pub fn get_migrations() -> Vec<Migration> {
                 WHERE source_type IN ('jina_url', 'twitter');
             ",
             kind: MigrationKind::Up,
+        },
+        Migration {
+            version: 9,
+            description: "add_app_settings",
+            sql: "
+                CREATE TABLE IF NOT EXISTS app_settings (
+                    key TEXT PRIMARY KEY,
+                    value TEXT NOT NULL,
+                    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+                );
+            ",
+            kind: MigrationKind::Up,
         }
     ]
 }

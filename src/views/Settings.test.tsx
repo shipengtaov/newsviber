@@ -91,10 +91,8 @@ const {
     };
 });
 
-vi.mock("@tauri-apps/plugin-sql", () => ({
-    default: {
-        load: vi.fn(),
-    },
+vi.mock("@/lib/db", () => ({
+    getDb: vi.fn(),
 }));
 
 vi.mock("@tauri-apps/plugin-opener", () => ({
