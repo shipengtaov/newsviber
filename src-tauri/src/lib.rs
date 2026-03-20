@@ -20,6 +20,8 @@ const HELP_MENU_ID_TWITTER: &str = "help.twitter";
 const HELP_MENU_ID_GITHUB: &str = "help.github";
 #[cfg(not(mobile))]
 const HELP_MENU_ID_ISSUES: &str = "help.issues";
+#[cfg(not(mobile))]
+const APP_DISPLAY_NAME: &str = "News Viber";
 
 #[cfg(not(mobile))]
 fn help_menu_url(menu_id: &str) -> Option<&'static str> {
@@ -79,7 +81,7 @@ fn build_macos_menu<R: Runtime>(app_handle: &AppHandle<R>) -> tauri::Result<Menu
     let pkg_info = app_handle.package_info();
     let config = app_handle.config();
     let about_metadata = AboutMetadata {
-        name: Some(pkg_info.name.clone()),
+        name: Some(APP_DISPLAY_NAME.to_string()),
         version: Some(pkg_info.version.to_string()),
         copyright: config.bundle.copyright.clone(),
         authors: config
@@ -118,21 +120,21 @@ fn build_macos_menu<R: Runtime>(app_handle: &AppHandle<R>) -> tauri::Result<Menu
         &[
             &Submenu::with_items(
                 app_handle,
-                pkg_info.name.clone(),
+                APP_DISPLAY_NAME,
                 true,
                 &[
                     &PredefinedMenuItem::about(
                         app_handle,
-                        Some("About Stream Deck"),
+                        Some("About News Viber"),
                         Some(about_metadata),
                     )?,
                     &PredefinedMenuItem::separator(app_handle)?,
                     &PredefinedMenuItem::services(app_handle, None)?,
                     &PredefinedMenuItem::separator(app_handle)?,
-                    &PredefinedMenuItem::hide(app_handle, Some("Hide Stream Deck"))?,
+                    &PredefinedMenuItem::hide(app_handle, Some("Hide News Viber"))?,
                     &PredefinedMenuItem::hide_others(app_handle, None)?,
                     &PredefinedMenuItem::separator(app_handle)?,
-                    &PredefinedMenuItem::quit(app_handle, Some("Quit Stream Deck"))?,
+                    &PredefinedMenuItem::quit(app_handle, Some("Quit News Viber"))?,
                 ],
             )?,
             &Submenu::with_items(

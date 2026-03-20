@@ -7,14 +7,14 @@ describe("StartupStatusScreen", () => {
   it("renders the loading state without visible startup copy", () => {
     const markup = renderToStaticMarkup(
       <StartupStatusScreen
-        title="Starting Stream Deck"
+        title="Starting News Viber"
         kicker={null}
         description={null}
         preserveCopySpace
       />,
     );
 
-    expect(markup).toContain(">Starting Stream Deck<");
+    expect(markup).toContain(">Starting News Viber<");
     expect(markup).toContain("startup-shell__progress-bar");
     expect(markup).toContain("startup-shell__copy-placeholder");
     expect(markup).not.toContain("App Startup");
@@ -25,7 +25,7 @@ describe("StartupStatusScreen", () => {
     const markup = renderToStaticMarkup(
       <StartupStatusScreen
         title="Failed to restore persisted settings"
-        description="Stream Deck could not load your saved application settings from SQLite."
+        description="News Viber could not load your saved application settings from SQLite."
         detail="database is locked"
         showRetry
         onRetry={() => undefined}
@@ -35,7 +35,7 @@ describe("StartupStatusScreen", () => {
     expect(markup).toContain(">App Startup<");
     expect(markup).toContain(">Failed to restore persisted settings<");
     expect(markup).toContain(
-      "Stream Deck could not load your saved application settings from SQLite.",
+      "News Viber could not load your saved application settings from SQLite.",
     );
     expect(markup).toContain("database is locked");
     expect(markup).toContain(">Retry<");

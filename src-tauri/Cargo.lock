@@ -3,27 +3,6 @@
 version = 4
 
 [[package]]
-name = "StreamDeck"
-version = "0.1.0"
-dependencies = [
- "atom_syndication",
- "chrono",
- "reqwest 0.13.2",
- "rss",
- "scraper",
- "serde",
- "serde_json",
- "sqlx",
- "tauri",
- "tauri-build",
- "tauri-plugin-http",
- "tauri-plugin-opener",
- "tauri-plugin-sql",
- "tokio",
- "url",
-]
-
-[[package]]
 name = "adler2"
 version = "2.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2650,6 +2629,27 @@ name = "new_debug_unreachable"
 version = "1.0.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "650eef8c711430f1a879fdd01d4745a7deea475becfb90269c06775983bbf086"
+
+[[package]]
+name = "news-viber"
+version = "0.1.0"
+dependencies = [
+ "atom_syndication",
+ "chrono",
+ "reqwest 0.13.2",
+ "rss",
+ "scraper",
+ "serde",
+ "serde_json",
+ "sqlx",
+ "tauri",
+ "tauri-build",
+ "tauri-plugin-http",
+ "tauri-plugin-opener",
+ "tauri-plugin-sql",
+ "tokio",
+ "url",
+]
 
 [[package]]
 name = "nodrop"

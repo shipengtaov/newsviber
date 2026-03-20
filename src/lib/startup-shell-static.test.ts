@@ -7,7 +7,7 @@ describe("static startup shell", () => {
   it("keeps the loading shell copyless while preserving placeholder nodes", () => {
     const markup = readFileSync(resolve(process.cwd(), "index.html"), "utf8");
 
-    expect(markup).toContain("Starting Stream Deck");
+    expect(markup).toContain("Starting News Viber");
     expect(markup).toContain("startup-shell__copy-placeholder");
     expect(markup).not.toContain("App Startup");
     expect(markup).not.toContain("Restoring persisted settings and preparing the app.");

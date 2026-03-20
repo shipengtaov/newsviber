@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import { Sidebar } from "@/components/layout/Sidebar";
 
 const translations: Record<string, string> = {
-    appName: "Stream Deck",
+    appName: "News Viber",
     "nav.news": "News",
     "nav.creativeSpace": "Creative Space",
     "nav.chat": "Chat",

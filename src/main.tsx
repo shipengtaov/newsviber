@@ -44,7 +44,7 @@ async function renderApp() {
 function renderLoadingScreen() {
   render(
     <StartupStatusScreen
-      title="Starting Stream Deck"
+      title="Starting News Viber"
       kicker={null}
       description={null}
       preserveCopySpace
@@ -70,7 +70,7 @@ function describeBootstrapError(error: unknown): {
     return {
       title: "Failed to restore persisted settings",
       description:
-        "Stream Deck could not load your saved application settings from SQLite. Your data was not changed. Retry after the database finishes initializing.",
+        "News Viber could not load your saved application settings from SQLite. Your data was not changed. Retry after the database finishes initializing.",
       detail,
     };
   }
@@ -79,7 +79,7 @@ function describeBootstrapError(error: unknown): {
     return {
       title: "Failed to initialize translations",
       description:
-        "Stream Deck could not finish loading its translations. Retry to continue launching the app.",
+        "News Viber could not finish loading its translations. Retry to continue launching the app.",
       detail,
     };
   }
@@ -87,7 +87,7 @@ function describeBootstrapError(error: unknown): {
   return {
     title: "Failed to start the app",
     description:
-      "An unexpected startup error prevented Stream Deck from launching correctly. Retry to try again.",
+      "An unexpected startup error prevented News Viber from launching correctly. Retry to try again.",
     detail,
   };
 }

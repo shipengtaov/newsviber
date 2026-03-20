@@ -1,6 +1,6 @@
-# Stream Deck
+# News Viber
 
-Stream Deck is a desktop news reader built with Tauri, React, and TypeScript using Vite.
+News Viber is a desktop news reader built with Tauri, React, and TypeScript using Vite.
 
 ## Recommended IDE Setup
 

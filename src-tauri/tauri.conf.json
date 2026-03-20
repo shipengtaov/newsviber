@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Stream Deck",
+  "productName": "News Viber",
   "version": "26.3.0",
   "identifier": "com.shipengtao.get-news",
   "build": {
@@ -13,7 +13,7 @@
     "windows": [
       {
         "label": "main",
-        "title": "Stream Deck",
+        "title": "News Viber",
         "titleBarStyle": "Overlay",
         "hiddenTitle": true,
         "trafficLightPosition": {
