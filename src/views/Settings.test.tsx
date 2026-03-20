@@ -16,6 +16,21 @@ const translations: Record<string, Record<string, string>> = {
         title: "System configuration",
         description: "Configure providers, keys, and housekeeping behavior.",
         general: "General",
+        softwareUpdate: "Software Update",
+        softwareUpdateDesc: "Check for and install available updates.",
+        softwareUpdateHint: "Available updates will appear here.",
+        currentVersion: "Current Version",
+        checkForUpdates: "Check for Updates",
+        checkingForUpdates: "Checking for updates...",
+        viewUpdate: "View Update",
+        restartNow: "Restart Now",
+        updateAvailableStatus: "Version 27.0.0 is available",
+        updateAvailableStatusDesc: "A signed update published on Mar 20 is ready to install.",
+        noUpdateStatus: "No update pending",
+        noUpdateStatusDesc: "You're currently running version 26.3.0.",
+        restartReadyStatus: "Restart required",
+        restartReadyStatusDesc: "Restart to finish applying the update.",
+        updateCheckFailedStatus: "Could not check for updates",
         aiProviderConfig: "AI Provider Configuration",
         aiProviderDesc: "Configure your AI provider for article chat and summaries.",
         selectProvider: "Select Provider",
@@ -51,6 +66,7 @@ const translations: Record<string, Record<string, string>> = {
 const {
     openaiProvider,
     geminiProvider,
+    mockUpdateState,
     providerConfigs,
     readCurrentProviderIdMock,
     readStoredProviderConfigsMock,
@@ -74,6 +90,22 @@ const {
     return {
         openaiProvider,
         geminiProvider,
+        mockUpdateState: {
+            checkForUpdates: vi.fn(),
+            currentVersion: "26.3.0",
+            downloadProgress: {
+                contentLength: null,
+                downloadedBytes: 0,
+            },
+            hasPendingUpdate: false,
+            isChecking: false,
+            isInstalling: false,
+            isRestartReady: false,
+            lastCheckError: null,
+            openUpdateDialog: vi.fn(),
+            restartToFinishUpdate: vi.fn(),
+            update: null,
+        },
         providerConfigs: {
             [openaiProvider.id]: {
                 url: openaiProvider.url,
@@ -114,9 +146,16 @@ vi.mock("@/hooks/use-toast", () => ({
     }),
 }));
 
+vi.mock("@/components/update/AppUpdateProvider", () => ({
+    useAppUpdate: () => mockUpdateState,
+}));
+
 vi.mock("@/lib/i18n", () => ({
     SUPPORTED_LANGUAGES: [{ code: "en", label: "English" }],
     AUTO_DETECT_VALUE: "auto",
+    default: {
+        language: "en",
+    },
     getLanguagePreference: () => "en",
     setLanguagePreference: vi.fn(),
 }));
@@ -184,6 +223,22 @@ describe("Settings", () => {
             [openaiProvider.id]: { ...providerConfigs[openaiProvider.id] },
             [geminiProvider.id]: { ...providerConfigs[geminiProvider.id] },
         }));
+        Object.assign(mockUpdateState, {
+            checkForUpdates: vi.fn(),
+            currentVersion: "26.3.0",
+            downloadProgress: {
+                contentLength: null,
+                downloadedBytes: 0,
+            },
+            hasPendingUpdate: false,
+            isChecking: false,
+            isInstalling: false,
+            isRestartReady: false,
+            lastCheckError: null,
+            openUpdateDialog: vi.fn(),
+            restartToFinishUpdate: vi.fn(),
+            update: null,
+        });
     });
 
     it("renders the about card after data management with the expected external links", () => {
@@ -212,5 +267,33 @@ describe("Settings", () => {
         expect(markup).toContain(`value="${geminiProvider.url}"`);
         expect(markup).toContain('value="gemini-key"');
         expect(markup).toContain(`value="${geminiProvider.models[0]}"`);
+    });
+
+    it("renders the software update card as a single panel in the default state", () => {
+        const markup = renderToStaticMarkup(<Settings />);
+
+        expect(markup).toContain(">Software Update<");
+        expect(markup).toContain(">Current Version<");
+        expect(markup).toContain(">v26.3.0<");
+        expect(markup).toContain(">Check for Updates<");
+        expect(markup).toContain(">Available updates will appear here.<");
+        expect((markup.match(/rounded-lg border bg-muted\/35 p-4/g) ?? []).length).toBe(1);
+    });
+
+    it("shows update actions inline when an update is available", () => {
+        Object.assign(mockUpdateState, {
+            hasPendingUpdate: true,
+            update: {
+                body: "Release notes",
+                currentVersion: "26.3.0",
+                date: "2026-03-20T00:00:00Z",
+                version: "27.0.0",
+            },
+        });
+
+        const markup = renderToStaticMarkup(<Settings />);
+
+        expect(markup).toContain(">Version 27.0.0 is available<");
+        expect(markup).toContain(">View Update<");
     });
 });

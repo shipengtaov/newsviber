@@ -214,6 +214,13 @@ fn build_default_desktop_menu<R: Runtime>(app_handle: &AppHandle<R>) -> tauri::R
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .setup(|app| {
+            #[cfg(not(mobile))]
+            app.handle()
+                .plugin(tauri_plugin_updater::Builder::new().build())?;
+
+            Ok(())
+        })
         .menu(|app_handle| {
             #[cfg(target_os = "macos")]
             {
@@ -239,6 +246,7 @@ pub fn run() {
             }
         })
         .plugin(tauri_plugin_http::init())
+        .plugin(tauri_plugin_process::init())
         .plugin(
             tauri_plugin_sql::Builder::new()
                 .add_migrations(&db::migration_database_url(), db::get_migrations())

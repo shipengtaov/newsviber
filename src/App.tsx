@@ -13,6 +13,7 @@ import { getDb } from "@/lib/db";
 import { addSourceFetchSyncListener, dispatchSourceFetchSyncEvent } from "@/lib/source-events";
 import { fetchSources, isSourceDueForFetch, type SchedulableSource } from "@/lib/source-fetch";
 import { normalizeFetchInterval } from "@/lib/source-utils";
+import { AppUpdateProvider } from "@/components/update/AppUpdateProvider";
 
 function App() {
   useEffect(() => {
@@ -88,21 +89,23 @@ function App() {
   }, []);
 
   return (
-    <BrowserRouter>
-      <Routes>
-        <Route element={<MainLayout />}>
-          <Route path="/" element={<NewsList />} />
-          <Route path="/news/:id" element={<NewsDetail />} />
-          <Route path="/sources" element={<SourceManager />} />
-          <Route path="/sources/add" element={<SourceForm />} />
-          <Route path="/sources/edit/:id" element={<SourceForm />} />
-          <Route path="/chat" element={<GlobalChat />} />
-          <Route path="/chat/:threadId" element={<GlobalChat />} />
-          <Route path="/creative" element={<CreativeSpace />} />
-          <Route path="/settings" element={<Settings />} />
-        </Route>
-      </Routes>
-    </BrowserRouter>
+    <AppUpdateProvider>
+      <BrowserRouter>
+        <Routes>
+          <Route element={<MainLayout />}>
+            <Route path="/" element={<NewsList />} />
+            <Route path="/news/:id" element={<NewsDetail />} />
+            <Route path="/sources" element={<SourceManager />} />
+            <Route path="/sources/add" element={<SourceForm />} />
+            <Route path="/sources/edit/:id" element={<SourceForm />} />
+            <Route path="/chat" element={<GlobalChat />} />
+            <Route path="/chat/:threadId" element={<GlobalChat />} />
+            <Route path="/creative" element={<CreativeSpace />} />
+            <Route path="/settings" element={<Settings />} />
+          </Route>
+        </Routes>
+      </BrowserRouter>
+    </AppUpdateProvider>
   );
 }
 

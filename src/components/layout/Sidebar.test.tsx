@@ -18,6 +18,12 @@ vi.mock("react-i18next", () => ({
     }),
 }));
 
+vi.mock("@/components/update/AppUpdateProvider", () => ({
+    useAppUpdate: () => ({
+        currentVersion: "26.3.0",
+    }),
+}));
+
 function renderSidebar(pathname: string, collapsed = false): string {
     return renderToStaticMarkup(
         <MemoryRouter initialEntries={[pathname]}>
@@ -51,6 +57,7 @@ describe("Sidebar", () => {
         expect(markup).not.toContain("Information workspace");
         expect(markup).not.toContain("Navigate");
         expect(markup).toContain(`>${translations.appName}<`);
+        expect(markup).toContain(">v26.3.0<");
     });
 
     it("uses the updated expanded width while preserving the collapsed width", () => {

@@ -1,8 +1,8 @@
 import { Link, useLocation } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/utils";
-import { APP_VERSION } from "@/lib/version";
 import { Newspaper, Rss, MessageSquare, Lightbulb, Settings } from "lucide-react";
+import { useAppUpdate } from "@/components/update/AppUpdateProvider";
 
 type SidebarProps = {
     collapsed: boolean;
@@ -11,6 +11,7 @@ type SidebarProps = {
 export function Sidebar({ collapsed }: SidebarProps) {
     const { t } = useTranslation();
     const location = useLocation();
+    const { currentVersion } = useAppUpdate();
     const navItems = [
         { name: t("nav.news"), path: "/", icon: Newspaper },
         { name: t("nav.creativeSpace"), path: "/creative", icon: Lightbulb },
@@ -96,7 +97,7 @@ export function Sidebar({ collapsed }: SidebarProps) {
                         contentTransitionClass,
                     )}
                 >
-                    v{APP_VERSION}
+                    v{currentVersion}
                 </div>
             </div>
         </aside>

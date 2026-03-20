@@ -32,6 +32,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { SUPPORTED_LANGUAGES, AUTO_DETECT_VALUE, getLanguagePreference, setLanguagePreference } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { PageShell } from "@/components/layout/PageShell";
+import { useAppUpdate } from "@/components/update/AppUpdateProvider";
+import { formatUtcDateTime } from "@/lib/time";
 
 function getProviderConfigSnapshot(providerId: string, providerConfig: AIProviderConfig) {
     return JSON.stringify(normalizeProviderConfig(providerId, providerConfig));
@@ -94,6 +96,19 @@ const ABOUT_LINKS: AboutLink[] = [
 export default function Settings() {
     const { t } = useTranslation("settings");
     const { toast } = useToast();
+    const {
+        checkForUpdates,
+        currentVersion,
+        downloadProgress,
+        hasPendingUpdate,
+        isChecking,
+        isInstalling,
+        isRestartReady,
+        lastCheckError,
+        openUpdateDialog,
+        restartToFinishUpdate,
+        update,
+    } = useAppUpdate();
     const [selectedProviderId, setSelectedProviderId] = useState(readCurrentProviderId);
     const [providerDrafts, setProviderDrafts] = useState<AIProviderConfigs>(readStoredProviderConfigs);
     const [savedProviderDrafts, setSavedProviderDrafts] = useState<AIProviderConfigs>(readStoredProviderConfigs);
@@ -230,6 +245,33 @@ export default function Settings() {
         void openUrl(url);
     }
 
+    const downloadProgressLabel = downloadProgress.contentLength && downloadProgress.contentLength > 0
+        ? `${Math.min(100, Math.round((downloadProgress.downloadedBytes / downloadProgress.contentLength) * 100))}%`
+        : null;
+    const updateStatusTitle = lastCheckError
+        ? t("updateCheckFailedStatus")
+        : isRestartReady
+            ? t("restartReadyStatus")
+            : isInstalling
+                ? t("installingUpdate")
+                : hasPendingUpdate && update
+                    ? t("updateAvailableStatus", { version: update.version })
+                    : null;
+    const updateStatusDescription = lastCheckError
+        ? lastCheckError
+        : isRestartReady
+            ? t("restartReadyStatusDesc")
+            : isInstalling
+                ? downloadProgressLabel
+                    ? t("downloadProgressStatus", { progress: downloadProgressLabel })
+                    : t("downloadPreparing")
+                : hasPendingUpdate && update
+                    ? t("updateAvailableStatusDesc", {
+                        version: update.version,
+                        publishedAt: formatUtcDateTime(update.date, t("unknown", { ns: "common" })),
+                    })
+                    : t("softwareUpdateHint");
+
     return (
         <PageShell
             variant="workspace"
@@ -274,6 +316,66 @@ export default function Settings() {
                                 ))}
                             </SelectContent>
                         </Select>
+                    </div>
+                </CardContent>
+            </Card>
+
+            <Card>
+                <CardHeader>
+                    <CardTitle>{t("softwareUpdate")}</CardTitle>
+                    <CardDescription>{t("softwareUpdateDesc")}</CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <div className="space-y-4 rounded-lg border bg-muted/35 p-4">
+                        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                            <div>
+                                <div className="text-sm font-medium">{t("currentVersion")}</div>
+                                <div className="text-sm text-muted-foreground">v{currentVersion}</div>
+                            </div>
+                            <Button
+                                type="button"
+                                onClick={() => {
+                                    void checkForUpdates();
+                                }}
+                                disabled={isChecking || isInstalling}
+                            >
+                                {isChecking ? t("checkingForUpdates") : t("checkForUpdates")}
+                            </Button>
+                        </div>
+
+                        <div className="space-y-3 border-t border-border/60 pt-4">
+                            {updateStatusTitle ? (
+                                <div>
+                                    <div className="font-medium">{updateStatusTitle}</div>
+                                    <div className="text-sm text-muted-foreground">{updateStatusDescription}</div>
+                                </div>
+                            ) : (
+                                <div className="text-sm text-muted-foreground">{updateStatusDescription}</div>
+                            )}
+
+                            {isInstalling ? (
+                                <div className="h-2 overflow-hidden rounded-full bg-border/70">
+                                    <div
+                                        className="h-full rounded-full bg-primary transition-[width] duration-200 ease-out"
+                                        style={{ width: downloadProgressLabel ?? "0%" }}
+                                    />
+                                </div>
+                            ) : null}
+
+                            {hasPendingUpdate && update && !isRestartReady && !isInstalling ? (
+                                <Button type="button" variant="outline" onClick={openUpdateDialog}>
+                                    {t("viewUpdate")}
+                                </Button>
+                            ) : null}
+
+                            {isRestartReady ? (
+                                <Button type="button" onClick={() => {
+                                    void restartToFinishUpdate();
+                                }}>
+                                    {t("restartNow")}
+                                </Button>
+                            ) : null}
+                        </div>
                     </div>
                 </CardContent>
             </Card>
