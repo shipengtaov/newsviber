@@ -197,10 +197,10 @@ describe("Settings", () => {
         expect(markup).toContain(">GitHub<");
         expect(markup).toContain(">Issues<");
         expect(markup).toContain('href="https://x.com/shipengtao"');
-        expect(markup).toContain('href="https://github.com/shipengtaov"');
-        expect(markup).toContain('href="https://github.com/shipengtaov/stream-deck-support"');
+        expect(markup).toContain('href="https://github.com/shipengtaov/newsviber"');
+        expect(markup).toContain('href="https://github.com/shipengtaov/newsviber/issues/new"');
         expect(markup).not.toContain(">https://x.com/shipengtao<");
-        expect(markup).not.toContain(">https://github.com/shipengtaov<");
+        expect(markup).not.toContain(">https://github.com/shipengtaov/newsviber<");
     });
 
     it("renders the saved provider selection on the first render", () => {

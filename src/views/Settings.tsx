@@ -80,13 +80,13 @@ const ABOUT_LINKS: AboutLink[] = [
     {
         key: "github",
         labelKey: "aboutGithub",
-        url: "https://github.com/shipengtaov",
+        url: "https://github.com/shipengtaov/newsviber",
         Icon: GitHubLogoIcon,
     },
     {
         key: "feedback",
         labelKey: "aboutFeedback",
-        url: "https://github.com/shipengtaov/stream-deck-support",
+        url: "https://github.com/shipengtaov/newsviber/issues/new",
         Icon: Bug,
     },
 ];

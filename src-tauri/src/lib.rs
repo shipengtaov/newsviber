@@ -27,9 +27,27 @@ const APP_DISPLAY_NAME: &str = "News Viber";
 fn help_menu_url(menu_id: &str) -> Option<&'static str> {
     match menu_id {
         HELP_MENU_ID_TWITTER => Some("https://x.com/shipengtao"),
-        HELP_MENU_ID_GITHUB => Some("https://github.com/shipengtaov"),
-        HELP_MENU_ID_ISSUES => Some("https://github.com/shipengtaov/stream-deck-support"),
+        HELP_MENU_ID_GITHUB => Some("https://github.com/shipengtaov/newsviber"),
+        HELP_MENU_ID_ISSUES => Some("https://github.com/shipengtaov/newsviber/issues/new"),
         _ => None,
+    }
+}
+
+#[cfg(all(test, not(mobile)))]
+mod tests {
+    use super::{help_menu_url, HELP_MENU_ID_GITHUB, HELP_MENU_ID_ISSUES};
+
+    #[test]
+    fn help_menu_urls_match_expected_destinations() {
+        assert_eq!(
+            help_menu_url(HELP_MENU_ID_GITHUB),
+            Some("https://github.com/shipengtaov/newsviber")
+        );
+        assert_eq!(
+            help_menu_url(HELP_MENU_ID_ISSUES),
+            Some("https://github.com/shipengtaov/newsviber/issues/new")
+        );
+        assert_eq!(help_menu_url("help.unknown"), None);
     }
 }
 
