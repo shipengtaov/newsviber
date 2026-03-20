@@ -5,9 +5,32 @@
     <link rel="icon" type="image/svg+xml" href="/logo_dark_waves.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Stream Deck</title>
+    <style>
+      html, body { min-height: 100%; margin: 0; background: #f4efe6; color: #223041; }
+      #root { min-height: 100vh; }
+      #startup-shell { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; padding: 24px; }
+    </style>
+    <link rel="stylesheet" href="/startup-shell.css" />
   </head>
 
   <body>
+    <div id="startup-shell" class="startup-stage startup-stage--overlay">
+      <div class="startup-shell" role="status" aria-live="polite">
+        <div class="startup-shell__content">
+          <div class="startup-shell__header">
+            <img src="/logo_dark_waves.svg" alt="" aria-hidden="true" class="startup-shell__logo" />
+            <div class="startup-shell__text">
+              <div aria-hidden="true" class="startup-shell__kicker startup-shell__copy-placeholder"></div>
+              <h1 class="startup-shell__title">Starting Stream Deck</h1>
+              <p aria-hidden="true" class="startup-shell__description startup-shell__copy-placeholder"></p>
+            </div>
+          </div>
+          <div class="startup-shell__progress" aria-hidden="true">
+            <span class="startup-shell__progress-bar"></span>
+          </div>
+        </div>
+      </div>
+    </div>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

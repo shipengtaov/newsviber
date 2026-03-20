@@ -12,6 +12,7 @@
   "app": {
     "windows": [
       {
+        "label": "main",
         "title": "Stream Deck",
         "titleBarStyle": "Overlay",
         "hiddenTitle": true,

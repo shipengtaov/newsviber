@@ -2,11 +2,13 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import "./index.css";
 import App from "./App";
+import { StartupStatusScreen } from "@/components/startup/StartupStatusScreen";
 import {
   AppSettingsBootstrapError,
   AppStartupI18nError,
   bootstrapApplication,
 } from "./lib/app-startup";
+import { completeStartupTransition } from "./lib/startup-transition";
 
 const rootElement = document.getElementById("root");
 
@@ -25,61 +27,27 @@ function render(node: React.ReactNode) {
   );
 }
 
-function renderApp() {
-  render(<App />);
+async function renderBootstrappedScreen(node: React.ReactNode) {
+  render(node);
+
+  try {
+    await completeStartupTransition();
+  } catch (error) {
+    console.error("Failed to complete startup transition:", error);
+  }
 }
 
-type BootstrapStatusScreenProps = {
-  title: string;
-  description: string;
-  detail?: string | null;
-  showRetry?: boolean;
-};
-
-function BootstrapStatusScreen({
-  title,
-  description,
-  detail = null,
-  showRetry = false,
-}: BootstrapStatusScreenProps) {
-  return (
-    <div className="flex min-h-screen items-center justify-center bg-background px-6 py-10 text-foreground">
-      <div className="w-full max-w-xl rounded-[1.75rem] border border-border/60 bg-card/90 p-8 shadow-xl backdrop-blur-sm">
-        <div className="space-y-4">
-          <div className="inline-flex rounded-full border border-border/60 bg-muted px-3 py-1 text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">
-            App Startup
-          </div>
-          <div className="space-y-2">
-            <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
-            <p className="text-sm leading-6 text-muted-foreground">{description}</p>
-          </div>
-          {detail ? (
-            <pre className="overflow-x-auto rounded-2xl border border-border/50 bg-muted/60 px-4 py-3 text-xs leading-5 text-muted-foreground">
-              {detail}
-            </pre>
-          ) : null}
-          {showRetry ? (
-            <button
-              type="button"
-              onClick={() => {
-                void bootstrap();
-              }}
-              className="inline-flex h-11 items-center justify-center rounded-xl bg-foreground px-5 text-sm font-medium text-background transition hover:opacity-90"
-            >
-              Retry
-            </button>
-          ) : null}
-        </div>
-      </div>
-    </div>
-  );
+async function renderApp() {
+  await renderBootstrappedScreen(<App />);
 }
 
 function renderLoadingScreen() {
   render(
-    <BootstrapStatusScreen
+    <StartupStatusScreen
       title="Starting Stream Deck"
-      description="Restoring persisted settings and preparing the app."
+      kicker={null}
+      description={null}
+      preserveCopySpace
     />,
   );
 }
@@ -124,15 +92,18 @@ function describeBootstrapError(error: unknown): {
   };
 }
 
-function renderBootstrapError(error: unknown) {
+async function renderBootstrapError(error: unknown) {
   const content = describeBootstrapError(error);
 
-  render(
-    <BootstrapStatusScreen
+  await renderBootstrappedScreen(
+    <StartupStatusScreen
       title={content.title}
       description={content.description}
       detail={content.detail}
       showRetry
+      onRetry={() => {
+        void bootstrap();
+      }}
     />,
   );
 }
@@ -155,7 +126,7 @@ async function bootstrap() {
       );
     }
 
-    renderApp();
+    await renderApp();
   } catch (error) {
     if (error instanceof AppSettingsBootstrapError) {
       console.error("Failed to bootstrap persisted settings:", getErrorCause(error) ?? error);
@@ -165,7 +136,7 @@ async function bootstrap() {
       console.error("Unexpected application bootstrap failure:", error);
     }
 
-    renderBootstrapError(error);
+    await renderBootstrapError(error);
   } finally {
     isBootstrapping = false;
   }
