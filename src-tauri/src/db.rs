@@ -2,6 +2,7 @@ use tauri_plugin_sql::{Migration, MigrationKind};
 
 pub fn get_migrations() -> Vec<Migration> {
     vec![
+        // Never edit an already-applied migration in place. sqlx hashes the full SQL string.
         Migration {
             version: 1,
             description: "create_initial_tables",
@@ -9,7 +10,7 @@ pub fn get_migrations() -> Vec<Migration> {
                 CREATE TABLE IF NOT EXISTS sources (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     name TEXT NOT NULL,
-                    source_type TEXT NOT NULL, /* 'rss' */
+                    source_type TEXT NOT NULL, /* 'rss', 'jina_url', 'jina_search', 'twitter', 'custom' */
                     url TEXT NOT NULL,
                     config TEXT, /* JSON config */
                     fetch_interval INTEGER NOT NULL DEFAULT 60, /* minutes */

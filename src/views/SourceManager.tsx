@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
-import Database from "@tauri-apps/plugin-sql";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -14,6 +13,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { RefreshCcw, Trash2, Edit, Plus, Power, PowerOff } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { getDb } from "@/lib/db";
 import { fetchSource, fetchSources, type FetchableSource } from "@/lib/source-fetch";
 import { addSourceFetchSyncListener, dispatchSourceFetchSyncEvent } from "@/lib/source-events";
 import { formatFetchInterval, formatLastFetchSummary, normalizeFetchInterval } from "@/lib/source-utils";
@@ -23,14 +23,6 @@ type Source = FetchableSource & {
     config: string | null;
     fetch_interval: number;
 };
-
-let db: Database | null = null;
-async function getDb() {
-    if (!db) {
-        db = await Database.load("sqlite:getnews.db");
-    }
-    return db;
-}
 
 export default function SourceManager() {
     const { t } = useTranslation("sources");

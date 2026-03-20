@@ -139,6 +139,15 @@ vi.mock("@/hooks/use-streaming-conversation", () => ({
 }));
 
 vi.mock("@/lib/global-chat-service", () => {
+    type MockGlobalChatScopeInput = {
+        title?: string;
+        time_range_mode: "preset" | "custom";
+        preset_days: number | null;
+        custom_start_date: string | null;
+        custom_end_date: string | null;
+        source_ids: number[];
+    };
+
     const DEFAULT_SCOPE = {
         time_range_mode: "preset" as const,
         preset_days: 7,
@@ -147,7 +156,7 @@ vi.mock("@/lib/global-chat-service", () => {
         source_ids: [] as number[],
     };
 
-    function normalizeGlobalChatScopeInput(input: Partial<typeof DEFAULT_SCOPE> & { title?: string } = {}) {
+    function normalizeGlobalChatScopeInput(input: Partial<MockGlobalChatScopeInput> = {}) {
         if (input.time_range_mode === "custom") {
             return {
                 title: input.title?.trim() || undefined,

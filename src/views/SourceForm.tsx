@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
-import Database from "@tauri-apps/plugin-sql";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -9,15 +8,8 @@ import { useToast } from "@/hooks/use-toast";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { ChevronLeft } from "lucide-react";
 import { PageShell } from "@/components/layout/PageShell";
+import { getDb } from "@/lib/db";
 import { DEFAULT_SOURCE_RETURN_TO, isNewsReturnToPath, resolveSourceReturnTo } from "@/lib/source-navigation";
-
-let db: Database | null = null;
-async function getDb() {
-    if (!db) {
-        db = await Database.load("sqlite:getnews.db");
-    }
-    return db;
-}
 
 function parseFetchInterval(value: string): number {
     const parsed = Number.parseInt(value, 10);

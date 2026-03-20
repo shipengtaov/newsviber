@@ -6,6 +6,7 @@ import {
   getDefaultProviderConfigs,
 } from "@/lib/ai-config";
 import {
+  AppSettingsBootstrapError,
   bootstrapAppSettings,
   getAppSettingsSnapshot,
   readCurrentProviderId,
@@ -254,5 +255,50 @@ describe("app settings persistence", () => {
       ),
     ).toBe(true);
     expect(readLanguagePreference()).toBe("de");
+  });
+
+  it("retries transient SQLite read failures during bootstrap", async () => {
+    vi.useFakeTimers();
+
+    const db = createDbMock({
+      "settings.ai.currentProviderId": JSON.stringify("gemini"),
+    });
+    db.select
+      .mockRejectedValueOnce(new Error("database is locked"))
+      .mockResolvedValueOnce(
+        Array.from(db.rows.entries()).map(([key, value]) => ({ key, value })),
+      );
+    getDbMock.mockResolvedValue(db);
+
+    const snapshotPromise = bootstrapAppSettings();
+    await vi.runAllTimersAsync();
+
+    await expect(snapshotPromise).resolves.toMatchObject({
+      currentProviderId: "gemini",
+    });
+    expect(db.select).toHaveBeenCalledTimes(2);
+
+    vi.useRealTimers();
+  });
+
+  it("throws an explicit bootstrap error when persisted settings cannot be loaded", async () => {
+    vi.useFakeTimers();
+
+    const db = createDbMock();
+    db.select.mockRejectedValue(new Error("database is locked"));
+    getDbMock.mockResolvedValue(db);
+
+    const snapshotPromise = bootstrapAppSettings();
+    const rejection = expect(snapshotPromise).rejects.toBeInstanceOf(AppSettingsBootstrapError);
+    await vi.runAllTimersAsync();
+
+    await rejection;
+    expect(getAppSettingsSnapshot()).toEqual({
+      languagePreference: AUTO_DETECT_VALUE,
+      currentProviderId: "openai",
+      providerConfigs: getDefaultProviderConfigs(),
+    });
+
+    vi.useRealTimers();
   });
 });

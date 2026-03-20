@@ -55,10 +55,22 @@ const APP_SETTINGS_TABLE_SQL = `
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
   )
 `;
+const BOOTSTRAP_READ_RETRY_ATTEMPTS = 3;
+const BOOTSTRAP_READ_RETRY_DELAY_MS = 100;
 
 let appSettingsCache = getDefaultAppSettingsSnapshot();
 let bootstrapPromise: Promise<AppSettingsSnapshot> | null = null;
 let ensureTablePromise: Promise<void> | null = null;
+
+export class AppSettingsBootstrapError extends Error {
+  readonly cause?: unknown;
+
+  constructor(message: string, options?: { cause?: unknown }) {
+    super(message);
+    this.name = "AppSettingsBootstrapError";
+    this.cause = options?.cause;
+  }
+}
 
 function getDefaultAppSettingsSnapshot(): AppSettingsSnapshot {
   return {
@@ -116,6 +128,23 @@ function isMissingAppSettingsTableError(error: unknown): boolean {
   return String(error).includes("no such table: app_settings");
 }
 
+function isTransientBootstrapReadError(error: unknown): boolean {
+  const message = String(error).toLowerCase();
+
+  return (
+    message.includes("database is locked") ||
+    message.includes("database is busy") ||
+    message.includes("sqlite_busy") ||
+    message.includes("sqlite_locked")
+  );
+}
+
+function wait(delayMs: number): Promise<void> {
+  return new Promise((resolve) => {
+    globalThis.setTimeout(resolve, delayMs);
+  });
+}
+
 async function ensureAppSettingsTable(): Promise<void> {
   if (!ensureTablePromise) {
     ensureTablePromise = (async () => {
@@ -144,6 +173,29 @@ async function withEnsuredAppSettingsTable<T>(operation: () => Promise<T>): Prom
     await ensureAppSettingsTable();
     return operation();
   }
+}
+
+async function withRetryableBootstrapRead<T>(operation: () => Promise<T>): Promise<T> {
+  let lastError: unknown;
+
+  for (let attempt = 0; attempt < BOOTSTRAP_READ_RETRY_ATTEMPTS; attempt += 1) {
+    try {
+      return await operation();
+    } catch (error) {
+      lastError = error;
+
+      if (
+        !isTransientBootstrapReadError(error) ||
+        attempt === BOOTSTRAP_READ_RETRY_ATTEMPTS - 1
+      ) {
+        throw error;
+      }
+
+      await wait(BOOTSTRAP_READ_RETRY_DELAY_MS);
+    }
+  }
+
+  throw lastError instanceof Error ? lastError : new Error(String(lastError));
 }
 
 function hasStorage(): boolean {
@@ -306,10 +358,12 @@ async function writeSetting(key: AppSettingsKey, value: unknown): Promise<void> 
 }
 
 async function loadRows(): Promise<AppSettingsRow[]> {
-  return withEnsuredAppSettingsTable(async () => {
-    const db = await getDb();
-    return (await db.select("SELECT key, value FROM app_settings")) as AppSettingsRow[];
-  });
+  return withRetryableBootstrapRead(() =>
+    withEnsuredAppSettingsTable(async () => {
+      const db = await getDb();
+      return (await db.select("SELECT key, value FROM app_settings")) as AppSettingsRow[];
+    }),
+  );
 }
 
 export function resetAppSettingsForTests(): void {
@@ -333,8 +387,15 @@ export async function bootstrapAppSettings(): Promise<AppSettingsSnapshot> {
       return cloneSnapshot(appSettingsCache);
     })().catch((error) => {
       bootstrapPromise = null;
-      appSettingsCache = getDefaultAppSettingsSnapshot();
-      throw error;
+
+      if (error instanceof AppSettingsBootstrapError) {
+        throw error;
+      }
+
+      throw new AppSettingsBootstrapError(
+        "Failed to load persisted application settings from SQLite.",
+        { cause: error },
+      );
     });
   }
 

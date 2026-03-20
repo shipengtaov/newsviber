@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import Database from "@tauri-apps/plugin-sql";
+import { getDb } from "@/lib/db";
 
 export type FetchableSource = {
     id: number;
@@ -30,15 +30,7 @@ type RemoteArticle = {
     author?: string | null;
 };
 
-let db: Database | null = null;
 const inFlightSourceFetches = new Map<number, Promise<FetchResult>>();
-
-async function getDb() {
-    if (!db) {
-        db = await Database.load("sqlite:getnews.db");
-    }
-    return db;
-}
 
 async function loadRemoteArticles(source: FetchableSource): Promise<RemoteArticle[]> {
     if (source.source_type === "rss") {
