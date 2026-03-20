@@ -1,6 +1,6 @@
 import Database from "@tauri-apps/plugin-sql";
 
-const DB_PATH = "sqlite:getnews.db";
+const DB_PATH = "sqlite:newsviber.db";
 const DB_LOAD_RETRY_ATTEMPTS = 4;
 const DB_LOAD_RETRY_DELAY_MS = 120;
 const TAURI_READY_WAIT_MS = 600;

@@ -1,4 +1,20 @@
+use std::fs::create_dir_all;
+use tauri::{AppHandle, Manager, Runtime};
 use tauri_plugin_sql::{Migration, MigrationKind};
+
+pub const DATABASE_FILE_NAME: &str = "newsviber.db";
+
+pub fn app_database_url<R: Runtime>(app: &AppHandle<R>) -> Result<String, String> {
+    let app_config_dir = app.path().app_config_dir().map_err(|error| error.to_string())?;
+    create_dir_all(&app_config_dir).map_err(|error| error.to_string())?;
+    let db_path = app_config_dir.join(DATABASE_FILE_NAME);
+
+    Ok(format!("sqlite:{}", db_path.to_string_lossy()))
+}
+
+pub fn migration_database_url() -> String {
+    format!("sqlite:{DATABASE_FILE_NAME}")
+}
 
 pub fn get_migrations() -> Vec<Migration> {
     vec![

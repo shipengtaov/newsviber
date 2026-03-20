@@ -1,9 +1,9 @@
+use crate::db;
 use chrono::NaiveDate;
 use serde::{Deserialize, Serialize};
 use sqlx::{Connection, SqliteConnection};
 use std::collections::HashSet;
-use std::fs::create_dir_all;
-use tauri::{AppHandle, Manager};
+use tauri::AppHandle;
 
 const DEFAULT_PRESET_DAYS: i64 = 7;
 
@@ -53,16 +53,8 @@ fn normalize_unique_ids(ids: Vec<i64>) -> Vec<i64> {
         .collect()
 }
 
-fn chat_db_url(app: &AppHandle) -> Result<String, String> {
-    let app_config_dir = app.path().app_config_dir().map_err(|error| error.to_string())?;
-    create_dir_all(&app_config_dir).map_err(|error| error.to_string())?;
-    let db_path = app_config_dir.join("getnews.db");
-
-    Ok(format!("sqlite:{}", db_path.to_string_lossy()))
-}
-
 async fn connect_chat_db(app: &AppHandle) -> Result<SqliteConnection, String> {
-    let db_url = chat_db_url(app)?;
+    let db_url = db::app_database_url(app)?;
     SqliteConnection::connect(&db_url)
         .await
         .map_err(|error| error.to_string())

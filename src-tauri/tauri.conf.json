@@ -3,7 +3,7 @@
   "productName": "News Viber",
   "mainBinaryName": "News Viber",
   "version": "26.3.0",
-  "identifier": "com.shipengtao.get-news",
+  "identifier": "com.shipengtao.NewsViber",
   "build": {
     "beforeDevCommand": "npm run dev",
     "devUrl": "http://localhost:1420",

@@ -223,7 +223,7 @@ pub fn run() {
         .plugin(tauri_plugin_http::init())
         .plugin(
             tauri_plugin_sql::Builder::new()
-                .add_migrations("sqlite:getnews.db", db::get_migrations())
+                .add_migrations(&db::migration_database_url(), db::get_migrations())
                 .build(),
         )
         .plugin(tauri_plugin_opener::init())

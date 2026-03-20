@@ -45,7 +45,7 @@ describe("shared database loader", () => {
   it("waits for the Tauri bridge before loading the SQLite database", async () => {
     vi.useFakeTimers();
 
-    const database = { path: "sqlite:getnews.db" };
+    const database = { path: "sqlite:newsviber.db" };
     loadMock.mockResolvedValue(database);
     setWindow({});
 
@@ -69,7 +69,7 @@ describe("shared database loader", () => {
   it("retries transient SQLite startup failures and caches the resolved connection", async () => {
     vi.useFakeTimers();
 
-    const database = { path: "sqlite:getnews.db" };
+    const database = { path: "sqlite:newsviber.db" };
     loadMock
       .mockRejectedValueOnce(new Error("database is locked"))
       .mockResolvedValueOnce(database);
