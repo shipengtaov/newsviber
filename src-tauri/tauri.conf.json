@@ -47,7 +47,7 @@
   },
   "plugins": {
     "updater": {
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDE4QzIxOUI1MDdFRkE3NEIKUldSTHArOEh0Um5DR0s0dG5tbWREbzk0WmpEODhHc091TDRjMWxjTUduVmk4TmFNcE1xUnFZemYK",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEQ4QUQxRTBDQkQxQzY0RkIKUldUN1pCeTlEQjZ0Mk5JaWtGdHBUTGZhUklERWZZOTJFTUVkZ0I1a0owbDhVZWttZ0M4RUpYaVAK",
       "endpoints": [
         "https://github.com/shipengtaov/newsviber/releases/latest/download/latest.json"
       ]

@@ -15,7 +15,7 @@ The updater public key is committed in `src-tauri/tauri.conf.json`. The matching
 GitHub Actions publishes signed updater artifacts from `.github/workflows/release.yml`. Before pushing a release tag, configure these repository secrets:
 
 - `TAURI_SIGNING_PRIVATE_KEY`: the contents of your updater private key
-- `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`: optional, only if your key is password protected
+- `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`: the password used to protect your updater private key
 
 Release tags must match the app version using the `v<version>` format. Example:
 
