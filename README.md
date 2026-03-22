@@ -39,21 +39,21 @@ Switch providers, models, and gateways from one settings surface. Keep updates, 
 <table>
   <tr>
     <td width="50%">
-      <img src="../newsviber-website/assets/news-overview.png" alt="News overview" />
+      <img src="./assets/readme/news-overview.png" alt="News overview" />
       <p><strong>News overview</strong><br/>Scan active sources, unread counts, and stored articles in one workspace.</p>
     </td>
     <td width="50%">
-      <img src="../newsviber-website/assets/cross-source-chat.png" alt="Cross-source chat" />
+      <img src="./assets/readme/cross-source-chat.png" alt="Cross-source chat" />
       <p><strong>Cross-source chat</strong><br/>Compare answers across sources with saved scope and time filters.</p>
     </td>
   </tr>
   <tr>
     <td width="50%">
-      <img src="../newsviber-website/assets/creative-space.png" alt="Automated outputs from news" />
+      <img src="./assets/readme/creative-space.png" alt="Automated outputs from news" />
       <p><strong>Automated outputs</strong><br/>Turn scoped source material into reports, briefs, ideas, or any other expected output.</p>
     </td>
     <td width="50%">
-      <img src="../newsviber-website/assets/settings.png" alt="Provider settings" />
+      <img src="./assets/readme/settings.png" alt="Provider settings" />
       <p><strong>Provider settings</strong><br/>Manage AI providers, models, updates, and housekeeping in one place.</p>
     </td>
   </tr>
