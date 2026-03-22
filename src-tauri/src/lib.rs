@@ -5,12 +5,11 @@ pub mod fetchers;
 
 #[cfg(not(mobile))]
 use tauri::{
-    menu::{
-        AboutMetadata, Menu, MenuItem, PredefinedMenuItem, Submenu, HELP_SUBMENU_ID,
-        WINDOW_SUBMENU_ID,
-    },
+    menu::{Menu, MenuItem, PredefinedMenuItem, Submenu, HELP_SUBMENU_ID},
     AppHandle, Runtime,
 };
+#[cfg(target_os = "macos")]
+use tauri::menu::{AboutMetadata, WINDOW_SUBMENU_ID};
 #[cfg(not(mobile))]
 use tauri_plugin_opener::OpenerExt;
 
@@ -20,7 +19,7 @@ const HELP_MENU_ID_TWITTER: &str = "help.twitter";
 const HELP_MENU_ID_GITHUB: &str = "help.github";
 #[cfg(not(mobile))]
 const HELP_MENU_ID_ISSUES: &str = "help.issues";
-#[cfg(not(mobile))]
+#[cfg(target_os = "macos")]
 const APP_DISPLAY_NAME: &str = "News Viber";
 
 #[cfg(not(mobile))]
@@ -192,7 +191,7 @@ fn build_default_desktop_menu<R: Runtime>(app_handle: &AppHandle<R>) -> tauri::R
     let menu = Menu::default(app_handle)?;
     let [twitter_item, github_item, issues_item] = build_help_link_items(app_handle)?;
 
-    let help_menu = match menu.get(&HELP_SUBMENU_ID).and_then(|item| item.as_submenu().cloned()) {
+    let help_menu = match menu.get(HELP_SUBMENU_ID).and_then(|item| item.as_submenu().cloned()) {
         Some(help_menu) => help_menu,
         None => {
             let help_menu =
