@@ -33,7 +33,6 @@ import { SUPPORTED_LANGUAGES, AUTO_DETECT_VALUE, getLanguagePreference, setLangu
 import { cn } from "@/lib/utils";
 import { PageShell } from "@/components/layout/PageShell";
 import { useAppUpdate } from "@/components/update/AppUpdateProvider";
-import { formatUtcDateTime } from "@/lib/time";
 
 function getProviderConfigSnapshot(providerId: string, providerConfig: AIProviderConfig) {
     return JSON.stringify(normalizeProviderConfig(providerId, providerConfig));
@@ -103,11 +102,10 @@ export default function Settings() {
         hasPendingUpdate,
         isChecking,
         isInstalling,
+        installUpdate,
         isRestartReady,
         lastCheckError,
-        openUpdateDialog,
         restartToFinishUpdate,
-        update,
     } = useAppUpdate();
     const [selectedProviderId, setSelectedProviderId] = useState(readCurrentProviderId);
     const [providerDrafts, setProviderDrafts] = useState<AIProviderConfigs>(readStoredProviderConfigs);
@@ -248,29 +246,15 @@ export default function Settings() {
     const downloadProgressLabel = downloadProgress.contentLength && downloadProgress.contentLength > 0
         ? `${Math.min(100, Math.round((downloadProgress.downloadedBytes / downloadProgress.contentLength) * 100))}%`
         : null;
-    const updateStatusTitle = lastCheckError
-        ? t("updateCheckFailedStatus")
-        : isRestartReady
-            ? t("restartReadyStatus")
-            : isInstalling
+    const updateActionLabel = isRestartReady
+        ? t("restartNow")
+        : hasPendingUpdate
+            ? isInstalling
                 ? t("installingUpdate")
-                : hasPendingUpdate && update
-                    ? t("updateAvailableStatus", { version: update.version })
-                    : null;
-    const updateStatusDescription = lastCheckError
-        ? lastCheckError
-        : isRestartReady
-            ? t("restartReadyStatusDesc")
-            : isInstalling
-                ? downloadProgressLabel
-                    ? t("downloadProgressStatus", { progress: downloadProgressLabel })
-                    : t("downloadPreparing")
-                : hasPendingUpdate && update
-                    ? t("updateAvailableStatusDesc", {
-                        version: update.version,
-                        publishedAt: formatUtcDateTime(update.date, t("unknown", { ns: "common" })),
-                    })
-                    : t("softwareUpdateHint");
+                : t("installUpdate")
+            : isChecking
+                ? t("checkingForUpdates")
+                : t("checkForUpdates");
 
     return (
         <PageShell
@@ -323,7 +307,6 @@ export default function Settings() {
             <Card>
                 <CardHeader>
                     <CardTitle>{t("softwareUpdate")}</CardTitle>
-                    <CardDescription>{t("softwareUpdateDesc")}</CardDescription>
                 </CardHeader>
                 <CardContent>
                     <div className="space-y-4 rounded-lg border bg-muted/35 p-4">
@@ -335,47 +318,50 @@ export default function Settings() {
                             <Button
                                 type="button"
                                 onClick={() => {
+                                    if (isRestartReady) {
+                                        void restartToFinishUpdate();
+                                        return;
+                                    }
+
+                                    if (hasPendingUpdate) {
+                                        void installUpdate();
+                                        return;
+                                    }
+
                                     void checkForUpdates();
                                 }}
                                 disabled={isChecking || isInstalling}
                             >
-                                {isChecking ? t("checkingForUpdates") : t("checkForUpdates")}
+                                {updateActionLabel}
                             </Button>
                         </div>
 
-                        <div className="space-y-3 border-t border-border/60 pt-4">
-                            {updateStatusTitle ? (
-                                <div>
-                                    <div className="font-medium">{updateStatusTitle}</div>
-                                    <div className="text-sm text-muted-foreground">{updateStatusDescription}</div>
-                                </div>
-                            ) : (
-                                <div className="text-sm text-muted-foreground">{updateStatusDescription}</div>
-                            )}
+                        {isInstalling || lastCheckError ? (
+                            <div className="space-y-3 border-t border-border/60 pt-4">
+                                {isInstalling ? (
+                                    <>
+                                        <div className="text-sm text-muted-foreground">
+                                            {downloadProgressLabel
+                                                ? t("downloadProgressStatus", { progress: downloadProgressLabel })
+                                                : t("downloadPreparing")}
+                                        </div>
+                                        <div className="h-2 overflow-hidden rounded-full bg-border/70">
+                                            <div
+                                                className="h-full rounded-full bg-primary transition-[width] duration-200 ease-out"
+                                                style={{ width: downloadProgressLabel ?? "0%" }}
+                                            />
+                                        </div>
+                                    </>
+                                ) : null}
 
-                            {isInstalling ? (
-                                <div className="h-2 overflow-hidden rounded-full bg-border/70">
-                                    <div
-                                        className="h-full rounded-full bg-primary transition-[width] duration-200 ease-out"
-                                        style={{ width: downloadProgressLabel ?? "0%" }}
-                                    />
-                                </div>
-                            ) : null}
-
-                            {hasPendingUpdate && update && !isRestartReady && !isInstalling ? (
-                                <Button type="button" variant="outline" onClick={openUpdateDialog}>
-                                    {t("viewUpdate")}
-                                </Button>
-                            ) : null}
-
-                            {isRestartReady ? (
-                                <Button type="button" onClick={() => {
-                                    void restartToFinishUpdate();
-                                }}>
-                                    {t("restartNow")}
-                                </Button>
-                            ) : null}
-                        </div>
+                                {lastCheckError ? (
+                                    <div className="rounded-[1rem] border border-destructive/40 bg-destructive/5 p-3 text-sm text-destructive">
+                                        <div className="font-medium">{t("updateCheckFailedStatus")}</div>
+                                        <div>{lastCheckError}</div>
+                                    </div>
+                                ) : null}
+                            </div>
+                        ) : null}
                     </div>
                 </CardContent>
             </Card>

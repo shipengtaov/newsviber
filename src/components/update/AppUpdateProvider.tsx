@@ -14,19 +14,14 @@ import { Button } from "@/components/ui/button";
 import {
     Dialog,
     DialogContent,
-    DialogDescription,
     DialogFooter,
     DialogHeader,
     DialogTitle,
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { formatUtcDateTime } from "@/lib/time";
 import { APP_VERSION, getAppVersion } from "@/lib/version";
 
 type AppUpdateMetadata = {
-    body?: string;
-    currentVersion: string;
-    date?: string;
     version: string;
 };
 
@@ -40,6 +35,7 @@ type AppUpdateContextValue = {
     hasPendingUpdate: boolean;
     isChecking: boolean;
     isInstalling: boolean;
+    installUpdate: () => Promise<void>;
     isRestartReady: boolean;
     lastCheckError: string | null;
     openUpdateDialog: () => void;
@@ -61,9 +57,6 @@ function closePendingUpdate(update: Update | null): void {
 
 function toUpdateMetadata(update: Update): AppUpdateMetadata {
     return {
-        body: update.body,
-        currentVersion: update.currentVersion,
-        date: update.date,
         version: update.version,
     };
 }
@@ -229,6 +222,7 @@ export function AppUpdateProvider({ children }: { children: ReactNode }) {
             });
 
             setPendingUpdate(null);
+            setUpdate(null);
             setIsRestartReady(true);
             setDialogOpen(true);
             toast({
@@ -276,10 +270,11 @@ export function AppUpdateProvider({ children }: { children: ReactNode }) {
         hasPendingUpdate: pendingUpdate !== null,
         isChecking,
         isInstalling,
+        installUpdate,
         isRestartReady,
         lastCheckError,
         openUpdateDialog: () => {
-            if (update) {
+            if (pendingUpdate || isRestartReady) {
                 setDialogOpen(true);
             }
         },
@@ -296,39 +291,10 @@ export function AppUpdateProvider({ children }: { children: ReactNode }) {
                         <DialogTitle>
                             {isRestartReady ? t("restartToFinish") : t("updateDialogTitle")}
                         </DialogTitle>
-                        <DialogDescription>
-                            {isRestartReady ? t("restartToFinishDesc") : t("updateDialogDesc")}
-                        </DialogDescription>
                     </DialogHeader>
 
-                    {update ? (
+                    {isInstalling || lastCheckError ? (
                         <div className="space-y-4">
-                            <div className="grid gap-3 rounded-[1.25rem] border border-border/70 bg-muted/35 p-4 text-sm">
-                                <div className="flex items-center justify-between gap-3">
-                                    <span className="font-medium text-foreground">{t("currentVersion")}</span>
-                                    <span className="text-muted-foreground">v{update.currentVersion}</span>
-                                </div>
-                                <div className="flex items-center justify-between gap-3">
-                                    <span className="font-medium text-foreground">{t("updateVersionLabel")}</span>
-                                    <span className="text-muted-foreground">v{update.version}</span>
-                                </div>
-                                <div className="flex items-center justify-between gap-3">
-                                    <span className="font-medium text-foreground">{t("updatePublishedLabel")}</span>
-                                    <span className="text-muted-foreground">
-                                        {formatUtcDateTime(update.date, t("unknown", { ns: "common" }))}
-                                    </span>
-                                </div>
-                            </div>
-
-                            {update.body ? (
-                                <div className="space-y-2">
-                                    <div className="text-sm font-medium text-foreground">{t("updateReleaseNotes")}</div>
-                                    <div className="max-h-56 overflow-y-auto rounded-[1.25rem] border border-border/70 bg-muted/25 p-4 text-sm text-muted-foreground whitespace-pre-wrap">
-                                        {update.body}
-                                    </div>
-                                </div>
-                            ) : null}
-
                             {isInstalling ? (
                                 <div className="space-y-3 rounded-[1.25rem] border border-border/70 bg-muted/25 p-4">
                                     <div className="text-sm font-medium text-foreground">{t("installingUpdate")}</div>

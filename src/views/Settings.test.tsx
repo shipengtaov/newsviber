@@ -17,11 +17,12 @@ const translations: Record<string, Record<string, string>> = {
         description: "Configure providers, keys, and housekeeping behavior.",
         general: "General",
         softwareUpdate: "Software Update",
-        softwareUpdateDesc: "Check for and install available updates.",
         softwareUpdateHint: "Available updates will appear here.",
         currentVersion: "Current Version",
         checkForUpdates: "Check for Updates",
         checkingForUpdates: "Checking for updates...",
+        installUpdate: "Install Update",
+        installingUpdate: "Installing Update...",
         viewUpdate: "View Update",
         restartNow: "Restart Now",
         updateAvailableStatus: "Version 27.0.0 is available",
@@ -100,6 +101,7 @@ const {
             hasPendingUpdate: false,
             isChecking: false,
             isInstalling: false,
+            installUpdate: vi.fn(),
             isRestartReady: false,
             lastCheckError: null,
             openUpdateDialog: vi.fn(),
@@ -233,6 +235,7 @@ describe("Settings", () => {
             hasPendingUpdate: false,
             isChecking: false,
             isInstalling: false,
+            installUpdate: vi.fn(),
             isRestartReady: false,
             lastCheckError: null,
             openUpdateDialog: vi.fn(),
@@ -276,24 +279,43 @@ describe("Settings", () => {
         expect(markup).toContain(">Current Version<");
         expect(markup).toContain(">v26.3.0<");
         expect(markup).toContain(">Check for Updates<");
-        expect(markup).toContain(">Available updates will appear here.<");
+        expect(markup).not.toContain(">Available updates will appear here.<");
         expect((markup.match(/rounded-lg border bg-muted\/35 p-4/g) ?? []).length).toBe(1);
     });
 
-    it("shows update actions inline when an update is available", () => {
+    it("shows install update as the primary action when an update is available", () => {
         Object.assign(mockUpdateState, {
             hasPendingUpdate: true,
             update: {
-                body: "Release notes",
-                currentVersion: "26.3.0",
-                date: "2026-03-20T00:00:00Z",
                 version: "27.0.0",
             },
         });
 
         const markup = renderToStaticMarkup(<Settings />);
 
-        expect(markup).toContain(">Version 27.0.0 is available<");
-        expect(markup).toContain(">View Update<");
+        expect(markup).toContain(">Install Update<");
+        expect(markup).not.toContain(">View Update<");
+        expect(markup).not.toContain(">Version 27.0.0 is available<");
+    });
+
+    it("shows restart as the primary action when the update is ready", () => {
+        Object.assign(mockUpdateState, {
+            isRestartReady: true,
+        });
+
+        const markup = renderToStaticMarkup(<Settings />);
+
+        expect(markup).toContain(">Restart Now<");
+    });
+
+    it("keeps update failures visible", () => {
+        Object.assign(mockUpdateState, {
+            lastCheckError: "network timeout",
+        });
+
+        const markup = renderToStaticMarkup(<Settings />);
+
+        expect(markup).toContain(">Could not check for updates<");
+        expect(markup).toContain(">network timeout<");
     });
 });
