@@ -22,20 +22,20 @@ jobs:
     runs-on: ${{ matrix.platform }}
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Setup Node.js with npm cache
         if: ${{ matrix.node_cache }}
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
-          node-version: lts/*
+          node-version: 24
           cache: npm
 
       - name: Setup Node.js
         if: ${{ !matrix.node_cache }}
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
-          node-version: lts/*
+          node-version: 24
 
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable
