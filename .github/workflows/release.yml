@@ -15,18 +15,27 @@ jobs:
         include:
           - platform: macos-latest
             args: --target aarch64-apple-darwin
+            node_cache: true
           - platform: macos-latest
             args: --target x86_64-apple-darwin
+            node_cache: false
     runs-on: ${{ matrix.platform }}
 
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup Node.js
+      - name: Setup Node.js with npm cache
+        if: ${{ matrix.node_cache }}
         uses: actions/setup-node@v4
         with:
           node-version: lts/*
           cache: npm
+
+      - name: Setup Node.js
+        if: ${{ !matrix.node_cache }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
 
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable
