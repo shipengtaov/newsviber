@@ -17,6 +17,13 @@ GitHub Actions publishes signed updater artifacts from `.github/workflows/releas
 - `TAURI_SIGNING_PRIVATE_KEY`: the contents of your updater private key
 - `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`: the password used to protect your updater private key
 
+Release tags currently publish:
+
+- macOS updater artifacts for Apple Silicon and Intel
+- one Windows NSIS installer
+
+Linux packaging is intentionally out of scope for the current release workflow.
+
 Release tags must match the app version using the `v<version>` format. Example:
 
 - `package.json`: `26.3.0`
