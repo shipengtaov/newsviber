@@ -17,14 +17,17 @@ jobs:
             args: --target aarch64-apple-darwin
             node_cache: true
             rust_targets: aarch64-apple-darwin,x86_64-apple-darwin
+            apple_signing_identity: "-"
           - platform: macos-latest
             args: --target x86_64-apple-darwin
             node_cache: false
             rust_targets: aarch64-apple-darwin,x86_64-apple-darwin
+            apple_signing_identity: "-"
           - platform: windows-latest
             args: --bundles nsis
             node_cache: false
             rust_targets: ""
+            apple_signing_identity: ""
     runs-on: ${{ matrix.platform }}
 
     steps:
@@ -77,6 +80,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ matrix.apple_signing_identity }}
         with:
           tagName: ${{ github.ref_name }}
           releaseName: News Viber ${{ github.ref_name }}
@@ -84,3 +88,24 @@ jobs:
           releaseDraft: false
           prerelease: false
           args: ${{ matrix.args }}
+
+      - name: Verify macOS app signature
+        if: ${{ matrix.apple_signing_identity != '' }}
+        shell: bash
+        run: |
+          shopt -s nullglob
+          app_paths=(src-tauri/target/*/release/bundle/macos/*.app)
+
+          if [[ ${#app_paths[@]} -eq 0 ]]; then
+            app_paths=(src-tauri/target/release/bundle/macos/*.app)
+          fi
+
+          if [[ ${#app_paths[@]} -eq 0 ]]; then
+            echo "No macOS app bundle found to verify."
+            exit 1
+          fi
+
+          for app_path in "${app_paths[@]}"; do
+            echo "Verifying ${app_path}"
+            codesign --verify --deep --strict --verbose=4 "$app_path"
+          done
