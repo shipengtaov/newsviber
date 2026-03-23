@@ -8,8 +8,8 @@ import { useToast } from "@/hooks/use-toast";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { ChevronLeft } from "lucide-react";
 import { PageShell } from "@/components/layout/PageShell";
-import { getDb } from "@/lib/db";
 import { DEFAULT_SOURCE_RETURN_TO, isNewsReturnToPath, resolveSourceReturnTo } from "@/lib/source-navigation";
+import { createSource, getSource, updateSource } from "@/lib/source-service";
 
 function parseFetchInterval(value: string): number {
     const parsed = Number.parseInt(value, 10);
@@ -45,14 +45,13 @@ export default function SourceForm() {
 
     async function loadSource(sourceId: string) {
         try {
-            const db = await getDb();
-            const result: any[] = await db.select("SELECT * FROM sources WHERE id = $1", [parseInt(sourceId)]);
-            if (result.length > 0) {
-                const s = result[0];
-                setName(s.name);
-                setType(s.source_type);
-                setUrl(s.url);
-                setInterval(s.fetch_interval.toString());
+            const source = await getSource(Number.parseInt(sourceId, 10));
+
+            if (source) {
+                setName(source.name);
+                setType(source.source_type);
+                setUrl(source.url);
+                setInterval(String(source.fetch_interval));
             } else {
                 toast({ title: t("sourceNotFound"), variant: "destructive" });
                 navigate(resolvedReturnTo, { replace: shouldReplaceOnReturn });
@@ -68,18 +67,21 @@ export default function SourceForm() {
         if (!name || !url) return;
         setLoading(true);
         try {
-            const db = await getDb();
             if (isEditing) {
-                await db.execute(
-                    "UPDATE sources SET name = $1, source_type = $2, url = $3, fetch_interval = $4 WHERE id = $5",
-                    [name, type, url, parseFetchInterval(interval), parseInt(id as string)]
-                );
+                await updateSource(Number.parseInt(id as string, 10), {
+                    name,
+                    sourceType: type,
+                    url,
+                    fetchInterval: parseFetchInterval(interval),
+                });
                 toast({ title: t("sourceUpdated") });
             } else {
-                await db.execute(
-                    "INSERT INTO sources (name, source_type, url, fetch_interval, active) VALUES ($1, $2, $3, $4, 1)",
-                    [name, type, url, parseFetchInterval(interval)]
-                );
+                await createSource({
+                    name,
+                    sourceType: type,
+                    url,
+                    fetchInterval: parseFetchInterval(interval),
+                });
                 toast({ title: t("sourceAdded") });
             }
             navigateBack();

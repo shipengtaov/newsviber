@@ -6,13 +6,17 @@ pub mod fetchers;
 #[cfg(not(mobile))]
 use tauri::{
     menu::{Menu, MenuItem, PredefinedMenuItem, Submenu, HELP_SUBMENU_ID},
-    AppHandle, Runtime,
+    AppHandle, Emitter, Runtime,
 };
 #[cfg(target_os = "macos")]
 use tauri::menu::{AboutMetadata, WINDOW_SUBMENU_ID};
 #[cfg(not(mobile))]
 use tauri_plugin_opener::OpenerExt;
 
+#[cfg(not(mobile))]
+const FILE_MENU_ID_EXPORT_SOURCES_OPML: &str = "file.export_sources_opml";
+#[cfg(not(mobile))]
+const APP_EVENT_EXPORT_SOURCES_OPML: &str = "sources:export-opml";
 #[cfg(not(mobile))]
 const HELP_MENU_ID_TWITTER: &str = "help.twitter";
 #[cfg(not(mobile))]
@@ -32,9 +36,20 @@ fn help_menu_url(menu_id: &str) -> Option<&'static str> {
     }
 }
 
+#[cfg(not(mobile))]
+fn app_event_for_menu_id(menu_id: &str) -> Option<&'static str> {
+    match menu_id {
+        FILE_MENU_ID_EXPORT_SOURCES_OPML => Some(APP_EVENT_EXPORT_SOURCES_OPML),
+        _ => None,
+    }
+}
+
 #[cfg(all(test, not(mobile)))]
 mod tests {
-    use super::{help_menu_url, HELP_MENU_ID_GITHUB, HELP_MENU_ID_ISSUES};
+    use super::{
+        app_event_for_menu_id, help_menu_url, APP_EVENT_EXPORT_SOURCES_OPML,
+        FILE_MENU_ID_EXPORT_SOURCES_OPML, HELP_MENU_ID_GITHUB, HELP_MENU_ID_ISSUES,
+    };
 
     #[test]
     fn help_menu_urls_match_expected_destinations() {
@@ -47,6 +62,15 @@ mod tests {
             Some("https://github.com/shipengtaov/newsviber/issues/new")
         );
         assert_eq!(help_menu_url("help.unknown"), None);
+    }
+
+    #[test]
+    fn app_menu_events_match_expected_destinations() {
+        assert_eq!(
+            app_event_for_menu_id(FILE_MENU_ID_EXPORT_SOURCES_OPML),
+            Some(APP_EVENT_EXPORT_SOURCES_OPML)
+        );
+        assert_eq!(app_event_for_menu_id("file.unknown"), None);
     }
 }
 
@@ -84,6 +108,19 @@ fn build_help_link_items<R: Runtime>(
     )?;
 
     Ok([twitter_item, github_item, issues_item])
+}
+
+#[cfg(not(mobile))]
+fn build_export_sources_opml_item<R: Runtime>(
+    app_handle: &AppHandle<R>,
+) -> tauri::Result<MenuItem<R>> {
+    MenuItem::with_id(
+        app_handle,
+        FILE_MENU_ID_EXPORT_SOURCES_OPML,
+        "Export Sources as OPML...",
+        true,
+        None::<&str>,
+    )
 }
 
 #[tauri::command]
@@ -124,6 +161,7 @@ fn build_macos_menu<R: Runtime>(app_handle: &AppHandle<R>) -> tauri::Result<Menu
     )?;
 
     let [twitter_item, github_item, issues_item] = build_help_link_items(app_handle)?;
+    let export_sources_item = build_export_sources_opml_item(app_handle)?;
     let help_menu = Submenu::with_id_and_items(
         app_handle,
         HELP_SUBMENU_ID,
@@ -158,7 +196,11 @@ fn build_macos_menu<R: Runtime>(app_handle: &AppHandle<R>) -> tauri::Result<Menu
                 app_handle,
                 "File",
                 true,
-                &[&PredefinedMenuItem::close_window(app_handle, None)?],
+                &[
+                    &export_sources_item,
+                    &PredefinedMenuItem::separator(app_handle)?,
+                    &PredefinedMenuItem::close_window(app_handle, None)?,
+                ],
             )?,
             &Submenu::with_items(
                 app_handle,
@@ -206,8 +248,65 @@ fn build_default_desktop_menu<R: Runtime>(app_handle: &AppHandle<R>) -> tauri::R
     }
 
     help_menu.append_items(&[&twitter_item, &github_item, &issues_item])?;
+    insert_export_sources_item(app_handle, &menu)?;
 
     Ok(menu)
+}
+
+#[cfg(not(any(target_os = "macos", mobile)))]
+fn insert_export_sources_item<R: Runtime>(
+    app_handle: &AppHandle<R>,
+    menu: &Menu<R>,
+) -> tauri::Result<()> {
+    let mut file_menu = None;
+    for item in menu.items()? {
+        if let Some(submenu) = item.as_submenu() {
+            if submenu.text()? == "File" {
+                file_menu = Some(submenu.clone());
+                break;
+            }
+        }
+    }
+
+    if let Some(file_menu) = file_menu {
+        if file_menu
+            .items()?
+            .iter()
+            .any(|item| item.id().as_ref() == FILE_MENU_ID_EXPORT_SOURCES_OPML)
+        {
+            return Ok(());
+        }
+
+        let export_sources_item = build_export_sources_opml_item(app_handle)?;
+        if file_menu.items()?.is_empty() {
+            file_menu.append(&export_sources_item)?;
+        } else {
+            let separator = PredefinedMenuItem::separator(app_handle)?;
+            file_menu.insert_items(&[&export_sources_item, &separator], 0)?;
+        }
+
+        return Ok(());
+    }
+
+    let export_sources_item = build_export_sources_opml_item(app_handle)?;
+    let separator = PredefinedMenuItem::separator(app_handle)?;
+    let close_window_item = PredefinedMenuItem::close_window(app_handle, None)?;
+    let quit_item = PredefinedMenuItem::quit(app_handle, None)?;
+    let file_menu = Submenu::with_id_and_items(
+        app_handle,
+        "file.custom",
+        "File",
+        true,
+        &[
+            &export_sources_item,
+            &separator,
+            &close_window_item,
+            &quit_item,
+        ],
+    )?;
+    menu.prepend(&file_menu)?;
+
+    Ok(())
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -238,14 +337,29 @@ pub fn run() {
         })
         .on_menu_event(|app, event| {
             #[cfg(not(mobile))]
-            if let Some(url) = help_menu_url(event.id().as_ref()) {
-                if let Err(error) = app.opener().open_url(url, None::<&str>) {
-                    eprintln!("failed to open help menu URL {url}: {error}");
+            {
+                if let Some(url) = help_menu_url(event.id().as_ref()) {
+                    if let Err(error) = app.opener().open_url(url, None::<&str>) {
+                        eprintln!("failed to open help menu URL {url}: {error}");
+                    }
+                }
+
+                if let Some(app_event) = app_event_for_menu_id(event.id().as_ref()) {
+                    if let Err(error) = app.emit(app_event, ()) {
+                        eprintln!(
+                            "failed to emit app menu event {} for menu id {}: {}",
+                            app_event,
+                            event.id().as_ref(),
+                            error
+                        );
+                    }
                 }
             }
         })
         .plugin(tauri_plugin_http::init())
         .plugin(tauri_plugin_process::init())
+        .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_fs::init())
         .plugin(
             tauri_plugin_sql::Builder::new()
                 .add_migrations(&db::migration_database_url(), db::get_migrations())

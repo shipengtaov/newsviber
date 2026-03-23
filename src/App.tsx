@@ -10,12 +10,36 @@ import Settings from "@/views/Settings";
 import { useEffect } from "react";
 import { runDueAutoCreativeProjects } from "@/lib/creative-service";
 import { getDb } from "@/lib/db";
+import { registerExportSourcesOpmlMenuHandler } from "@/lib/source-opml-export";
 import { addSourceFetchSyncListener, dispatchSourceFetchSyncEvent } from "@/lib/source-events";
 import { fetchSources, isSourceDueForFetch, type SchedulableSource } from "@/lib/source-fetch";
 import { normalizeFetchInterval } from "@/lib/source-utils";
 import { AppUpdateProvider } from "@/components/update/AppUpdateProvider";
 
 function App() {
+  useEffect(() => {
+    let removeMenuListener: (() => void) | null = null;
+    let disposed = false;
+
+    void registerExportSourcesOpmlMenuHandler()
+      .then((unlisten) => {
+        if (disposed) {
+          unlisten();
+          return;
+        }
+
+        removeMenuListener = unlisten;
+      })
+      .catch((err) => {
+        console.error("Failed to register sources export menu handler", err);
+      });
+
+    return () => {
+      disposed = true;
+      removeMenuListener?.();
+    };
+  }, []);
+
   useEffect(() => {
     let isBackgroundCheckRunning = false;
     let isCreativeCheckRunning = false;
