@@ -96,7 +96,7 @@ jobs:
           releaseName: News Viber ${{ github.ref_name }}
           releaseBody: See the assets to download and install this version.
           releaseDraft: false
-          prerelease: false
+          prerelease: ${{ contains(github.ref_name, '-') }}
           args: ${{ matrix.args }}
 
       - name: Verify macOS app signature
