@@ -104,7 +104,7 @@ function createMockUpdate(overrides: Partial<MockUpdate> = {}): MockUpdate {
         currentVersion: "26.2.0",
         date: "2026-03-22T09:55:32Z",
         downloadAndInstall: vi.fn().mockResolvedValue(undefined),
-        version: "26.3.0",
+        version: "26.3.1-rc.1",
         ...overrides,
     };
 }

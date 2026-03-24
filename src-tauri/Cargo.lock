@@ -2669,7 +2669,7 @@ checksum = "650eef8c711430f1a879fdd01d4745a7deea475becfb90269c06775983bbf086"
 
 [[package]]
 name = "news-viber"
-version = "26.3.0"
+version = "26.3.1-rc.1"
 dependencies = [
  "atom_syndication",
  "chrono",
