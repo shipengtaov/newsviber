@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use std::error::Error;
 use std::io;
 
-const RSS_USER_AGENT: &str = "News Viber/26.3.0 (Tauri RSS Fetcher)";
+const RSS_USER_AGENT: &str = "News Viber/26.3.1 (Tauri RSS Fetcher)";
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ParsedArticle {
