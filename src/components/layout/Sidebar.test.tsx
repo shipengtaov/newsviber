@@ -80,6 +80,8 @@ describe("Sidebar", () => {
         const expandedMarkup = renderSidebar("/");
         const collapsedMarkup = renderSidebar("/", true);
 
+        expect(expandedMarkup).toContain('data-sidebar-shell="true"');
+        expect(expandedMarkup).toContain("border-r");
         expect(expandedMarkup).toContain("w-64");
         expect(expandedMarkup).not.toContain("w-[18.75rem]");
         expect(collapsedMarkup).toContain("w-20");
@@ -88,7 +90,8 @@ describe("Sidebar", () => {
     it("keeps the icon rail anchored in collapsed mode", () => {
         const markup = renderSidebar("/", true);
 
-        expect(markup).toContain("px-2 py-3");
+        expect(markup).toContain("pt-[var(--layout-titlebar-safe-height)]");
+        expect(markup).not.toContain("surface-panel flex h-full shrink-0 flex-col overflow-hidden px-2 py-3");
         expect(markup).toContain("grid-cols-[3rem_0fr] gap-0");
         expect(markup).not.toContain("grid-cols-[3rem_0fr] justify-center");
         expect(markup).toContain("mt-4 flex-1 space-y-1.5 px-2");

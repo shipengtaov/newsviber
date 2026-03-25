@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type MouseEvent, type RefObject } from "react";
+import { useEffect, useRef, useState, type CSSProperties, type MouseEvent, type RefObject } from "react";
 import { useTranslation } from "react-i18next";
 import { Outlet, useOutletContext } from "react-router-dom";
 import { isTauri } from "@tauri-apps/api/core";
@@ -8,7 +8,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { useMainMenuScrollMemory } from "@/hooks/use-main-menu-scroll-memory";
 import { Button } from "@/components/ui/button";
 import { PanelLeftClose, PanelLeftOpen } from "lucide-react";
-import { PAGE_GUTTER_LEFT_CLASS, PAGE_GUTTER_X_CLASS } from "@/components/layout/layout-spacing";
+import { CONTENT_GUTTER_LEFT_CLASS } from "@/components/layout/layout-spacing";
 
 const SIDEBAR_COLLAPSED_STORAGE_KEY = "sidebarCollapsed_v1";
 const TITLEBAR_HEIGHT = 46;
@@ -77,6 +77,11 @@ export function MainLayout() {
         }
     };
 
+    const layoutShellStyle = {
+        "--layout-titlebar-height": `${TITLEBAR_HEIGHT + 12}px`,
+        "--layout-titlebar-safe-height": `${TITLEBAR_HEIGHT + 10}px`,
+    } as CSSProperties;
+
     return (
         <div className="relative h-screen w-full overflow-hidden bg-background text-foreground">
             <div className="pointer-events-none absolute inset-0">
@@ -84,30 +89,31 @@ export function MainLayout() {
                 <div className="absolute right-[-8%] top-[12%] h-64 w-64 rounded-full bg-[radial-gradient(circle,_rgba(251,191,36,0.18),_transparent_68%)] blur-3xl" />
                 <div className="absolute bottom-[-10%] left-[18%] h-72 w-72 rounded-full bg-[radial-gradient(circle,_rgba(14,165,233,0.1),_transparent_72%)] blur-3xl" />
             </div>
-            <div className={`absolute inset-x-0 top-0 z-20 ${PAGE_GUTTER_X_CLASS} pt-3`} style={{ height: TITLEBAR_HEIGHT + 12 }}>
+            <div data-layout-shell="true" className="relative z-10 flex h-full w-full overflow-hidden" style={layoutShellStyle}>
                 <div
+                    data-layout-titlebar="true"
                     data-tauri-drag-region
                     onMouseDown={handleTitlebarMouseDown}
-                    className="surface-panel absolute inset-0 rounded-[1.4rem] border-white/50 bg-background/70"
+                    className="surface-panel absolute inset-x-0 top-0 z-20 h-[var(--layout-titlebar-height)] rounded-none border-x-0 border-t-0 border-white/50 bg-background/70"
                 />
-            </div>
-            <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                onClick={() => setIsSidebarCollapsed((value) => !value)}
-                data-no-window-drag
-                aria-label={isSidebarCollapsed ? t("expandSidebar") : t("collapseSidebar")}
-                className="absolute z-30 border border-border/50 bg-background/60 text-muted-foreground shadow-soft backdrop-blur-sm hover:bg-card/90 hover:text-foreground"
-                style={{ left: TOGGLE_BUTTON_LEFT, top: TOGGLE_BUTTON_TOP, width: TOGGLE_BUTTON_SIZE, height: TOGGLE_BUTTON_SIZE }}
-            >
-                {isSidebarCollapsed ? <PanelLeftOpen className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
-            </Button>
-            <div className={`relative z-10 flex h-full w-full overflow-hidden ${PAGE_GUTTER_X_CLASS} pb-3 pt-2 md:pb-4`} style={{ paddingTop: TITLEBAR_HEIGHT + 10 }}>
+                <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => setIsSidebarCollapsed((value) => !value)}
+                    data-no-window-drag
+                    aria-label={isSidebarCollapsed ? t("expandSidebar") : t("collapseSidebar")}
+                    className="absolute z-30 border border-border/50 bg-background/60 text-muted-foreground shadow-soft backdrop-blur-sm hover:bg-card/90 hover:text-foreground"
+                    style={{ left: TOGGLE_BUTTON_LEFT, top: TOGGLE_BUTTON_TOP, width: TOGGLE_BUTTON_SIZE, height: TOGGLE_BUTTON_SIZE }}
+                >
+                    {isSidebarCollapsed ? <PanelLeftOpen className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
+                </Button>
                 <Sidebar collapsed={isSidebarCollapsed} />
-                <main ref={mainRef} className={`min-w-0 flex-1 overflow-y-auto ${PAGE_GUTTER_LEFT_CLASS}`}>
-                    <Outlet context={{ mainScrollRef: mainRef }} />
-                </main>
+                <div data-layout-main-column="true" className="relative flex min-w-0 flex-1 flex-col overflow-hidden">
+                    <main ref={mainRef} className={`min-w-0 flex-1 overflow-y-auto ${CONTENT_GUTTER_LEFT_CLASS} pr-3 pb-3 pt-[var(--layout-titlebar-safe-height)] md:pr-4 md:pb-4`}>
+                        <Outlet context={{ mainScrollRef: mainRef }} />
+                    </main>
+                </div>
             </div>
             <Toaster />
         </div>

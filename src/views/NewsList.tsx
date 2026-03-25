@@ -18,7 +18,7 @@ import { resolveArticlePreview, sanitizeArticleHtml } from "@/lib/article-html";
 import { listNewsSources, markScopedNewsArticlesAsRead, type NewsSource } from "@/lib/news-service";
 import { useMainLayoutScrollContainer } from "@/components/layout/MainLayout";
 import { EmptyState, WorkspaceHeader } from "@/components/layout/WorkspaceHeader";
-import { PAGE_GUTTER_X_CLASS } from "@/components/layout/layout-spacing";
+import { CONTENT_GUTTER_X_CLASS } from "@/components/layout/layout-spacing";
 
 type Article = {
     id: number;
@@ -767,7 +767,7 @@ export default function NewsList() {
     }
 
     return (
-        <div className={cn("flex min-h-full w-full min-w-0 flex-col gap-4 py-4 md:py-6", PAGE_GUTTER_X_CLASS)}>
+        <div className={cn("flex min-h-full w-full min-w-0 flex-col gap-4 py-4 md:py-6", CONTENT_GUTTER_X_CLASS)}>
             <WorkspaceHeader
                 density="compact"
                 eyebrow={t("eyebrow")}

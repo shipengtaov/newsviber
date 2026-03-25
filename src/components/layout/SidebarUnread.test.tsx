@@ -131,12 +131,9 @@ describe("Sidebar unread indicators", () => {
         const unreadDot = container.querySelector('[data-sidebar-unread="news"]');
 
         expect(unreadDot).not.toBeNull();
-        expect(unreadDot?.className).toContain("bg-amber-500");
-        expect(unreadDot?.className).toContain("h-2");
-        expect(unreadDot?.className).toContain("w-2");
-        expect(unreadDot?.className).toContain("ring-1");
-        expect(unreadDot?.className).toContain("-right-0.5");
-        expect(unreadDot?.className).toContain("-top-0.5");
+        expect(unreadDot?.className).toContain("unread-badge");
+        expect(unreadDot?.className).toContain("ring-primary");
+        expect(unreadDot?.parentElement?.className).toContain("unread-badge-container");
         expect(container.querySelector('[data-sidebar-unread="creative"]')).toBeNull();
     });
 
