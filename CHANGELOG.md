@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [26.3.2] - 2026-03-25
+
+### Added
+
+- Added sidebar unread indicators and synced news badge updates.
+
+### Changed
+
+- Improved sidebar UI layout and styling.
+
 ## [26.3.1] - 2026-03-24
 
 ### Added
