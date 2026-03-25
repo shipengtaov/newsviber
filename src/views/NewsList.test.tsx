@@ -103,6 +103,10 @@ vi.mock("@/lib/source-events", () => ({
     dispatchSourceFetchSyncEvent: vi.fn(),
 }));
 
+vi.mock("@/lib/news-events", () => ({
+    dispatchNewsSyncEvent: vi.fn(),
+}));
+
 vi.mock("@/lib/db", () => ({
     getDb: mockGetDb,
 }));

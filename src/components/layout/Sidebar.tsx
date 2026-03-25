@@ -1,20 +1,34 @@
+import { useEffect, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/utils";
 import { Newspaper, Rss, MessageSquare, Lightbulb, Settings } from "lucide-react";
+import { addCreativeSyncListener } from "@/lib/creative-events";
+import { listCreativeProjects } from "@/lib/creative-service";
+import { addNewsSyncListener } from "@/lib/news-events";
+import { listNewsSources } from "@/lib/news-service";
 import { useAppUpdate } from "@/components/update/AppUpdateProvider";
 
 type SidebarProps = {
     collapsed: boolean;
 };
 
+type NavItem = {
+    name: string;
+    path: string;
+    icon: typeof Newspaper;
+    unreadScope?: "news" | "creative";
+};
+
 export function Sidebar({ collapsed }: SidebarProps) {
     const { t } = useTranslation();
     const location = useLocation();
     const { currentVersion } = useAppUpdate();
-    const navItems = [
-        { name: t("nav.news"), path: "/", icon: Newspaper },
-        { name: t("nav.creativeSpace"), path: "/creative", icon: Lightbulb },
+    const [hasNewsUnread, setHasNewsUnread] = useState(false);
+    const [hasCreativeUnread, setHasCreativeUnread] = useState(false);
+    const navItems: NavItem[] = [
+        { name: t("nav.news"), path: "/", icon: Newspaper, unreadScope: "news" },
+        { name: t("nav.creativeSpace"), path: "/creative", icon: Lightbulb, unreadScope: "creative" },
         { name: t("nav.chat"), path: "/chat", icon: MessageSquare },
         { name: t("nav.sources"), path: "/sources", icon: Rss },
         { name: t("nav.settings"), path: "/settings", icon: Settings },
@@ -22,6 +36,48 @@ export function Sidebar({ collapsed }: SidebarProps) {
     const contentTransitionClass = collapsed
         ? "pointer-events-none -translate-x-2 opacity-0"
         : "translate-x-0 opacity-100";
+
+    useEffect(() => {
+        let isDisposed = false;
+
+        async function refreshNewsUnreadState() {
+            try {
+                const sources = await listNewsSources();
+                if (!isDisposed) {
+                    setHasNewsUnread(sources.some((source) => source.unread_count > 0));
+                }
+            } catch (error) {
+                console.error("Failed to refresh sidebar news unread state", error);
+            }
+        }
+
+        async function refreshCreativeUnreadState() {
+            try {
+                const projects = await listCreativeProjects();
+                if (!isDisposed) {
+                    setHasCreativeUnread(projects.some((project) => project.unread_card_count > 0));
+                }
+            } catch (error) {
+                console.error("Failed to refresh sidebar creative unread state", error);
+            }
+        }
+
+        void refreshNewsUnreadState();
+        void refreshCreativeUnreadState();
+
+        const removeNewsSyncListener = addNewsSyncListener(() => {
+            void refreshNewsUnreadState();
+        });
+        const removeCreativeSyncListener = addCreativeSyncListener(() => {
+            void refreshCreativeUnreadState();
+        });
+
+        return () => {
+            isDisposed = true;
+            removeNewsSyncListener();
+            removeCreativeSyncListener();
+        };
+    }, []);
 
     return (
         <aside
@@ -60,6 +116,11 @@ export function Sidebar({ collapsed }: SidebarProps) {
                     const isActive = item.path === "/"
                         ? location.pathname === "/" || location.pathname.startsWith("/news/")
                         : location.pathname === item.path || location.pathname.startsWith(`${item.path}/`);
+                    const hasUnreadIndicator = item.unreadScope === "news"
+                        ? hasNewsUnread
+                        : item.unreadScope === "creative"
+                            ? hasCreativeUnread
+                            : false;
                     return (
                         <Link
                             key={item.name}
@@ -75,8 +136,20 @@ export function Sidebar({ collapsed }: SidebarProps) {
                                     : "text-muted-foreground hover:bg-background/72 hover:text-foreground",
                             )}
                         >
-                            <span className="flex h-5 w-5 shrink-0 items-center justify-center">
+                            <span className="relative flex h-5 w-5 shrink-0 items-center justify-center">
                                 <item.icon className="h-4 w-4 shrink-0" />
+                                {hasUnreadIndicator ? (
+                                    <div className="unread-badge-container">
+                                        <div
+                                            aria-hidden="true"
+                                            data-sidebar-unread={item.unreadScope}
+                                            className={cn(
+                                                "unread-badge",
+                                                isActive ? "ring-primary" : "ring-background/90"
+                                            )}
+                                        />
+                                    </div>
+                                ) : null}
                             </span>
                             <span
                                 className={cn(

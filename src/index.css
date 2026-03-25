@@ -232,6 +232,22 @@
     }
   }
 
+  @keyframes pulse-subtle {
+    0%,
+    100% {
+      transform: scale(1);
+      opacity: 1;
+    }
+    50% {
+      transform: scale(1.08);
+      opacity: 0.94;
+    }
+  }
+
+  .animate-pulse-subtle {
+    animation: pulse-subtle 4s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+
   .chat-markdown {
     --chat-markdown-body: hsl(var(--foreground) / 0.95);
     --chat-markdown-foreground: hsl(var(--foreground));
@@ -370,5 +386,29 @@
   .chat-markdown-inverse .chat-markdown-pre,
   .chat-markdown-inverse .chat-markdown-table-wrapper {
     box-shadow: none;
+  }
+
+  /* Unread Badge */
+  .unread-badge-container {
+    @apply absolute -right-0.5 -top-0.5 pointer-events-none;
+    filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.16));
+  }
+
+  .unread-badge {
+    @apply h-1.5 w-1.5 rounded-full ring-[1.5px] transition-all duration-300 opacity-80;
+    background: linear-gradient(135deg, hsl(36 92% 58%), hsl(24 94% 54%));
+    background-clip: padding-box;
+  }
+
+  .unread-badge:hover {
+    @apply opacity-100 scale-110;
+  }
+
+  /* No explicit animation to minimize distraction, or use a very slow pulse */
+  .unread-badge::before {
+    content: "";
+    @apply absolute inset-0 rounded-full animate-pulse-subtle opacity-40;
+    background: currentColor;
+    background: inherit;
   }
 }

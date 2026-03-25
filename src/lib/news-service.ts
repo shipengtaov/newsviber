@@ -1,4 +1,5 @@
 import { getDb } from "@/lib/db";
+import { dispatchNewsSyncEvent } from "@/lib/news-events";
 import type { FetchableSource } from "@/lib/source-fetch";
 import { normalizeFetchInterval } from "@/lib/source-utils";
 
@@ -78,6 +79,7 @@ export async function listNewsSources(): Promise<NewsSource[]> {
 export async function markNewsArticleAsRead(articleId: number): Promise<void> {
     const db = await getDb();
     await db.execute("UPDATE articles SET is_read = 1 WHERE id = $1", [articleId]);
+    dispatchNewsSyncEvent();
 }
 
 export async function markScopedNewsArticlesAsRead(sourceId: number | null): Promise<void> {
@@ -88,8 +90,10 @@ export async function markScopedNewsArticlesAsRead(sourceId: number | null): Pro
             "UPDATE articles SET is_read = 1 WHERE is_read = 0 AND source_id IN (SELECT id FROM sources WHERE active = 1)",
             [],
         );
+        dispatchNewsSyncEvent();
         return;
     }
 
     await db.execute("UPDATE articles SET is_read = 1 WHERE source_id = $1 AND is_read = 0", [sourceId]);
+    dispatchNewsSyncEvent();
 }

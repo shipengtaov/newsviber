@@ -1,11 +1,19 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-const { getDbMock } = vi.hoisted(() => ({
+const {
+    dispatchNewsSyncEventMock,
+    getDbMock,
+} = vi.hoisted(() => ({
+    dispatchNewsSyncEventMock: vi.fn(),
     getDbMock: vi.fn(),
 }));
 
 vi.mock("@/lib/db", () => ({
     getDb: getDbMock,
+}));
+
+vi.mock("@/lib/news-events", () => ({
+    dispatchNewsSyncEvent: dispatchNewsSyncEventMock,
 }));
 
 import {
@@ -15,6 +23,7 @@ import {
 } from "@/lib/news-service";
 
 afterEach(() => {
+    dispatchNewsSyncEventMock.mockReset();
     getDbMock.mockReset();
 });
 
@@ -65,6 +74,7 @@ describe("news service unread state", () => {
             "UPDATE articles SET is_read = 1 WHERE id = $1",
             [18],
         );
+        expect(dispatchNewsSyncEventMock).toHaveBeenCalledTimes(1);
     });
 
     it("marks all unread articles in a source as read", async () => {
@@ -80,6 +90,7 @@ describe("news service unread state", () => {
             "UPDATE articles SET is_read = 1 WHERE source_id = $1 AND is_read = 0",
             [7],
         );
+        expect(dispatchNewsSyncEventMock).toHaveBeenCalledTimes(1);
     });
 
     it("marks all unread articles in active sources as read", async () => {
@@ -95,5 +106,6 @@ describe("news service unread state", () => {
             "UPDATE articles SET is_read = 1 WHERE is_read = 0 AND source_id IN (SELECT id FROM sources WHERE active = 1)",
             [],
         );
+        expect(dispatchNewsSyncEventMock).toHaveBeenCalledTimes(1);
     });
 });

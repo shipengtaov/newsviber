@@ -7,6 +7,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import SourceManager from "@/views/SourceManager";
 
 const {
+    dispatchNewsSyncEventMock,
+    dispatchSourceFetchSyncEventMock,
     toastMock,
     listSourcesMock,
     setSourceActiveMock,
@@ -18,6 +20,8 @@ const {
     readTextFileMock,
     parseOpmlTextMock,
 } = vi.hoisted(() => ({
+    dispatchNewsSyncEventMock: vi.fn(),
+    dispatchSourceFetchSyncEventMock: vi.fn(),
     toastMock: vi.fn(),
     listSourcesMock: vi.fn(),
     setSourceActiveMock: vi.fn(),
@@ -130,7 +134,11 @@ vi.mock("@/lib/source-opml", () => ({
 
 vi.mock("@/lib/source-events", () => ({
     addSourceFetchSyncListener: vi.fn(() => () => {}),
-    dispatchSourceFetchSyncEvent: vi.fn(),
+    dispatchSourceFetchSyncEvent: dispatchSourceFetchSyncEventMock,
+}));
+
+vi.mock("@/lib/news-events", () => ({
+    dispatchNewsSyncEvent: dispatchNewsSyncEventMock,
 }));
 
 vi.mock("@/lib/source-fetch", () => ({
@@ -272,6 +280,8 @@ describe("SourceManager", () => {
     let previousActEnvironment: boolean | undefined;
 
     beforeEach(() => {
+        dispatchNewsSyncEventMock.mockReset();
+        dispatchSourceFetchSyncEventMock.mockReset();
         toastMock.mockReset();
         listSourcesMock.mockReset();
         setSourceActiveMock.mockReset();
@@ -386,7 +396,53 @@ describe("SourceManager", () => {
             active: true,
             fetchInterval: 15,
         }], "skip", null);
+        expect(dispatchNewsSyncEventMock).toHaveBeenCalledTimes(1);
         expect(container.textContent).not.toContain("Review OPML import");
+    });
+
+    it("dispatches news sync when toggling a source active state", async () => {
+        await renderView();
+
+        const toggleButton = container.querySelector('button[title="Deactivate source"]');
+        if (!(toggleButton instanceof HTMLButtonElement)) {
+            throw new Error("Expected the active toggle button to be rendered.");
+        }
+
+        await click(toggleButton);
+
+        expect(setSourceActiveMock).toHaveBeenCalledWith(11, false);
+        expect(dispatchNewsSyncEventMock).toHaveBeenCalledTimes(1);
+    });
+
+    it("dispatches both sync events when a fetch inserts new articles", async () => {
+        fetchSourcesMock.mockResolvedValueOnce({
+            insertedCount: 2,
+            fetchedCount: 2,
+            successCount: 1,
+            failCount: 0,
+        });
+
+        await renderView();
+        await click(findButton(container, "Fetch All"));
+
+        expect(fetchSourcesMock).toHaveBeenCalledTimes(1);
+        expect(dispatchSourceFetchSyncEventMock).toHaveBeenCalledTimes(1);
+        expect(dispatchNewsSyncEventMock).toHaveBeenCalledTimes(1);
+    });
+
+    it("dispatches news sync after deleting a source", async () => {
+        await renderView();
+
+        const deleteTrigger = container.querySelector('button[title="Delete source"]');
+        if (!(deleteTrigger instanceof HTMLButtonElement)) {
+            throw new Error("Expected the delete button to be rendered.");
+        }
+
+        await click(deleteTrigger);
+        await click(findButton(container, "Delete"));
+
+        expect(deleteSourceMock).toHaveBeenCalledWith(11);
+        expect(dispatchNewsSyncEventMock).toHaveBeenCalledTimes(1);
     });
 
     it("shows the duplicate review dialog after the file is selected", async () => {

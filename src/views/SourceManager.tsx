@@ -24,6 +24,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
+import { dispatchNewsSyncEvent } from "@/lib/news-events";
 import { addSourceFetchSyncListener, dispatchSourceFetchSyncEvent } from "@/lib/source-events";
 import { normalizeSourceUrl, parseOpmlText, type ImportOpmlMode, type OpmlSourceEntry } from "@/lib/source-opml";
 import { fetchSource, fetchSources } from "@/lib/source-fetch";
@@ -133,6 +134,7 @@ export default function SourceManager() {
         try {
             const nextActive = !source.active;
             await setSourceActive(source.id, nextActive);
+            dispatchNewsSyncEvent();
             toast({ title: nextActive ? t("sourceActivated") : t("sourceDeactivated") });
             await loadSources();
         } catch (err: unknown) {
@@ -165,6 +167,7 @@ export default function SourceManager() {
         setDeletingSourceId(sourceId);
         try {
             await deleteSourceRecord(sourceId);
+            dispatchNewsSyncEvent();
             toast({ title: t("sourceDeleted") });
             setPendingDeleteSource(null);
             await loadSources();
@@ -189,6 +192,7 @@ export default function SourceManager() {
             const result = await fetchSources(activeSources);
             if (result.insertedCount > 0) {
                 dispatchSourceFetchSyncEvent();
+                dispatchNewsSyncEvent();
             }
             toast({
                 title: t("fetchAllComplete"),
@@ -217,6 +221,7 @@ export default function SourceManager() {
             const result = await fetchSource(source);
             if (result.insertedCount > 0) {
                 dispatchSourceFetchSyncEvent();
+                dispatchNewsSyncEvent();
             }
             toast({
                 title: t("fetchComplete"),
@@ -243,6 +248,9 @@ export default function SourceManager() {
             skippedInvalidCount: importResult.skippedInvalidCount + payload.skippedInvalidCount,
         };
 
+        if (summary.insertedCount > 0 || summary.updatedCount > 0) {
+            dispatchNewsSyncEvent();
+        }
         await loadSources();
         toast({
             title: t("importOpmlComplete"),

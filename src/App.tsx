@@ -10,6 +10,7 @@ import Settings from "@/views/Settings";
 import { useEffect } from "react";
 import { runDueAutoCreativeProjects } from "@/lib/creative-service";
 import { getDb } from "@/lib/db";
+import { dispatchNewsSyncEvent } from "@/lib/news-events";
 import { registerExportSourcesOpmlMenuHandler } from "@/lib/source-opml-export";
 import { addSourceFetchSyncListener, dispatchSourceFetchSyncEvent } from "@/lib/source-events";
 import { fetchSources, isSourceDueForFetch, type SchedulableSource } from "@/lib/source-fetch";
@@ -89,6 +90,7 @@ function App() {
         const fetchResult = await fetchSources(dueSources);
         if (fetchResult.insertedCount > 0) {
           dispatchSourceFetchSyncEvent();
+          dispatchNewsSyncEvent();
         }
         await runCreativeCheck();
       } catch (err) {

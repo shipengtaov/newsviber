@@ -8,6 +8,7 @@ import { Link, useLocation, useNavigate, useSearchParams } from "react-router-do
 import { Search, ExternalLink, RefreshCcw, ChevronLeft, ChevronRight, MoreHorizontal, Plus, CheckCheck, Loader2, Newspaper } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
+import { dispatchNewsSyncEvent } from "@/lib/news-events";
 import { fetchSource, fetchSources } from "@/lib/source-fetch";
 import { addSourceFetchSyncListener, dispatchSourceFetchSyncEvent } from "@/lib/source-events";
 import { getDb } from "@/lib/db";
@@ -717,6 +718,7 @@ export default function NewsList() {
             const result = await fetchSources(sources);
             if (result.insertedCount > 0) {
                 dispatchSourceFetchSyncEvent();
+                dispatchNewsSyncEvent();
             }
             toast({
                 title: t("fetchAllComplete"),
@@ -743,6 +745,7 @@ export default function NewsList() {
             const result = await fetchSource(source);
             if (result.insertedCount > 0) {
                 dispatchSourceFetchSyncEvent();
+                dispatchNewsSyncEvent();
             }
             toast({
                 title: t("fetchComplete"),

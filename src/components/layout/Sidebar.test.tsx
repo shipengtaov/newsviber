@@ -24,6 +24,22 @@ vi.mock("@/components/update/AppUpdateProvider", () => ({
     }),
 }));
 
+vi.mock("@/lib/news-service", () => ({
+    listNewsSources: vi.fn().mockResolvedValue([]),
+}));
+
+vi.mock("@/lib/creative-service", () => ({
+    listCreativeProjects: vi.fn().mockResolvedValue([]),
+}));
+
+vi.mock("@/lib/news-events", () => ({
+    addNewsSyncListener: vi.fn(() => () => {}),
+}));
+
+vi.mock("@/lib/creative-events", () => ({
+    addCreativeSyncListener: vi.fn(() => () => {}),
+}));
+
 function renderSidebar(pathname: string, collapsed = false): string {
     return renderToStaticMarkup(
         <MemoryRouter initialEntries={[pathname]}>
