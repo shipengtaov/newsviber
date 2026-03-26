@@ -714,12 +714,10 @@ export default function NewsList() {
         setIsFetchingAll(true);
         toast({ title: t("fetchingNSources", { count: sources.length }) });
 
+        let insertedCount = 0;
         try {
             const result = await fetchSources(sources);
-            if (result.insertedCount > 0) {
-                dispatchSourceFetchSyncEvent();
-                dispatchNewsSyncEvent();
-            }
+            insertedCount = result.insertedCount;
             toast({
                 title: t("fetchAllComplete"),
                 description: t("fetchAllCompleteDesc", { inserted: result.insertedCount, succeeded: result.successCount, failedPart: result.failCount > 0 ? `, ${result.failCount} failed` : "" }),
@@ -728,6 +726,10 @@ export default function NewsList() {
             toast({ title: t("fetchFailed"), description: String(err), variant: "destructive" });
         } finally {
             await refreshCurrentView();
+            if (insertedCount > 0) {
+                dispatchSourceFetchSyncEvent();
+                dispatchNewsSyncEvent();
+            }
             setIsFetchingAll(false);
         }
     }
@@ -741,12 +743,10 @@ export default function NewsList() {
         setFetchingSourceId(source.id);
         toast({ title: t("fetchingSource", { name: source.name }) });
 
+        let insertedCount = 0;
         try {
             const result = await fetchSource(source);
-            if (result.insertedCount > 0) {
-                dispatchSourceFetchSyncEvent();
-                dispatchNewsSyncEvent();
-            }
+            insertedCount = result.insertedCount;
             toast({
                 title: t("fetchComplete"),
                 description: t("fetchCompleteDesc", { fetched: result.fetchedCount, inserted: result.insertedCount }),
@@ -755,6 +755,10 @@ export default function NewsList() {
             toast({ title: t("fetchFailed"), description: String(err), variant: "destructive" });
         } finally {
             await refreshCurrentView();
+            if (insertedCount > 0) {
+                dispatchSourceFetchSyncEvent();
+                dispatchNewsSyncEvent();
+            }
             setFetchingSourceId(null);
         }
     }
