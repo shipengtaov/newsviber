@@ -85,16 +85,16 @@ export function MainLayout() {
     return (
         <div className="relative h-screen w-full overflow-hidden bg-background text-foreground">
             <div className="pointer-events-none absolute inset-0">
-                <div className="absolute inset-x-0 top-0 h-48 bg-[radial-gradient(circle_at_top_left,_rgba(56,189,248,0.18),_transparent_48%)]" />
-                <div className="absolute right-[-8%] top-[12%] h-64 w-64 rounded-full bg-[radial-gradient(circle,_rgba(251,191,36,0.18),_transparent_68%)] blur-3xl" />
-                <div className="absolute bottom-[-10%] left-[18%] h-72 w-72 rounded-full bg-[radial-gradient(circle,_rgba(14,165,233,0.1),_transparent_72%)] blur-3xl" />
+                <div className="absolute inset-x-0 top-0 h-48 bg-[radial-gradient(circle_at_top_left,_rgba(56,189,248,0.08),_transparent_48%)]" />
+                <div className="absolute right-[-8%] top-[12%] h-64 w-64 rounded-full bg-[radial-gradient(circle,_rgba(251,191,36,0.08),_transparent_68%)] blur-3xl" />
+                <div className="absolute bottom-[-10%] left-[18%] h-72 w-72 rounded-full bg-[radial-gradient(circle,_rgba(14,165,233,0.05),_transparent_72%)] blur-3xl" />
             </div>
             <div data-layout-shell="true" className="relative z-10 flex h-full w-full overflow-hidden" style={layoutShellStyle}>
                 <div
                     data-layout-titlebar="true"
                     data-tauri-drag-region
                     onMouseDown={handleTitlebarMouseDown}
-                    className="surface-panel absolute inset-x-0 top-0 z-20 h-[var(--layout-titlebar-height)] rounded-none border-x-0 border-t-0 border-white/50 bg-background/70"
+                    className="absolute inset-x-0 top-0 z-20 h-[var(--layout-titlebar-height)] rounded-none border-b border-border/50 bg-background/80 backdrop-blur-md"
                 />
                 <Button
                     type="button"

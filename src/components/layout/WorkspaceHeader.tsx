@@ -149,7 +149,6 @@ export function WorkspaceHeader({
                 className,
             )}
         >
-            <div className="absolute inset-x-0 top-0 h-px bg-white/70" aria-hidden="true" />
             <div className={cn("flex flex-col", shouldUseCompactTitlelessLayout ? "gap-2.5" : density === "compact" ? "gap-3.5" : "gap-5")}>
                 {shouldUseCompactTitlelessLayout ? (
                     <div className={cn("flex flex-col gap-2.5", actions ? "lg:flex-row lg:items-start lg:justify-between" : undefined)}>

@@ -54,7 +54,7 @@ const PAGE_SIZE = 20;
 const DEFAULT_SOURCES_PANEL_WIDTH = 240;
 const MIN_SOURCES_PANEL_WIDTH = 200;
 const MAX_SOURCES_PANEL_WIDTH = 420;
-const SOURCE_ACTION_BUTTON_CLASS_NAME = "h-10 w-10 shrink-0 rounded-2xl border border-transparent text-muted-foreground shadow-none hover:border-primary/15 hover:bg-accent/70 hover:text-accent-foreground";
+const SOURCE_ACTION_BUTTON_CLASS_NAME = "h-10 w-10 shrink-0 rounded-lg border border-transparent text-muted-foreground shadow-none hover:bg-accent/50 hover:text-accent-foreground transition-colors";
 
 function parsePageParam(rawPage: string | null): number {
     const parsed = Number.parseInt(rawPage ?? "0", 10);
@@ -243,8 +243,8 @@ function SourceFilterRow({
                 type="button"
                 variant="ghost"
                 className={cn(
-                    "h-11 min-w-0 grid w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-3 rounded-[1.15rem] border border-transparent bg-background/42 px-3.5 text-left shadow-none transition-all duration-200 hover:border-primary/15 hover:bg-background/78 hover:text-foreground",
-                    isSelected && "border-primary/20 bg-accent/80 text-accent-foreground shadow-soft hover:bg-accent/80",
+                    "h-10 min-w-0 grid w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-3 rounded-lg border border-transparent bg-transparent px-3 text-left shadow-none transition-all duration-200 hover:bg-accent/50 hover:text-foreground",
+                    isSelected && "bg-accent/70 text-accent-foreground font-medium",
                 )}
                 onClick={onSelect}
                 title={title}
@@ -951,10 +951,10 @@ export default function NewsList() {
                                         >
                                             <Card
                                                 className={cn(
-                                                    "editor-list-card border-border/55 bg-card/72",
+                                                    "editor-list-card border border-border/55",
                                                     article.is_read
-                                                        ? "hover:border-primary/20"
-                                                        : "border-amber-200/70 bg-amber-50/52 shadow-[0_22px_46px_-38px_rgba(245,158,11,0.45)]",
+                                                        ? "bg-card/40 hover:border-primary/30"
+                                                        : "border-amber-200/70 bg-amber-50/52 shadow-sm",
                                                 )}
                                             >
                                                 <CardHeader className="space-y-3 px-4 py-4">

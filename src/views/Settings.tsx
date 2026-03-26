@@ -532,7 +532,7 @@ export default function Settings() {
                             key={key}
                             asChild
                             variant="outline"
-                            className="h-11 w-full justify-start rounded-[1rem] px-4 sm:w-auto"
+                            className="h-10 w-full justify-start rounded-lg px-4 transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] sm:w-auto"
                         >
                             <a
                                 href={url}

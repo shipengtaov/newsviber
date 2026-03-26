@@ -40,6 +40,7 @@
     --shadow-elevated: 0 28px 80px -42px rgba(17, 34, 53, 0.34);
     --shadow-glow: 0 0 0 1px rgba(255, 255, 255, 0.72), 0 24px 70px -40px rgba(11, 84, 118, 0.38);
   }
+
   .dark {
     color-scheme: dark;
     --background: 218 24% 11%;
@@ -150,33 +151,16 @@
 
 @layer components {
   .surface-panel {
-    @apply relative overflow-hidden rounded-[1.75rem] border shadow-soft backdrop-blur-xl;
-    border-color: hsl(var(--border) / 0.7);
-    background-color: hsl(var(--card) / 0.8);
-  }
-
-  .surface-panel::after {
-    content: "";
-    position: absolute;
-    inset: 0;
-    border-radius: inherit;
-    pointer-events: none;
-    background: linear-gradient(180deg, hsl(0 0% 100% / 0.42), transparent 22%);
-  }
-
-  .surface-panel > * {
-    position: relative;
-    z-index: 1;
+    @apply relative overflow-hidden rounded-xl border bg-card text-card-foreground shadow-sm;
   }
 
   .surface-panel-quiet {
-    @apply relative overflow-hidden rounded-[1.5rem] border shadow-soft backdrop-blur-md;
+    @apply relative overflow-hidden rounded-xl border bg-card/60 text-foreground shadow-sm backdrop-blur-md;
     border-color: hsl(var(--border) / 0.6);
-    background-color: hsl(var(--card) / 0.62);
   }
 
   .surface-panel-elevated {
-    @apply surface-panel shadow-elevated;
+    @apply surface-panel shadow-md;
   }
 
   .section-kicker {
@@ -199,7 +183,7 @@
   }
 
   .editor-list-card {
-    @apply surface-panel-quiet rounded-[1.35rem] transition-all duration-200 motion-safe:hover:-translate-y-1 motion-safe:hover:shadow-elevated;
+    @apply surface-panel-quiet rounded-xl transition-all duration-200 motion-safe:hover:-translate-y-[2px] motion-safe:hover:shadow-md;
   }
 
   .editor-empty {
@@ -233,11 +217,13 @@
   }
 
   @keyframes pulse-subtle {
+
     0%,
     100% {
       transform: scale(1);
       opacity: 1;
     }
+
     50% {
       transform: scale(1.08);
       opacity: 0.94;
@@ -305,11 +291,11 @@
     background-color: var(--chat-markdown-surface);
   }
 
-  .chat-markdown > :first-child {
+  .chat-markdown> :first-child {
     @apply mt-0;
   }
 
-  .chat-markdown > :last-child {
+  .chat-markdown> :last-child {
     @apply mb-0;
   }
 
