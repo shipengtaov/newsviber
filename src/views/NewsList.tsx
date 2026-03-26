@@ -243,14 +243,14 @@ function SourceFilterRow({
                 type="button"
                 variant="ghost"
                 className={cn(
-                    "h-10 min-w-0 grid w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-3 rounded-lg border border-transparent bg-transparent px-3 text-left shadow-none transition-all duration-200 hover:bg-accent/50 hover:text-foreground",
+                    "h-10 min-w-0 flex w-full items-center gap-2 rounded-lg border border-transparent bg-transparent px-3 text-left shadow-none transition-all duration-200 hover:bg-accent/50 hover:text-foreground",
                     isSelected && "bg-accent/70 text-accent-foreground font-medium",
                 )}
                 onClick={onSelect}
                 title={title}
             >
-                <span className="min-w-0 truncate text-sm font-medium">{label}</span>
-                <span className="inline-flex min-w-[4.75rem] shrink-0 items-center justify-end gap-1.5">
+                <span className="min-w-0 flex-1 truncate text-sm font-medium">{label}</span>
+                <span className="inline-flex min-w-[4ch] shrink-0 items-center justify-end gap-1.5">
                     <span className={cn(
                         "text-right text-xs tabular-nums",
                         isSelected ? "text-accent-foreground" : "text-muted-foreground",

@@ -294,6 +294,18 @@ describe("NewsList pagination scroll reset", () => {
         return button;
     }
 
+    function getSourceFilterButton(label: string): HTMLButtonElement {
+        const button = Array.from(container.querySelectorAll("button")).find((candidate) => (
+            candidate.title.startsWith(`${label} (`)
+        ));
+
+        if (!(button instanceof HTMLButtonElement)) {
+            throw new Error(`Source filter "${label}" not found.`);
+        }
+
+        return button;
+    }
+
     function getSearchInput(): HTMLInputElement {
         const input = container.querySelector("input");
         if (!(input instanceof HTMLInputElement)) {
@@ -407,6 +419,70 @@ describe("NewsList pagination scroll reset", () => {
         expect(listContainer.className).toContain("lg:flex-1");
         expect(listContainer.className).toContain("lg:min-h-0");
         expect(listContainer.className).toContain("lg:overflow-y-auto");
+    });
+
+    it("gives source labels the remaining width before truncating", async () => {
+        mockListNewsSources.mockResolvedValue([
+            {
+                id: 1,
+                name: "Hacker News",
+                source_type: "rss",
+                url: "https://news.ycombinator.com/rss",
+                active: true,
+                fetch_interval: 60,
+                last_fetch: null,
+                article_count: 808,
+                unread_count: 12,
+            },
+            {
+                id: 2,
+                name: "Reddit/Claude",
+                source_type: "rss",
+                url: "https://example.com/reddit-claude.xml",
+                active: true,
+                fetch_interval: 60,
+                last_fetch: null,
+                article_count: 347,
+                unread_count: 0,
+            },
+        ]);
+
+        renderNewsList("/");
+        await settleNewsList();
+
+        const hackerNewsButton = getSourceFilterButton("Hacker News");
+        expect(hackerNewsButton.className).toContain("flex");
+        expect(hackerNewsButton.className).toContain("gap-2");
+        expect(hackerNewsButton.className).not.toContain("grid-cols-[minmax(0,1fr)_auto]");
+
+        const labelSpan = hackerNewsButton.children[0];
+        if (!(labelSpan instanceof HTMLSpanElement)) {
+            throw new Error("Source label span not found.");
+        }
+
+        expect(labelSpan.textContent).toBe("Hacker News");
+        expect(labelSpan.className).toContain("min-w-0");
+        expect(labelSpan.className).toContain("flex-1");
+        expect(labelSpan.className).toContain("truncate");
+
+        const metaSpan = hackerNewsButton.children[1];
+        if (!(metaSpan instanceof HTMLSpanElement)) {
+            throw new Error("Source meta span not found.");
+        }
+
+        expect(metaSpan.className).toContain("min-w-[4ch]");
+        expect(metaSpan.className).toContain("shrink-0");
+        expect(metaSpan.className).not.toContain("min-w-[4.75rem]");
+
+        const countSpan = metaSpan.children[0];
+        if (!(countSpan instanceof HTMLSpanElement)) {
+            throw new Error("Source count span not found.");
+        }
+
+        expect(countSpan.textContent).toBe("808");
+        expect(countSpan.className).toContain("text-right");
+
+        expect(metaSpan.children[1]).toBeInstanceOf(HTMLSpanElement);
     });
 
     it("reuses the same reset behavior for the next-page control", async () => {
