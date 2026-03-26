@@ -299,6 +299,15 @@ pub fn get_migrations() -> Vec<Migration> {
                 );
             ",
             kind: MigrationKind::Up,
+        },
+        Migration {
+            version: 10,
+            description: "add_min_articles_per_card",
+            sql: "
+                ALTER TABLE creative_projects ADD COLUMN min_articles_per_card INTEGER NOT NULL DEFAULT 1;
+                UPDATE creative_projects SET min_articles_per_card = 1;
+            ",
+            kind: MigrationKind::Up,
         }
     ]
 }

@@ -55,12 +55,14 @@ type ProjectFormState = {
     autoEnabled: boolean;
     autoIntervalMinutes: string;
     maxArticlesPerCard: string;
+    minArticlesPerCard: string;
     useAllSources: boolean;
     sourceIds: number[];
 };
 
 const DEFAULT_AUTO_INTERVAL_MINUTES = "60";
 const DEFAULT_MAX_ARTICLES_PER_CARD = "12";
+const DEFAULT_MIN_ARTICLES_PER_CARD = "1";
 const GENERATED_TILE_PREVIEW_MAX_LENGTH = 360;
 const DESKTOP_CARD_DISCUSSION_MEDIA_QUERY = "(min-width: 1024px)";
 const CREATIVE_TILE_GRID_CLASS = "grid gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4";
@@ -83,6 +85,7 @@ function createEmptyProjectFormState(): ProjectFormState {
         autoEnabled: false,
         autoIntervalMinutes: DEFAULT_AUTO_INTERVAL_MINUTES,
         maxArticlesPerCard: DEFAULT_MAX_ARTICLES_PER_CARD,
+        minArticlesPerCard: DEFAULT_MIN_ARTICLES_PER_CARD,
         useAllSources: true,
         sourceIds: [],
     };
@@ -99,6 +102,7 @@ function createProjectFormState(project?: CreativeProject): ProjectFormState {
         autoEnabled: project.auto_enabled,
         autoIntervalMinutes: String(project.auto_interval_minutes),
         maxArticlesPerCard: String(project.max_articles_per_card),
+        minArticlesPerCard: String(project.min_articles_per_card),
         useAllSources: project.source_ids.length === 0,
         sourceIds: project.source_ids,
     };
@@ -317,15 +321,28 @@ function ProjectDialog({
                             </div>
                         </div>
 
-                        <div className="space-y-2">
-                            <Label>{t("maxArticlesPerCard")}</Label>
-                            <Input
-                                type="number"
-                                min="1"
-                                value={projectForm.maxArticlesPerCard}
-                                onChange={(event) => setProjectForm((current) => ({ ...current, maxArticlesPerCard: event.target.value }))}
-                            />
-                            <p className="text-xs text-muted-foreground">{t("maxArticlesDesc")}</p>
+                        <div className="grid gap-4 md:grid-cols-2">
+                            <div className="space-y-2">
+                                <Label>{t("minArticlesPerCard")}</Label>
+                                <Input
+                                    type="number"
+                                    min="1"
+                                    value={projectForm.minArticlesPerCard}
+                                    onChange={(event) => setProjectForm((current) => ({ ...current, minArticlesPerCard: event.target.value }))}
+                                />
+                                <p className="text-xs text-muted-foreground">{t("minArticlesDesc")}</p>
+                            </div>
+
+                            <div className="space-y-2">
+                                <Label>{t("maxArticlesPerCard")}</Label>
+                                <Input
+                                    type="number"
+                                    min="1"
+                                    value={projectForm.maxArticlesPerCard}
+                                    onChange={(event) => setProjectForm((current) => ({ ...current, maxArticlesPerCard: event.target.value }))}
+                                />
+                                <p className="text-xs text-muted-foreground">{t("maxArticlesDesc")}</p>
+                            </div>
                         </div>
 
                         <div className="space-y-4 rounded-xl border p-4">
@@ -853,6 +870,7 @@ export default function CreativeSpace() {
                     auto_enabled: projectForm.autoEnabled,
                     auto_interval_minutes: Number.parseInt(projectForm.autoIntervalMinutes, 10),
                     max_articles_per_card: Number.parseInt(projectForm.maxArticlesPerCard, 10),
+                    min_articles_per_card: Number.parseInt(projectForm.minArticlesPerCard, 10),
                     use_all_sources: projectForm.useAllSources,
                     source_ids: projectForm.sourceIds,
                 },
@@ -1315,6 +1333,10 @@ export default function CreativeSpace() {
                                     <span className="truncate font-medium text-foreground">{formatProjectScopeSummary(activeProject, sources)}</span>
                                 </span>
                                 <span className="inline-flex items-center gap-1.5">
+                                    <span className="text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">{t("minLabel")}</span>
+                                    <span className="font-medium text-foreground">{formatArticleCount(activeProject.min_articles_per_card)}</span>
+                                </span>
+                                <span className="inline-flex items-center gap-1.5">
                                     <span className="text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">{t("maxLabel")}</span>
                                     <span className="font-medium text-foreground">{formatArticleCount(activeProject.max_articles_per_card)}</span>
                                 </span>
@@ -1649,8 +1671,8 @@ export default function CreativeSpace() {
                                         </div>
                                     </div>
                                     <div>
-                                        <div className="text-[10px] font-medium uppercase tracking-[0.16em] text-muted-foreground">{t("maxLabel")}</div>
-                                        <div className="mt-1 text-sm font-medium text-foreground">{formatArticleCount(project.max_articles_per_card)}</div>
+                                        <div className="text-[10px] font-medium uppercase tracking-[0.16em] text-muted-foreground">{t("minLabel")}–{t("maxLabel")}</div>
+                                        <div className="mt-1 text-sm font-medium text-foreground">{project.min_articles_per_card}–{project.max_articles_per_card} {t("articlesUnit")}</div>
                                     </div>
                                 </div>
                             </div>

@@ -13,6 +13,7 @@ export type CreativeProject = {
     auto_enabled: boolean;
     auto_interval_minutes: number;
     max_articles_per_card: number;
+    min_articles_per_card: number;
     last_auto_checked_at: string | null;
     last_auto_generated_at: string | null;
     source_ids: number[];
@@ -54,6 +55,7 @@ export type SaveCreativeProjectInput = {
     auto_enabled: boolean;
     auto_interval_minutes: number;
     max_articles_per_card: number;
+    min_articles_per_card: number;
     use_all_sources: boolean;
     source_ids: number[];
 };
@@ -72,6 +74,7 @@ type SaveCreativeProjectCommandInput = {
     autoEnabled: boolean;
     autoIntervalMinutes: number;
     maxArticlesPerCard: number;
+    minArticlesPerCard: number;
     sourceIds: number[];
 };
 
@@ -101,6 +104,7 @@ type CreativeProjectRow = {
     auto_enabled: number | boolean;
     auto_interval_minutes: number;
     max_articles_per_card: number;
+    min_articles_per_card: number;
     last_auto_checked_at: string | null;
     last_auto_generated_at: string | null;
     source_ids_csv: string | null;
@@ -149,6 +153,7 @@ type CreativeArticleContextRow = {
 
 const DEFAULT_AUTO_INTERVAL_MINUTES = 60;
 const DEFAULT_MAX_ARTICLES_PER_CARD = 12;
+const DEFAULT_MIN_ARTICLES_PER_CARD = 1;
 const DEFAULT_CANDIDATE_LIMIT = 200;
 const MAX_CONTEXT_CHARS_PER_ARTICLE = 1200;
 
@@ -161,6 +166,7 @@ const PROJECT_SELECT_BASE_SQL = `
         p.auto_enabled,
         p.auto_interval_minutes,
         p.max_articles_per_card,
+        p.min_articles_per_card,
         p.last_auto_checked_at,
         p.last_auto_generated_at,
         (
@@ -223,6 +229,7 @@ function normalizeCreativeProject(row: CreativeProjectRow): CreativeProject {
         auto_enabled: normalizeBoolean(row.auto_enabled),
         auto_interval_minutes: normalizePositiveInteger(row.auto_interval_minutes, DEFAULT_AUTO_INTERVAL_MINUTES),
         max_articles_per_card: normalizePositiveInteger(row.max_articles_per_card, DEFAULT_MAX_ARTICLES_PER_CARD),
+        min_articles_per_card: normalizePositiveInteger(row.min_articles_per_card, DEFAULT_MIN_ARTICLES_PER_CARD),
         last_auto_checked_at: row.last_auto_checked_at ?? null,
         last_auto_generated_at: row.last_auto_generated_at ?? null,
         source_ids: parseCsvNumbers(row.source_ids_csv),
@@ -605,6 +612,7 @@ export async function saveCreativeProject(input: SaveCreativeProjectInput, proje
 
     const autoIntervalMinutes = normalizePositiveInteger(input.auto_interval_minutes, DEFAULT_AUTO_INTERVAL_MINUTES);
     const maxArticlesPerCard = normalizePositiveInteger(input.max_articles_per_card, DEFAULT_MAX_ARTICLES_PER_CARD);
+    const minArticlesPerCard = normalizePositiveInteger(input.min_articles_per_card, DEFAULT_MIN_ARTICLES_PER_CARD);
     const selectedSourceIds = input.use_all_sources ? [] : sanitizeSourceIds(input.source_ids);
 
     if (!input.use_all_sources && selectedSourceIds.length === 0) {
@@ -618,6 +626,7 @@ export async function saveCreativeProject(input: SaveCreativeProjectInput, proje
         autoEnabled: input.auto_enabled,
         autoIntervalMinutes,
         maxArticlesPerCard,
+        minArticlesPerCard,
         sourceIds: selectedSourceIds,
     };
     const result = await invoke<SaveCreativeProjectCommandResult>("save_creative_project_cmd", { input: commandInput });
@@ -747,6 +756,11 @@ async function runAutoGenerationForProject(project: CreativeProject, checkedAt: 
     });
 
     if (candidates.length === 0) {
+        await updateAutoCheckTimestamp(project.id, checkedAt);
+        return null;
+    }
+
+    if (candidates.length < project.min_articles_per_card) {
         await updateAutoCheckTimestamp(project.id, checkedAt);
         return null;
     }

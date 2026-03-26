@@ -13,6 +13,7 @@ pub struct SaveCreativeProjectCommandInput {
     pub auto_enabled: bool,
     pub auto_interval_minutes: i64,
     pub max_articles_per_card: i64,
+    pub min_articles_per_card: i64,
     pub source_ids: Vec<i64>,
 }
 
@@ -76,6 +77,7 @@ pub async fn save_creative_project_cmd(
 
     let auto_interval_minutes = normalize_positive_i64(input.auto_interval_minutes, 60);
     let max_articles_per_card = normalize_positive_i64(input.max_articles_per_card, 12);
+    let min_articles_per_card = normalize_positive_i64(input.min_articles_per_card, 1);
     let source_ids = normalize_unique_ids(input.source_ids);
 
     let mut connection = connect_creative_db(&app).await?;
@@ -95,7 +97,8 @@ pub async fn save_creative_project_cmd(
                         cycle_mode = 'manual',
                         auto_enabled = ?,
                         auto_interval_minutes = ?,
-                        max_articles_per_card = ?
+                        max_articles_per_card = ?,
+                        min_articles_per_card = ?
                     WHERE id = ?
                 ",
             )
@@ -104,6 +107,7 @@ pub async fn save_creative_project_cmd(
             .bind(if input.auto_enabled { 1_i64 } else { 0_i64 })
             .bind(auto_interval_minutes)
             .bind(max_articles_per_card)
+            .bind(min_articles_per_card)
             .bind(project_id)
             .execute(&mut *transaction)
             .await
@@ -118,8 +122,8 @@ pub async fn save_creative_project_cmd(
             sqlx::query(
                 "
                     INSERT INTO creative_projects
-                        (name, prompt, cycle_mode, auto_enabled, auto_interval_minutes, max_articles_per_card)
-                    VALUES (?, ?, 'manual', ?, ?, ?)
+                        (name, prompt, cycle_mode, auto_enabled, auto_interval_minutes, max_articles_per_card, min_articles_per_card)
+                    VALUES (?, ?, 'manual', ?, ?, ?, ?)
                 ",
             )
             .bind(name)
@@ -127,6 +131,7 @@ pub async fn save_creative_project_cmd(
             .bind(if input.auto_enabled { 1_i64 } else { 0_i64 })
             .bind(auto_interval_minutes)
             .bind(max_articles_per_card)
+            .bind(min_articles_per_card)
             .execute(&mut *transaction)
             .await
             .map_err(|error| error.to_string())?
