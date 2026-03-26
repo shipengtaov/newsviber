@@ -2,6 +2,21 @@
 
 All notable changes to this project will be documented in this file.
 
+## [26.3.3] - 2026-03-26
+
+### Added
+
+- Added `min_articles_per_card` support for creative projects.
+
+### Changed
+
+- Flattened UI components and refined interactions.
+
+### Fixed
+
+- Fixed a race condition in unread counts after source refresh.
+- Fixed early truncation in the news source list.
+
 ## [26.3.2] - 2026-03-25
 
 ### Added
