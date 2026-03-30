@@ -6,6 +6,8 @@ import {
   createStreamingConversationState,
   failStreamingConversation,
   finishStreamingConversation,
+  restartStreamingConversation,
+  resolveStreamingConversation,
 } from "@/hooks/streaming-conversation-state";
 
 function createUserMessage(content: string): Message {
@@ -72,5 +74,33 @@ describe("streaming conversation state", () => {
     expect(failedState.messages[1]?.content).toBe(
       "Partial answer\n\n**Error:** MockAI: Streaming response was interrupted. socket closed",
     );
+  });
+
+  it("clears the in-flight assistant text when a streamed answer is restarted", () => {
+    const preparingState = beginStreamingConversation(
+      [],
+      createUserMessage("What is OpenClaw?"),
+    );
+    const streamingState = appendStreamingConversationChunk(preparingState, "Half a sentence");
+
+    const restartedState = restartStreamingConversation(streamingState);
+
+    expect(restartedState.streamPhase).toBe("preparing");
+    expect(restartedState.isStreaming).toBe(true);
+    expect(restartedState.messages[1]?.content).toBe("");
+  });
+
+  it("replaces the streamed assistant draft with the resolved final answer", () => {
+    const preparingState = beginStreamingConversation(
+      [],
+      createUserMessage("What is OpenClaw?"),
+    );
+    const streamingState = appendStreamingConversationChunk(preparingState, "Draft answer");
+
+    const resolvedState = resolveStreamingConversation(streamingState, "Final answer");
+
+    expect(resolvedState.streamPhase).toBe("idle");
+    expect(resolvedState.isStreaming).toBe(false);
+    expect(resolvedState.messages[1]?.content).toBe("Final answer");
   });
 });

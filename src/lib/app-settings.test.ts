@@ -12,16 +12,19 @@ import {
   readCurrentProviderId,
   readLanguagePreference,
   readProviderConfigs,
+  readWebSearchSettings,
   resetAppSettingsForTests,
   saveCurrentProviderId,
   saveLanguagePreference,
   saveProviderConfigs,
+  saveWebSearchSettings,
 } from "@/lib/app-settings";
 import {
   AUTO_DETECT_VALUE,
   I18NEXT_LANGUAGE_STORAGE_KEY,
   LANGUAGE_PREFERENCE_STORAGE_KEY,
 } from "@/lib/language-settings";
+import { DEFAULT_WEB_SEARCH_SETTINGS } from "@/lib/web-search-config";
 
 type DbRowMap = Map<string, string>;
 
@@ -107,6 +110,7 @@ describe("app settings persistence", () => {
     expect(snapshot.languagePreference).toBe(AUTO_DETECT_VALUE);
     expect(snapshot.currentProviderId).toBe("openai");
     expect(snapshot.providerConfigs).toEqual(getDefaultProviderConfigs());
+    expect(snapshot.webSearchSettings).toEqual(DEFAULT_WEB_SEARCH_SETTINGS);
     expect(getAppSettingsSnapshot()).toEqual(snapshot);
   });
 
@@ -125,6 +129,11 @@ describe("app settings persistence", () => {
       model: "gemini-2.5-pro",
     };
     await saveProviderConfigs(nextConfigs);
+    await saveWebSearchSettings({
+      provider: "tavily",
+      baseUrl: "https://search.example.test",
+      apiKey: "tvly-secret",
+    });
 
     expect(readLanguagePreference()).toBe("fr");
     expect(readCurrentProviderId()).toBe("gemini");
@@ -132,6 +141,11 @@ describe("app settings persistence", () => {
       url: "https://example.test/gemini",
       apiKey: "gemini-secret",
       model: "gemini-2.5-pro",
+    });
+    expect(readWebSearchSettings()).toEqual({
+      provider: "tavily",
+      baseUrl: "https://search.example.test",
+      apiKey: "tvly-secret",
     });
 
     resetAppSettingsForTests();
@@ -146,6 +160,11 @@ describe("app settings persistence", () => {
       model: "gemini-2.5-pro",
     });
     expect(snapshot.providerConfigs.openai).toEqual(getDefaultProviderConfigs().openai);
+    expect(snapshot.webSearchSettings).toEqual({
+      provider: "tavily",
+      baseUrl: "https://search.example.test",
+      apiKey: "tvly-secret",
+    });
   });
 
   it("migrates structured localStorage settings into SQLite and clears old keys", async () => {
@@ -172,6 +191,7 @@ describe("app settings persistence", () => {
     expect(localStorage.getItem(AI_CURRENT_PROVIDER_STORAGE_KEY)).toBeNull();
     expect(localStorage.getItem(AI_PROVIDER_CONFIGS_STORAGE_KEY)).toBeNull();
     expect(db.rows.size).toBe(3);
+    expect(snapshot.webSearchSettings).toEqual(DEFAULT_WEB_SEARCH_SETTINGS);
   });
 
   it("migrates legacy AI settings and detector language into SQLite", async () => {
@@ -240,6 +260,7 @@ describe("app settings persistence", () => {
     expect(snapshot.currentProviderId).toBe("gemini");
     expect(snapshot.providerConfigs).toEqual(getDefaultProviderConfigs());
     expect(snapshot.providerConfigs.azure.azureApiVersion).toBe(DEFAULT_AZURE_API_VERSION);
+    expect(snapshot.webSearchSettings).toEqual(DEFAULT_WEB_SEARCH_SETTINGS);
   });
 
   it("creates the table on demand before reading or writing settings", async () => {
@@ -297,6 +318,7 @@ describe("app settings persistence", () => {
       languagePreference: AUTO_DETECT_VALUE,
       currentProviderId: "openai",
       providerConfigs: getDefaultProviderConfigs(),
+      webSearchSettings: DEFAULT_WEB_SEARCH_SETTINGS,
     });
 
     vi.useRealTimers();

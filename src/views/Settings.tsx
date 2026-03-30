@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { getDb } from "@/lib/db";
+import { readWebSearchSettings, saveWebSearchSettings } from "@/lib/app-settings";
 import {
     AIProviderConfig,
     AIProviderConfigs,
@@ -33,9 +34,14 @@ import { SUPPORTED_LANGUAGES, AUTO_DETECT_VALUE, getLanguagePreference, setLangu
 import { cn } from "@/lib/utils";
 import { PageShell } from "@/components/layout/PageShell";
 import { useAppUpdate } from "@/components/update/AppUpdateProvider";
+import { normalizeWebSearchSettings, type WebSearchSettings } from "@/lib/web-search-config";
 
 function getProviderConfigSnapshot(providerId: string, providerConfig: AIProviderConfig) {
     return JSON.stringify(normalizeProviderConfig(providerId, providerConfig));
+}
+
+function getWebSearchConfigSnapshot(webSearchSettings: WebSearchSettings) {
+    return JSON.stringify(normalizeWebSearchSettings(webSearchSettings));
 }
 
 type BrandIconProps = {
@@ -111,6 +117,9 @@ export default function Settings() {
     const [providerDrafts, setProviderDrafts] = useState<AIProviderConfigs>(readStoredProviderConfigs);
     const [savedProviderDrafts, setSavedProviderDrafts] = useState<AIProviderConfigs>(readStoredProviderConfigs);
     const [showAiApiKey, setShowAiApiKey] = useState(false);
+    const [webSearchDraft, setWebSearchDraft] = useState<WebSearchSettings>(() => readWebSearchSettings());
+    const [savedWebSearchDraft, setSavedWebSearchDraft] = useState<WebSearchSettings>(() => readWebSearchSettings());
+    const [showWebSearchApiKey, setShowWebSearchApiKey] = useState(false);
     const [pendingProviderId, setPendingProviderId] = useState<string | null>(null);
     const [discardDialogOpen, setDiscardDialogOpen] = useState(false);
 
@@ -121,6 +130,10 @@ export default function Settings() {
     const savedSelectedConfigSnapshot = getProviderConfigSnapshot(selectedProviderId, savedSelectedConfig);
     const normalizedSelectedConfig = normalizeProviderConfig(selectedProviderId, selectedConfig);
     const isAiDirty = selectedConfigSnapshot !== savedSelectedConfigSnapshot;
+    const normalizedWebSearchDraft = normalizeWebSearchSettings(webSearchDraft);
+    const webSearchConfigSnapshot = getWebSearchConfigSnapshot(webSearchDraft);
+    const savedWebSearchConfigSnapshot = getWebSearchConfigSnapshot(savedWebSearchDraft);
+    const isWebSearchDirty = webSearchConfigSnapshot !== savedWebSearchConfigSnapshot;
 
     function updateSelectedProviderConfig(updates: Partial<AIProviderConfig>) {
         setProviderDrafts((prev) => ({
@@ -134,6 +147,13 @@ export default function Settings() {
 
     function persistAiSettings() {
         return saveProviderConfig(selectedProviderId, selectedConfig);
+    }
+
+    function updateWebSearchConfig(updates: Partial<WebSearchSettings>) {
+        setWebSearchDraft((current) => normalizeWebSearchSettings({
+            ...current,
+            ...updates,
+        }));
     }
 
     function showPersistenceError(error: unknown) {
@@ -215,6 +235,19 @@ export default function Settings() {
             await persistAiSettings();
             markSelectedProviderDraftSaved();
             toast({ title: t("settingsSaved"), description: t("settingsSavedDesc") });
+        } catch (error) {
+            showPersistenceError(error);
+        }
+    }
+
+    async function handleSaveWebSearchSettings(e: React.FormEvent) {
+        e.preventDefault();
+
+        try {
+            await saveWebSearchSettings(normalizedWebSearchDraft);
+            setWebSearchDraft(normalizedWebSearchDraft);
+            setSavedWebSearchDraft(normalizedWebSearchDraft);
+            toast({ title: t("webSearchSettingsSaved"), description: t("webSearchSettingsSavedDesc") });
         } catch (error) {
             showPersistenceError(error);
         }
@@ -470,6 +503,59 @@ export default function Settings() {
                         <Button
                             type="submit"
                             disabled={!isAiDirty}
+                            className="disabled:border disabled:border-input disabled:bg-muted disabled:text-muted-foreground disabled:opacity-100 disabled:shadow-none"
+                        >
+                            {t("save", { ns: "common" })}
+                        </Button>
+                    </form>
+                </CardContent>
+            </Card>
+
+            <Card>
+                <CardHeader>
+                    <CardTitle>{t("webSearchConfig")}</CardTitle>
+                    <CardDescription>{t("webSearchConfigDesc")}</CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <form onSubmit={handleSaveWebSearchSettings} className="space-y-6">
+                        <div className="grid gap-4 md:grid-cols-2">
+                            <div className="space-y-2">
+                                <Label>{t("webSearchProvider")}</Label>
+                                <Input value={t("webSearchProviderValue")} readOnly disabled />
+                            </div>
+                            <div className="space-y-2">
+                                <Label>{t("webSearchBaseUrl")}</Label>
+                                <Input
+                                    value={webSearchDraft.baseUrl}
+                                    onChange={(event) => updateWebSearchConfig({ baseUrl: event.target.value })}
+                                />
+                            </div>
+                            <div className="space-y-2 md:col-span-2">
+                                <Label>{t("webSearchApiKey")}</Label>
+                                <div className="relative">
+                                    <Input
+                                        type={showWebSearchApiKey ? "text" : "password"}
+                                        value={webSearchDraft.apiKey}
+                                        onChange={(event) => updateWebSearchConfig({ apiKey: event.target.value })}
+                                        placeholder={t("webSearchApiKeyPlaceholder")}
+                                        className="pr-10"
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowWebSearchApiKey((prev) => !prev)}
+                                        aria-label={showWebSearchApiKey ? t("hideApiKey") : t("showApiKey")}
+                                        aria-pressed={showWebSearchApiKey}
+                                        className="absolute inset-y-0 right-0 flex w-10 items-center justify-center text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                                    >
+                                        {showWebSearchApiKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <Button
+                            type="submit"
+                            disabled={!isWebSearchDirty}
                             className="disabled:border disabled:border-input disabled:bg-muted disabled:text-muted-foreground disabled:opacity-100 disabled:shadow-none"
                         >
                             {t("save", { ns: "common" })}

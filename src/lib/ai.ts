@@ -6,11 +6,9 @@ import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { createMoonshotAI } from "@ai-sdk/moonshotai";
 import { createOpenAI } from "@ai-sdk/openai";
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
-import { isTauri } from "@tauri-apps/api/core";
 import { createOllama } from "ai-sdk-ollama";
 import { createOpenRouter } from "@openrouter/ai-sdk-provider";
-import { createGateway, generateObject, streamText } from "ai";
-import type { FetchFunction } from "@ai-sdk/provider-utils";
+import { createGateway, generateObject, generateText, Output, stepCountIs, streamText, tool } from "ai";
 import { createMinimax, createMinimaxOpenAI } from "vercel-minimax-ai-provider";
 import { z } from "zod";
 import { createZhipu } from "zhipu-ai-provider";
@@ -19,6 +17,12 @@ import {
   getActiveAIProviderSettings,
   getProviderById,
 } from "@/lib/ai-config";
+import { runtimeFetch } from "@/lib/runtime-fetch";
+import {
+  hasConfiguredWebSearch,
+  searchWeb,
+  WebSearchUnavailableError,
+} from "@/lib/web-search-service";
 
 export type Message = {
   role: "system" | "user" | "assistant";
@@ -58,12 +62,25 @@ export type ProviderFlavor =
 
 const API_KEY_OPTIONAL_PROVIDERS = new Set(["ollama", "custom"]);
 const STREAMING_CHUNK_TIMEOUT_MS = 10_000;
-let tauriFetchPromise: Promise<FetchFunction | null> | null = null;
+const WEB_SEARCH_REPORT_STOP_STEPS = 5;
+const WEB_SEARCH_STREAM_STOP_STEPS = 4;
+
+const webSearchToolInputSchema = z.object({
+  query: z.string().describe("A short web search query for the missing fact or latest context."),
+  maxResults: z.number().int().min(1).max(10).optional().describe("Maximum number of web results to retrieve."),
+});
 
 class StreamingContractError extends Error {
   constructor(message: string) {
     super(message);
     this.name = "StreamingContractError";
+  }
+}
+
+class WebSearchFallbackError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "WebSearchFallbackError";
   }
 }
 
@@ -116,33 +133,6 @@ function createStreamingError(
 
   return new StreamingContractError(`${providerName}: ${prefix} ${detailText}${suffix}`);
 }
-
-async function loadTauriFetch(): Promise<FetchFunction | null> {
-  if (!isTauri()) {
-    return null;
-  }
-
-  if (!tauriFetchPromise) {
-    tauriFetchPromise = import("@tauri-apps/plugin-http")
-      .then((module) => module.fetch as FetchFunction)
-      .catch(() => null);
-  }
-
-  return tauriFetchPromise;
-}
-
-const runtimeFetch: FetchFunction = async (input, init) => {
-  const tauriFetch = await loadTauriFetch();
-  if (tauriFetch) {
-    return tauriFetch(input as URL | Request | string, init as RequestInit);
-  }
-
-  if (typeof globalThis.fetch !== "function") {
-    throw new Error("No fetch implementation is available for AI requests.");
-  }
-
-  return globalThis.fetch(input as RequestInfo | URL, init as RequestInit);
-};
 
 function getRequiredModelId(providerId: string, config: AIProviderConfig): string {
   const modelId = trimConfigValue(config.model);
@@ -201,6 +191,62 @@ export function getErrorMessage(error: unknown): string {
 
   return String(error || "Unknown AI error.");
 }
+
+function shouldRetryWithoutWebSearch(error: unknown): boolean {
+  if (error instanceof WebSearchFallbackError || error instanceof WebSearchUnavailableError) {
+    return true;
+  }
+
+  const message = getErrorMessage(error).toLowerCase();
+  return [
+    "tool calling",
+    "function calling",
+    "does not support tools",
+    "doesn't support tools",
+    "tool use",
+    "unsupported functionality",
+    "tool_choice",
+    "tool choice",
+    "tool execution",
+  ].some((pattern) => message.includes(pattern));
+}
+
+function createWebSearchToolSet() {
+  return {
+    web_search: tool({
+      description:
+        "Search the live web for up-to-date facts, missing background, or entity disambiguation when the provided context is not sufficient. Prefer using this tool over telling the user to search manually.",
+      inputSchema: webSearchToolInputSchema,
+      execute: async ({ query, maxResults }, { abortSignal }) => {
+        return searchWeb({
+          query,
+          maxResults,
+          abortSignal,
+        });
+      },
+    }),
+  };
+}
+
+function canEnableWebSearch(enableWebSearch: boolean): boolean {
+  return enableWebSearch && hasConfiguredWebSearch();
+}
+
+function hasToolErrorInContent(
+  content: Array<{ type: string }>,
+): boolean {
+  return content.some((part) => part.type === "tool-error");
+}
+
+type GenerateCreativeReportInput = {
+  prompt: string;
+  enableWebSearch: boolean;
+};
+
+type StreamConversationOptions = {
+  enableWebSearch?: boolean;
+  onRetryWithoutWebSearch?: () => void;
+};
 
 export function isMiniMaxAnthropicEndpoint(url: string): boolean {
   return url.trim().toLowerCase().includes("/anthropic");
@@ -417,21 +463,46 @@ export function resolveModel(providerId?: string, config?: AIProviderConfig) {
   }
 }
 
-export async function streamConversation(
+async function attemptStreamConversation(
   messages: Message[],
-  onChunk: (chunk: string) => void,
-  abortSignal?: AbortSignal,
+  onTextUpdate: (text: string) => void,
+  abortSignal: AbortSignal | undefined,
+  enableWebSearch: boolean,
 ): Promise<string> {
   const { provider } = getActiveAIProviderSettings();
+  const useWebSearch = canEnableWebSearch(enableWebSearch);
+  const tools = useWebSearch ? createWebSearchToolSet() : undefined;
   let fullText = "";
   let streamError: unknown = null;
   let hasReceivedTextChunk = false;
+  const textBlockOrder: string[] = [];
+  const textBlocks = new Map<string, string>();
+
+  function ensureTextBlock(id: string) {
+    if (textBlocks.has(id)) {
+      return;
+    }
+
+    textBlocks.set(id, "");
+    textBlockOrder.push(id);
+  }
+
+  function readLiveText(): string {
+    return textBlockOrder.map((id) => textBlocks.get(id) ?? "").join("");
+  }
+
+  function resetLiveText() {
+    textBlockOrder.length = 0;
+    textBlocks.clear();
+    onTextUpdate("");
+  }
 
   const result = streamText({
     model: resolveModel(),
     messages: buildMessageArray(messages),
     abortSignal,
     timeout: { chunkMs: STREAMING_CHUNK_TIMEOUT_MS },
+    ...(tools ? { tools, stopWhen: stepCountIs(WEB_SEARCH_STREAM_STOP_STEPS) } : {}),
     onError({ error }) {
       streamError = error;
     },
@@ -440,6 +511,16 @@ export async function streamConversation(
   try {
     for await (const part of result.fullStream) {
       switch (part.type) {
+        case "start-step": {
+          if (textBlockOrder.length > 0) {
+            resetLiveText();
+          }
+          break;
+        }
+        case "text-start": {
+          ensureTextBlock(part.id);
+          break;
+        }
         case "text-delta": {
           if (!part.text) {
             break;
@@ -447,8 +528,13 @@ export async function streamConversation(
 
           hasReceivedTextChunk = true;
           fullText += part.text;
-          onChunk(part.text);
+          ensureTextBlock(part.id);
+          textBlocks.set(part.id, `${textBlocks.get(part.id) ?? ""}${part.text}`);
+          onTextUpdate(readLiveText());
           break;
+        }
+        case "tool-error": {
+          throw new WebSearchFallbackError(getErrorMessage(part.error));
         }
         case "error": {
           streamError = part.error;
@@ -470,7 +556,7 @@ export async function streamConversation(
       }
     }
   } catch (error) {
-    if (error instanceof StreamingContractError) {
+    if (error instanceof StreamingContractError || error instanceof WebSearchFallbackError) {
       throw error;
     }
 
@@ -489,24 +575,75 @@ export async function streamConversation(
     });
   }
 
-  if (!fullText.trim()) {
+  const resultWithText = result as { text?: PromiseLike<string> };
+  const resolvedText = (resultWithText.text ? await resultWithText.text : fullText) || fullText;
+
+  if (!resolvedText.trim()) {
     throw createStreamingError(provider.name, "The provider returned no text chunks.");
   }
 
-  return fullText;
+  return resolvedText;
 }
 
-export async function generateCreativeReport(prompt: string): Promise<CreativeReport> {
+export async function streamConversation(
+  messages: Message[],
+  onTextUpdate: (text: string) => void,
+  abortSignal?: AbortSignal,
+  options: StreamConversationOptions = {},
+): Promise<string> {
+  try {
+    return await attemptStreamConversation(
+      messages,
+      onTextUpdate,
+      abortSignal,
+      Boolean(options.enableWebSearch),
+    );
+  } catch (error) {
+    if (!options.enableWebSearch || !shouldRetryWithoutWebSearch(error)) {
+      throw error;
+    }
+
+    if (abortSignal?.aborted) {
+      throw error;
+    }
+
+    options.onRetryWithoutWebSearch?.();
+    return attemptStreamConversation(messages, onTextUpdate, abortSignal, false);
+  }
+}
+
+async function attemptGenerateCreativeReport(input: GenerateCreativeReportInput): Promise<CreativeReport> {
+  const tools = canEnableWebSearch(input.enableWebSearch) ? createWebSearchToolSet() : undefined;
+  const result = await generateText({
+    model: resolveModel(),
+    prompt: input.prompt,
+    output: Output.object({ schema: creativeReportSchema }),
+    ...(tools ? { tools, stopWhen: stepCountIs(WEB_SEARCH_REPORT_STOP_STEPS) } : {}),
+  });
+
+  if (tools && result.steps.some((step) => hasToolErrorInContent(step.content))) {
+    throw new WebSearchFallbackError("Web search tool execution failed.");
+  }
+
+  return creativeReportSchema.parse(result.output);
+}
+
+export async function generateCreativeReport(input: GenerateCreativeReportInput): Promise<CreativeReport> {
   const { provider } = getActiveAIProviderSettings();
 
   try {
-    const result = await generateObject({
-      model: resolveModel(),
-      schema: creativeReportSchema,
-      prompt,
-    });
+    try {
+      return await attemptGenerateCreativeReport(input);
+    } catch (error) {
+      if (!input.enableWebSearch || !shouldRetryWithoutWebSearch(error)) {
+        throw error;
+      }
 
-    return creativeReportSchema.parse(result.object);
+      return attemptGenerateCreativeReport({
+        ...input,
+        enableWebSearch: false,
+      });
+    }
   } catch (error) {
     throw new Error(`${provider.name}: ${getErrorMessage(error)}`);
   }

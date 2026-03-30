@@ -50,6 +50,13 @@ const translations: Record<string, Record<string, string>> = {
         discardUnsavedChanges: "Discard unsaved provider changes?",
         discardUnsavedDesc: "Discard and switch?",
         discardAndSwitch: "Discard and Switch",
+        webSearchConfig: "Web Search Configuration",
+        webSearchConfigDesc: "Configure the Tavily backend used by project-level web search.",
+        webSearchProvider: "Search Provider",
+        webSearchProviderValue: "Tavily",
+        webSearchBaseUrl: "Search Base URL",
+        webSearchApiKey: "Search API Key",
+        webSearchApiKeyPlaceholder: "tvly-...",
         dataManagement: "Data Management",
         dataManagementDesc: "Clean up your locally stored articles and manage database size.",
         deleteOldArticles30: "Delete Old Articles (30 Days)",
@@ -270,6 +277,17 @@ describe("Settings", () => {
         expect(markup).toContain(`value="${geminiProvider.url}"`);
         expect(markup).toContain('value="gemini-key"');
         expect(markup).toContain(`value="${geminiProvider.models[0]}"`);
+    });
+
+    it("renders the web search settings card with Tavily defaults", () => {
+        const markup = renderToStaticMarkup(<Settings />);
+
+        expect(markup).toContain(">Web Search Configuration<");
+        expect(markup).toContain(">Search Provider<");
+        expect(markup).toContain('value="Tavily"');
+        expect(markup).toContain(">Search Base URL<");
+        expect(markup).toContain('value="https://api.tavily.com/search"');
+        expect(markup).toContain(">Search API Key<");
     });
 
     it("renders the software update card as a single panel in the default state", () => {

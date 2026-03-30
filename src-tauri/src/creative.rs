@@ -14,6 +14,7 @@ pub struct SaveCreativeProjectCommandInput {
     pub auto_interval_minutes: i64,
     pub max_articles_per_card: i64,
     pub min_articles_per_card: i64,
+    pub web_search_enabled: bool,
     pub source_ids: Vec<i64>,
 }
 
@@ -98,7 +99,8 @@ pub async fn save_creative_project_cmd(
                         auto_enabled = ?,
                         auto_interval_minutes = ?,
                         max_articles_per_card = ?,
-                        min_articles_per_card = ?
+                        min_articles_per_card = ?,
+                        web_search_enabled = ?
                     WHERE id = ?
                 ",
             )
@@ -108,6 +110,7 @@ pub async fn save_creative_project_cmd(
             .bind(auto_interval_minutes)
             .bind(max_articles_per_card)
             .bind(min_articles_per_card)
+            .bind(if input.web_search_enabled { 1_i64 } else { 0_i64 })
             .bind(project_id)
             .execute(&mut *transaction)
             .await
@@ -122,8 +125,17 @@ pub async fn save_creative_project_cmd(
             sqlx::query(
                 "
                     INSERT INTO creative_projects
-                        (name, prompt, cycle_mode, auto_enabled, auto_interval_minutes, max_articles_per_card, min_articles_per_card)
-                    VALUES (?, ?, 'manual', ?, ?, ?, ?)
+                        (
+                            name,
+                            prompt,
+                            cycle_mode,
+                            auto_enabled,
+                            auto_interval_minutes,
+                            max_articles_per_card,
+                            min_articles_per_card,
+                            web_search_enabled
+                        )
+                    VALUES (?, ?, 'manual', ?, ?, ?, ?, ?)
                 ",
             )
             .bind(name)
@@ -132,6 +144,7 @@ pub async fn save_creative_project_cmd(
             .bind(auto_interval_minutes)
             .bind(max_articles_per_card)
             .bind(min_articles_per_card)
+            .bind(if input.web_search_enabled { 1_i64 } else { 0_i64 })
             .execute(&mut *transaction)
             .await
             .map_err(|error| error.to_string())?

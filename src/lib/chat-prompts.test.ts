@@ -28,4 +28,16 @@ describe("chat prompt builders", () => {
     expect(prompt).toContain("## Market pulse");
     expect(prompt).toContain(getChatMarkdownFormattingInstructions());
   });
+
+  it("adds web search guidance for creative card discussion when enabled", () => {
+    const prompt = buildCreativeCardDiscussionSystemPrompt({
+      title: "AI News Desk",
+      bodyMarkdown: "## Market pulse\nProvider updates",
+      enableWebSearch: true,
+    });
+
+    expect(prompt).toContain("use web search before answering from memory");
+    expect(prompt).toContain("Do not ask the user to search in a browser");
+    expect(prompt).toContain("cite the source URLs inline");
+  });
 });

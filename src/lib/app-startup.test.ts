@@ -5,11 +5,13 @@ import {
   bootstrapApplication,
 } from "@/lib/app-startup";
 import { getDefaultProviderConfigs } from "@/lib/ai-config";
+import { DEFAULT_WEB_SEARCH_SETTINGS } from "@/lib/web-search-config";
 
 const persistedSettings = {
   languagePreference: "fr",
   currentProviderId: "gemini",
   providerConfigs: getDefaultProviderConfigs(),
+  webSearchSettings: DEFAULT_WEB_SEARCH_SETTINGS,
 };
 
 describe("application bootstrap", () => {

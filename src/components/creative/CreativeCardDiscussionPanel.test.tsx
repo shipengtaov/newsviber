@@ -12,6 +12,8 @@ vi.mock("react-i18next", () => ({
             closeDiscussion: "Close discussion",
             connectingToModel: "Connecting to model...",
             streaming: "Streaming...",
+            webSearchReady: "Web search is enabled for this discussion.",
+            webSearchUnavailable: "Web search is enabled for this project, but Tavily is not configured right now.",
         }[key] ?? key),
     }),
 }));
@@ -35,6 +37,24 @@ describe("CreativeCardDiscussionPanel", () => {
         expect(markup).toContain("Ask follow-up questions or expand the report with AI.");
         expect(markup).toContain("Expand on this report with AI.");
         expect(markup).toContain("Explore further...");
+    });
+
+    it("renders the web search notice when live search is available", () => {
+        const markup = renderToStaticMarkup(
+            <CreativeCardDiscussionPanel
+                variant="inline"
+                chatMessages={[]}
+                isChatStreaming={false}
+                chatStreamPhase="idle"
+                webSearchStatus="ready"
+                chatInput=""
+                onChatInputChange={() => undefined}
+                onChatSubmit={(event) => event.preventDefault()}
+                scrollRef={{ current: null }}
+            />,
+        );
+
+        expect(markup).toContain("Web search is enabled for this discussion.");
     });
 
     it("keeps the desktop rail mounted but hidden when closed", () => {

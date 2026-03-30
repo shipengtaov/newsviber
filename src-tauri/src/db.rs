@@ -308,6 +308,15 @@ pub fn get_migrations() -> Vec<Migration> {
                 UPDATE creative_projects SET min_articles_per_card = 1;
             ",
             kind: MigrationKind::Up,
+        },
+        Migration {
+            version: 11,
+            description: "add_creative_project_web_search_enabled",
+            sql: "
+                ALTER TABLE creative_projects ADD COLUMN web_search_enabled BOOLEAN NOT NULL DEFAULT 0;
+                UPDATE creative_projects SET web_search_enabled = 0;
+            ",
+            kind: MigrationKind::Up,
         }
     ]
 }

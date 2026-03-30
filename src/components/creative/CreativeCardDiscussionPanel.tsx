@@ -14,6 +14,7 @@ type CreativeCardDiscussionPanelProps = {
     chatMessages: Message[];
     isChatStreaming: boolean;
     chatStreamPhase: StreamPhase;
+    webSearchStatus?: "disabled" | "ready" | "unavailable";
     chatInput: string;
     onChatInputChange: (value: string) => void;
     onChatSubmit: (event: FormEvent<HTMLFormElement>) => void;
@@ -31,16 +32,32 @@ type CreativeCardDiscussionRailProps = {
 
 function CreativeCardDiscussionHeader({
     variant,
+    webSearchStatus = "disabled",
     onClose,
     showCloseButton,
-}: Pick<CreativeCardDiscussionPanelProps, "variant" | "onClose" | "showCloseButton">) {
+}: Pick<CreativeCardDiscussionPanelProps, "variant" | "webSearchStatus" | "onClose" | "showCloseButton">) {
     const { t } = useTranslation("creative");
+    const webSearchNotice = webSearchStatus === "ready"
+        ? t("webSearchReady")
+        : webSearchStatus === "unavailable"
+            ? t("webSearchUnavailable")
+            : null;
 
     if (variant === "sheet") {
         return (
             <SheetHeader className="shrink-0 border-b border-border/60 px-5 pb-4 pt-5 text-left">
                 <SheetTitle>{t("discussCard")}</SheetTitle>
                 <SheetDescription>{t("discussCardDesc")}</SheetDescription>
+                {webSearchNotice ? (
+                    <p
+                        className={cn(
+                            "mt-2 text-xs",
+                            webSearchStatus === "unavailable" ? "text-amber-700 dark:text-amber-300" : "text-muted-foreground",
+                        )}
+                    >
+                        {webSearchNotice}
+                    </p>
+                ) : null}
             </SheetHeader>
         );
     }
@@ -51,6 +68,16 @@ function CreativeCardDiscussionHeader({
                 <div className="min-w-0 space-y-2">
                     <h2 className="text-lg font-semibold text-foreground">{t("discussCard")}</h2>
                     <p className="text-sm text-muted-foreground">{t("discussCardDesc")}</p>
+                    {webSearchNotice ? (
+                        <p
+                            className={cn(
+                                "text-xs",
+                                webSearchStatus === "unavailable" ? "text-amber-700 dark:text-amber-300" : "text-muted-foreground",
+                            )}
+                        >
+                            {webSearchNotice}
+                        </p>
+                    ) : null}
                 </div>
                 {showCloseButton && onClose ? (
                     <Button
@@ -75,6 +102,7 @@ export function CreativeCardDiscussionPanel({
     chatMessages,
     isChatStreaming,
     chatStreamPhase,
+    webSearchStatus = "disabled",
     chatInput,
     onChatInputChange,
     onChatSubmit,
@@ -89,6 +117,7 @@ export function CreativeCardDiscussionPanel({
         <div className={cn("flex h-full min-h-0 flex-col", className)}>
             <CreativeCardDiscussionHeader
                 variant={variant}
+                webSearchStatus={webSearchStatus}
                 onClose={onClose}
                 showCloseButton={showCloseButton}
             />
@@ -107,6 +136,8 @@ export function CreativeCardDiscussionPanel({
                                 const isPreparingMessage = isLiveAssistantMessage
                                     && chatStreamPhase === "preparing"
                                     && message.content.trim().length === 0;
+                                const shouldRenderPlainStreamingText = isLiveAssistantMessage
+                                    && chatStreamPhase === "streaming";
 
                                 if (isPreparingMessage) {
                                     return (
@@ -123,10 +154,16 @@ export function CreativeCardDiscussionPanel({
 
                                 return (
                                     <div className="space-y-2">
-                                        <ChatMarkdown
-                                            content={message.content}
-                                            tone={message.role === "user" ? "inverse" : "default"}
-                                        />
+                                        {shouldRenderPlainStreamingText && message.role === "assistant" ? (
+                                            <div className="whitespace-pre-wrap break-words leading-6 text-foreground">
+                                                {message.content}
+                                            </div>
+                                        ) : (
+                                            <ChatMarkdown
+                                                content={message.content}
+                                                tone={message.role === "user" ? "inverse" : "default"}
+                                            />
+                                        )}
                                         {isLiveAssistantMessage && chatStreamPhase === "streaming" && (
                                             <div className="flex items-center gap-2 text-xs text-muted-foreground">
                                                 <span className="h-2 w-2 rounded-full bg-primary/80 animate-pulse" />

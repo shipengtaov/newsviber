@@ -43,6 +43,22 @@ import {
     summarizeArticleContextText,
 } from "@/lib/creative-service";
 
+const baseCreativeProject = {
+    id: 1,
+    name: "Founder ideas",
+    prompt: "Please find startup patterns.",
+    cycle_mode: "manual",
+    auto_enabled: false,
+    auto_interval_minutes: 60,
+    max_articles_per_card: 12,
+    min_articles_per_card: 1,
+    web_search_enabled: false,
+    last_auto_checked_at: null,
+    last_auto_generated_at: null,
+    source_ids: [],
+    unread_card_count: 0,
+};
+
 afterEach(() => {
     dispatchCreativeSyncEventMock.mockReset();
     generateCreativeReportMock.mockReset();
@@ -68,18 +84,8 @@ describe("creative service context helpers", () => {
     it("builds a prompt that leaves report structure up to the user's focus prompt", () => {
         const prompt = buildCreativePrompt(
             {
-                id: 1,
-                name: "Founder ideas",
+                ...baseCreativeProject,
                 prompt: "请给我 Key Signals、Ideas 和 Next Actions 三段结构。",
-                cycle_mode: "manual",
-                auto_enabled: false,
-                auto_interval_minutes: 60,
-                max_articles_per_card: 12,
-                min_articles_per_card: 1,
-                last_auto_checked_at: null,
-                last_auto_generated_at: null,
-                source_ids: [],
-                unread_card_count: 0,
             },
             [{
                 id: 9,
@@ -101,6 +107,29 @@ describe("creative service context helpers", () => {
         expect(prompt).not.toContain('Do not default to headings like "Key Signals", "Ideas", or "Next Actions" unless the user\'s prompt explicitly makes that structure the best fit.');
     });
 
+    it("adds web search guidance when the project enables it", () => {
+        const prompt = buildCreativePrompt(
+            {
+                ...baseCreativeProject,
+                web_search_enabled: true,
+            },
+            [{
+                id: 9,
+                source_id: 2,
+                source_name: "HN",
+                title: "AI infra costs are dropping",
+                summary: "<p>Inference is getting cheaper.</p>",
+                content: null,
+                published_at: "2026-03-12T10:00:00Z",
+                inserted_at: "2026-03-12T10:05:00Z",
+            }],
+        );
+
+        expect(prompt).toContain("use external search only when it materially improves accuracy or recency");
+        expect(prompt).toContain("cite the source URLs inline");
+        expect(prompt).toContain("Do not use web search for facts already well supported");
+    });
+
     it("persists the generated markdown body directly into full_report", async () => {
         const selectMock = vi.fn(async (query: string) => {
             if (query.includes("FROM creative_projects p")) {
@@ -113,6 +142,7 @@ describe("creative service context helpers", () => {
                     auto_interval_minutes: 60,
                     max_articles_per_card: 12,
                     min_articles_per_card: 1,
+                    web_search_enabled: 0,
                     last_auto_checked_at: null,
                     last_auto_generated_at: null,
                     source_ids_csv: null,
@@ -165,7 +195,10 @@ describe("creative service context helpers", () => {
             mode: "manual",
         });
 
-        expect(generateCreativeReportMock).toHaveBeenCalledWith(expect.stringContaining("Return a JSON object with:"));
+        expect(generateCreativeReportMock).toHaveBeenCalledWith(expect.objectContaining({
+            enableWebSearch: false,
+            prompt: expect.stringContaining("Return a JSON object with:"),
+        }));
         expect(invokeMock).toHaveBeenCalledTimes(1);
 
         const [commandName, payload] = invokeMock.mock.calls[0];
@@ -202,6 +235,7 @@ describe("creative service unread state", () => {
                 auto_interval_minutes: 30,
                 max_articles_per_card: 9,
                 min_articles_per_card: 1,
+                web_search_enabled: 1,
                 last_auto_checked_at: "2026-03-13T00:00:00Z",
                 last_auto_generated_at: "2026-03-13T01:00:00Z",
                 source_ids_csv: "1,2",

@@ -14,6 +14,7 @@ export type CreativeProject = {
     auto_interval_minutes: number;
     max_articles_per_card: number;
     min_articles_per_card: number;
+    web_search_enabled: boolean;
     last_auto_checked_at: string | null;
     last_auto_generated_at: string | null;
     source_ids: number[];
@@ -56,6 +57,7 @@ export type SaveCreativeProjectInput = {
     auto_interval_minutes: number;
     max_articles_per_card: number;
     min_articles_per_card: number;
+    web_search_enabled: boolean;
     use_all_sources: boolean;
     source_ids: number[];
 };
@@ -75,6 +77,7 @@ type SaveCreativeProjectCommandInput = {
     autoIntervalMinutes: number;
     maxArticlesPerCard: number;
     minArticlesPerCard: number;
+    webSearchEnabled: boolean;
     sourceIds: number[];
 };
 
@@ -105,6 +108,7 @@ type CreativeProjectRow = {
     auto_interval_minutes: number;
     max_articles_per_card: number;
     min_articles_per_card: number;
+    web_search_enabled: number | boolean;
     last_auto_checked_at: string | null;
     last_auto_generated_at: string | null;
     source_ids_csv: string | null;
@@ -167,6 +171,7 @@ const PROJECT_SELECT_BASE_SQL = `
         p.auto_interval_minutes,
         p.max_articles_per_card,
         p.min_articles_per_card,
+        p.web_search_enabled,
         p.last_auto_checked_at,
         p.last_auto_generated_at,
         (
@@ -230,6 +235,7 @@ function normalizeCreativeProject(row: CreativeProjectRow): CreativeProject {
         auto_interval_minutes: normalizePositiveInteger(row.auto_interval_minutes, DEFAULT_AUTO_INTERVAL_MINUTES),
         max_articles_per_card: normalizePositiveInteger(row.max_articles_per_card, DEFAULT_MAX_ARTICLES_PER_CARD),
         min_articles_per_card: normalizePositiveInteger(row.min_articles_per_card, DEFAULT_MIN_ARTICLES_PER_CARD),
+        web_search_enabled: normalizeBoolean(row.web_search_enabled),
         last_auto_checked_at: row.last_auto_checked_at ?? null,
         last_auto_generated_at: row.last_auto_generated_at ?? null,
         source_ids: parseCsvNumbers(row.source_ids_csv),
@@ -363,6 +369,17 @@ export function buildCreativePrompt(project: CreativeProject, articles: Creative
         ].join("\n");
     }).join("\n\n");
 
+    const evidenceInstructions = project.web_search_enabled
+        ? `- Ground every major point primarily in the supplied articles.
+- If the supplied articles are not enough for a point that clearly needs fresher or broader context, you may use web search sparingly to verify or supplement the missing fact.
+- Clearly distinguish external web findings from the supplied project articles, and cite the source URLs inline when using external web findings.
+- If evidence is weak, mixed, or missing even after checking, state the uncertainty clearly.
+- Do not use web search for facts already well supported by the supplied articles.
+- Do not invent facts beyond the supplied articles and any explicitly cited web findings.`
+        : `- Ground every major point in the supplied articles.
+- If evidence is weak, mixed, or missing, state the uncertainty clearly.
+- Do not invent facts outside the supplied articles.`;
+
     return `You are an AI assistant generating a report from curated news context and the user's focus prompt.
 
 Return a JSON object with:
@@ -373,10 +390,9 @@ Guidelines:
 - Prioritize satisfying the user's focus prompt, including any requested structure, tone, depth, and output style that can be supported by the supplied evidence.
 - If the user explicitly wants sections such as Key Signals, Ideas, Next Actions, or any other structure, use that structure.
 - If the user does not specify a structure, choose the clearest markdown structure for the material.
-- Ground every major point in the supplied articles.
-- If evidence is weak, mixed, or missing, state the uncertainty clearly.
+- ${project.web_search_enabled ? "Prefer the supplied project articles first; use external search only when it materially improves accuracy or recency." : "Use only the supplied project articles as evidence."}
+${evidenceInstructions}
 - Keep the language consistent with the user's prompt.
-- Do not invent facts outside the supplied articles.
 - Do not repeat the prompt verbatim.
 - Do not repeat the full report title as a top-level heading in markdown.
 
@@ -472,7 +488,10 @@ async function requestCreativeReport(
     articles: CreativeArticleContextRow[],
 ): Promise<CreativeReport> {
     const { generateCreativeReport } = await import("@/lib/ai");
-    return generateCreativeReport(buildCreativePrompt(project, articles));
+    return generateCreativeReport({
+        prompt: buildCreativePrompt(project, articles),
+        enableWebSearch: project.web_search_enabled,
+    });
 }
 
 async function persistCreativeCard(input: PersistCreativeCardCommandInput): Promise<number> {
@@ -627,6 +646,7 @@ export async function saveCreativeProject(input: SaveCreativeProjectInput, proje
         autoIntervalMinutes,
         maxArticlesPerCard,
         minArticlesPerCard,
+        webSearchEnabled: input.web_search_enabled,
         sourceIds: selectedSourceIds,
     };
     const result = await invoke<SaveCreativeProjectCommandResult>("save_creative_project_cmd", { input: commandInput });

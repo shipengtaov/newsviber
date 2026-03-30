@@ -18,6 +18,11 @@ import {
   LANGUAGE_PREFERENCE_STORAGE_KEY,
   normalizeLanguagePreference,
 } from "@/lib/language-settings";
+import {
+  DEFAULT_WEB_SEARCH_SETTINGS,
+  type WebSearchSettings,
+  normalizeWebSearchSettings,
+} from "@/lib/web-search-config";
 
 type AppSettingsRow = {
   key: string;
@@ -27,18 +32,21 @@ type AppSettingsRow = {
 type AppSettingsKey =
   | "settings.languagePreference"
   | "settings.ai.currentProviderId"
-  | "settings.ai.providerConfigs";
+  | "settings.ai.providerConfigs"
+  | "settings.webSearch.config";
 
 export type AppSettingsSnapshot = {
   languagePreference: string;
   currentProviderId: string;
   providerConfigs: AIProviderConfigs;
+  webSearchSettings: WebSearchSettings;
 };
 
 const APP_SETTING_KEYS = {
   languagePreference: "settings.languagePreference",
   currentProviderId: "settings.ai.currentProviderId",
   providerConfigs: "settings.ai.providerConfigs",
+  webSearchSettings: "settings.webSearch.config",
 } as const satisfies Record<string, AppSettingsKey>;
 
 const SETTINGS_PAGE_STORAGE_KEYS = [
@@ -77,6 +85,7 @@ function getDefaultAppSettingsSnapshot(): AppSettingsSnapshot {
     languagePreference: AUTO_DETECT_VALUE,
     currentProviderId: DEFAULT_AI_PROVIDER_ID,
     providerConfigs: getDefaultProviderConfigs(),
+    webSearchSettings: DEFAULT_WEB_SEARCH_SETTINGS,
   };
 }
 
@@ -92,6 +101,7 @@ function cloneSnapshot(snapshot: AppSettingsSnapshot): AppSettingsSnapshot {
     languagePreference: snapshot.languagePreference,
     currentProviderId: snapshot.currentProviderId,
     providerConfigs: cloneProviderConfigs(snapshot.providerConfigs),
+    webSearchSettings: { ...snapshot.webSearchSettings },
   };
 }
 
@@ -114,6 +124,14 @@ function normalizeProviderConfigs(value: unknown): AIProviderConfigs {
     );
     return configs;
   }, {});
+}
+
+function normalizePersistedWebSearchSettings(value: unknown): WebSearchSettings {
+  if (!isRecord(value)) {
+    return DEFAULT_WEB_SEARCH_SETTINGS;
+  }
+
+  return normalizeWebSearchSettings(value as Partial<WebSearchSettings>);
 }
 
 function parseJson(value: string): unknown {
@@ -309,6 +327,7 @@ function parseSnapshotFromRows(
   hasLanguagePreference: boolean;
   hasCurrentProviderId: boolean;
   hasProviderConfigs: boolean;
+  hasWebSearchSettings: boolean;
 } {
   const defaults = getDefaultAppSettingsSnapshot();
   const rowMap = new Map(rows.map((row) => [row.key, row.value]));
@@ -331,15 +350,23 @@ function parseSnapshotFromRows(
       ? defaults.providerConfigs
       : normalizeProviderConfigs(parsedProviderConfigs);
 
+  const parsedWebSearchSettings = parseJson(rowMap.get(APP_SETTING_KEYS.webSearchSettings) ?? "");
+  const webSearchSettings =
+    parsedWebSearchSettings === undefined
+      ? defaults.webSearchSettings
+      : normalizePersistedWebSearchSettings(parsedWebSearchSettings);
+
   return {
     snapshot: {
       languagePreference,
       currentProviderId,
       providerConfigs,
+      webSearchSettings,
     },
     hasLanguagePreference: parsedLanguagePreference !== undefined,
     hasCurrentProviderId: parsedCurrentProviderId !== undefined,
     hasProviderConfigs: parsedProviderConfigs !== undefined,
+    hasWebSearchSettings: parsedWebSearchSettings !== undefined,
   };
 }
 
@@ -381,6 +408,7 @@ export async function bootstrapAppSettings(): Promise<AppSettingsSnapshot> {
         hasLanguagePreference: parsed.hasLanguagePreference,
         hasCurrentProviderId: parsed.hasCurrentProviderId,
         hasProviderConfigs: parsed.hasProviderConfigs,
+        hasWebSearchSettings: parsed.hasWebSearchSettings,
       });
 
       appSettingsCache = cloneSnapshot(snapshot);
@@ -418,6 +446,10 @@ export function readProviderConfigs(): AIProviderConfigs {
   return cloneProviderConfigs(appSettingsCache.providerConfigs);
 }
 
+export function readWebSearchSettings(): WebSearchSettings {
+  return { ...appSettingsCache.webSearchSettings };
+}
+
 export async function saveLanguagePreference(value: string): Promise<void> {
   const normalizedValue = normalizeLanguagePreference(value);
   await writeSetting(APP_SETTING_KEYS.languagePreference, normalizedValue);
@@ -444,12 +476,22 @@ export async function saveProviderConfigs(value: AIProviderConfigs): Promise<voi
     providerConfigs: normalizedValue,
   };
 }
+
+export async function saveWebSearchSettings(value: WebSearchSettings): Promise<void> {
+  const normalizedValue = normalizeWebSearchSettings(value);
+  await writeSetting(APP_SETTING_KEYS.webSearchSettings, normalizedValue);
+  appSettingsCache = {
+    ...appSettingsCache,
+    webSearchSettings: normalizedValue,
+  };
+}
 async function migrateBrowserSettingsIfNeeded(
   snapshot: AppSettingsSnapshot,
   presence: {
     hasLanguagePreference: boolean;
     hasCurrentProviderId: boolean;
     hasProviderConfigs: boolean;
+    hasWebSearchSettings: boolean;
   },
 ): Promise<AppSettingsSnapshot> {
   const migratedSnapshot = cloneSnapshot(snapshot);
@@ -479,6 +521,10 @@ async function migrateBrowserSettingsIfNeeded(
     pendingWrites.push(
       writeSetting(APP_SETTING_KEYS.providerConfigs, storageAiSnapshot.providerConfigs),
     );
+  }
+
+  if (!presence.hasWebSearchSettings) {
+    migratedSnapshot.webSearchSettings = { ...DEFAULT_WEB_SEARCH_SETTINGS };
   }
 
   if (pendingWrites.length === 0) {

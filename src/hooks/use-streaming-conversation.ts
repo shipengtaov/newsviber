@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Message } from "@/lib/ai";
 import {
-  appendStreamingConversationChunk,
   beginStreamingConversation,
   createStreamingConversationState,
   failStreamingConversation,
   finishStreamingConversation,
+  replaceStreamingConversationText,
+  restartStreamingConversation,
+  resolveStreamingConversation,
   type StreamPhase,
   type StreamingConversationState,
 } from "@/hooks/streaming-conversation-state";
@@ -20,6 +22,9 @@ type ConversationBuilder = (
 type SendConversationInput = {
   content: string;
   buildConversation: ConversationBuilder;
+  streamOptions?: {
+    enableWebSearch?: boolean;
+  };
   onUserMessageCommitted?: (input: {
     history: Message[];
     userMessage: Message;
@@ -94,6 +99,7 @@ export function useStreamingConversation() {
   const send = useCallback(async ({
     content,
     buildConversation,
+    streamOptions,
     onUserMessageCommitted,
     onAssistantComplete,
     onAssistantError,
@@ -136,20 +142,45 @@ export function useStreamingConversation() {
 
       const fullText = await streamConversation(
         conversation,
-        (chunk) => {
+        (content) => {
           applyState(
-            appendStreamingConversationChunk(
+            replaceStreamingConversationText(
               {
                 messages: messagesRef.current,
                 isStreaming: isStreamingRef.current,
                 streamPhase: streamPhaseRef.current,
               },
-              chunk,
+              content,
             ),
           );
         },
         abortController.signal,
+        {
+          ...streamOptions,
+          onRetryWithoutWebSearch: () => {
+            applyState(
+              restartStreamingConversation({
+                messages: messagesRef.current,
+                isStreaming: isStreamingRef.current,
+                streamPhase: streamPhaseRef.current,
+              }),
+            );
+          },
+        },
       );
+
+      if (!abortController.signal.aborted) {
+        applyState(
+          resolveStreamingConversation(
+            {
+              messages: messagesRef.current,
+              isStreaming: isStreamingRef.current,
+              streamPhase: streamPhaseRef.current,
+            },
+            fullText,
+          ),
+        );
+      }
 
       await onAssistantComplete?.({
         history,

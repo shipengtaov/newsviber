@@ -76,13 +76,14 @@ describe("streamConversation", () => {
         await continueStream.promise;
         yield textDelta(" world");
       })(),
+      text: Promise.resolve("Hello world"),
     }));
 
     const chunks: string[] = [];
     const completionPromise = streamConversation(
       [{ role: "user", content: "Say hello" }],
-      (chunk) => {
-        chunks.push(chunk);
+      (text) => {
+        chunks.push(text);
       },
     );
 
@@ -91,10 +92,51 @@ describe("streamConversation", () => {
 
     continueStream.resolve();
     await expect(completionPromise).resolves.toBe("Hello world");
-    expect(chunks).toEqual(["Hello", " world"]);
+    expect(chunks).toEqual(["Hello", "Hello world"]);
     expect(streamTextMock).toHaveBeenCalledWith(expect.objectContaining({
       timeout: { chunkMs: 10_000 },
     }));
+  });
+
+  it("reconstructs live text from text block ids instead of blindly appending arrival order", async () => {
+    streamTextMock.mockImplementation(() => ({
+      fullStream: (async function* () {
+        yield { type: "text-start" as const, id: "text-1" };
+        yield { type: "text-delta" as const, id: "text-1", text: "什么是 " };
+        yield { type: "text-start" as const, id: "text-2" };
+        yield { type: "text-delta" as const, id: "text-2", text: "OpenClaw" };
+        yield { type: "text-delta" as const, id: "text-1", text: "项目？" };
+      })(),
+      text: Promise.resolve("什么是 项目？OpenClaw"),
+    }));
+
+    const updates: string[] = [];
+
+    await expect(
+      streamConversation([{ role: "user", content: "Hello" }], (text) => {
+        updates.push(text);
+      }),
+    ).resolves.toBe("什么是 项目？OpenClaw");
+
+    expect(updates).toEqual([
+      "什么是 ",
+      "什么是 OpenClaw",
+      "什么是 项目？OpenClaw",
+    ]);
+  });
+
+  it("returns the SDK final text instead of the raw concatenated stream draft", async () => {
+    streamTextMock.mockImplementation(() => ({
+      fullStream: (async function* () {
+        yield textDelta("Draft answer");
+        yield textDelta(" that will be replaced");
+      })(),
+      text: Promise.resolve("Final answer"),
+    }));
+
+    await expect(
+      streamConversation([{ role: "user", content: "Hello" }], vi.fn()),
+    ).resolves.toBe("Final answer");
   });
 
   it("throws a clear error when streaming never starts", async () => {
@@ -105,6 +147,7 @@ describe("streamConversation", () => {
           reason: "No stream chunk arrived within 10 seconds.",
         };
       })(),
+      text: Promise.resolve(""),
     }));
 
     await expect(
@@ -123,6 +166,7 @@ describe("streamConversation", () => {
           error: new Error("socket closed"),
         };
       })(),
+      text: Promise.resolve("Partial"),
     }));
 
     await expect(

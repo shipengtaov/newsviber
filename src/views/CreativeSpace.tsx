@@ -46,12 +46,14 @@ import { useStreamingConversation } from "@/hooks/use-streaming-conversation";
 import { getCreativeCardBodyMarkdown, getCreativeCardPreviewExcerpt } from "@/lib/creative-card";
 import { formatUtcDateTime } from "@/lib/time";
 import { cn } from "@/lib/utils";
+import { hasConfiguredWebSearch } from "@/lib/web-search-service";
 import ReactMarkdown from "react-markdown";
 import { ArrowLeft, ChevronDown, ChevronUp, Ellipsis, Lightbulb, Loader2, MessageSquare, Pencil, Plus, Trash2, WandSparkles } from "lucide-react";
 
 type ProjectFormState = {
     name: string;
     prompt: string;
+    webSearchEnabled: boolean;
     autoEnabled: boolean;
     autoIntervalMinutes: string;
     maxArticlesPerCard: string;
@@ -82,6 +84,7 @@ function createEmptyProjectFormState(): ProjectFormState {
     return {
         name: "",
         prompt: "",
+        webSearchEnabled: false,
         autoEnabled: false,
         autoIntervalMinutes: DEFAULT_AUTO_INTERVAL_MINUTES,
         maxArticlesPerCard: DEFAULT_MAX_ARTICLES_PER_CARD,
@@ -99,6 +102,7 @@ function createProjectFormState(project?: CreativeProject): ProjectFormState {
     return {
         name: project.name,
         prompt: project.prompt,
+        webSearchEnabled: project.web_search_enabled,
         autoEnabled: project.auto_enabled,
         autoIntervalMinutes: String(project.auto_interval_minutes),
         maxArticlesPerCard: String(project.max_articles_per_card),
@@ -292,6 +296,19 @@ function ProjectDialog({
                                     )}
                                 </Button>
                             </div>
+                        </div>
+
+                        <div className="space-y-3 rounded-xl border p-4">
+                            <label className="flex items-center gap-3 text-sm font-medium">
+                                <Checkbox
+                                    checked={projectForm.webSearchEnabled}
+                                    onChange={(event) => setProjectForm((current) => ({ ...current, webSearchEnabled: event.target.checked }))}
+                                />
+                                {t("enableWebSearch")}
+                            </label>
+                            <p className="text-sm text-muted-foreground">
+                                {t("webSearchDesc")}
+                            </p>
                         </div>
 
                         <div className="grid gap-4 md:grid-cols-2">
@@ -509,6 +526,11 @@ export default function CreativeSpace() {
 
     const activeProject = projects.find((project) => project.id === activeProjectId) ?? null;
     const activeCard = cards.find((card) => card.id === activeCardId) ?? null;
+    const activeProjectWebSearchStatus = !activeProject?.web_search_enabled
+        ? "disabled"
+        : hasConfiguredWebSearch()
+            ? "ready"
+            : "unavailable";
     const activeCardBodyMarkdown = activeCard ? getCreativeCardBodyMarkdown(activeCard) : "";
     const activeProjectUnreadCount = activeProject
         ? cards.length === 0
@@ -867,6 +889,7 @@ export default function CreativeSpace() {
                 {
                     name: projectForm.name,
                     prompt: projectForm.prompt,
+                    web_search_enabled: projectForm.webSearchEnabled,
                     auto_enabled: projectForm.autoEnabled,
                     auto_interval_minutes: Number.parseInt(projectForm.autoIntervalMinutes, 10),
                     max_articles_per_card: Number.parseInt(projectForm.maxArticlesPerCard, 10),
@@ -1119,6 +1142,7 @@ export default function CreativeSpace() {
                 const systemPrompt = buildCreativeCardDiscussionSystemPrompt({
                     title: activeCard.title,
                     bodyMarkdown: activeCardBodyMarkdown,
+                    enableWebSearch: activeProject?.web_search_enabled,
                 });
 
                 return [
@@ -1126,6 +1150,9 @@ export default function CreativeSpace() {
                     ...history,
                     userMessage,
                 ];
+            },
+            streamOptions: {
+                enableWebSearch: activeProject?.web_search_enabled,
             },
         });
     }
@@ -1212,6 +1239,7 @@ export default function CreativeSpace() {
                         chatMessages={chatMessages}
                         isChatStreaming={isChatStreaming}
                         chatStreamPhase={chatStreamPhase}
+                        webSearchStatus={activeProjectWebSearchStatus}
                         chatInput={chatInput}
                         onChatInputChange={setChatInput}
                         onChatSubmit={handleChat}
@@ -1233,6 +1261,7 @@ export default function CreativeSpace() {
                                 chatMessages={chatMessages}
                                 isChatStreaming={isChatStreaming}
                                 chatStreamPhase={chatStreamPhase}
+                                webSearchStatus={activeProjectWebSearchStatus}
                                 chatInput={chatInput}
                                 onChatInputChange={setChatInput}
                                 onChatSubmit={handleChat}
@@ -1385,6 +1414,10 @@ export default function CreativeSpace() {
                                     <ProjectOverviewItem
                                         label={t("checkInterval")}
                                         value={activeProject.auto_enabled ? formatAutoSummary(activeProject) : t("notScheduled")}
+                                    />
+                                    <ProjectOverviewItem
+                                        label={t("webSearch")}
+                                        value={activeProject.web_search_enabled ? t("active", { ns: "common" }) : t("inactive", { ns: "common" })}
                                     />
                                     <ProjectOverviewItem
                                         label={t("scopeLabel")}
