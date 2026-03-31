@@ -1,7 +1,7 @@
 import { RefObject, useEffect, useRef } from "react";
 import { useLocation } from "react-router-dom";
 
-const MAIN_MENU_PATHS = new Set(["/", "/sources", "/chat", "/creative", "/settings"]);
+const MAIN_MENU_PATHS = new Set(["/", "/sources", "/chat", "/automation", "/settings"]);
 const STORAGE_KEY = "mainMenuScrollPositions_v1";
 const RESTORE_TOLERANCE_PX = 2;
 const MAX_RESTORE_ATTEMPTS = 180;

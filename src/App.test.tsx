@@ -12,7 +12,7 @@ const {
     isSourceDueForFetchMock,
     newsListeners,
     registerExportSourcesOpmlMenuHandlerMock,
-    runDueAutoCreativeProjectsMock,
+    runDueAutomationsMock,
     sourceListeners,
     fetchSourcesMock,
 } = vi.hoisted(() => ({
@@ -22,7 +22,7 @@ const {
     isSourceDueForFetchMock: vi.fn(),
     newsListeners: new Set<() => void>(),
     registerExportSourcesOpmlMenuHandlerMock: vi.fn(),
-    runDueAutoCreativeProjectsMock: vi.fn(),
+    runDueAutomationsMock: vi.fn(),
     sourceListeners: new Set<() => void>(),
     fetchSourcesMock: vi.fn(),
 }));
@@ -55,7 +55,7 @@ vi.mock("@/views/GlobalChat", () => ({
     default: () => null,
 }));
 
-vi.mock("@/views/CreativeSpace", () => ({
+vi.mock("@/views/Automation", () => ({
     default: () => null,
 }));
 
@@ -63,8 +63,8 @@ vi.mock("@/views/Settings", () => ({
     default: () => null,
 }));
 
-vi.mock("@/lib/creative-service", () => ({
-    runDueAutoCreativeProjects: runDueAutoCreativeProjectsMock,
+vi.mock("@/lib/automation-service", () => ({
+    runDueAutomations: runDueAutomationsMock,
 }));
 
 vi.mock("@/lib/db", () => ({
@@ -128,12 +128,12 @@ describe("App background sync routing", () => {
         isSourceDueForFetchMock.mockReset();
         newsListeners.clear();
         registerExportSourcesOpmlMenuHandlerMock.mockReset();
-        runDueAutoCreativeProjectsMock.mockReset();
+        runDueAutomationsMock.mockReset();
         sourceListeners.clear();
         fetchSourcesMock.mockReset();
 
         registerExportSourcesOpmlMenuHandlerMock.mockResolvedValue(() => {});
-        runDueAutoCreativeProjectsMock.mockResolvedValue(undefined);
+        runDueAutomationsMock.mockResolvedValue(undefined);
         fetchSourcesMock.mockResolvedValue({
             insertedCount: 0,
             fetchedCount: 0,
@@ -192,26 +192,26 @@ describe("App background sync routing", () => {
         expect(fetchSourcesMock).toHaveBeenCalledTimes(1);
         expect(dispatchSourceFetchSyncEventMock).toHaveBeenCalledTimes(1);
         expect(dispatchNewsSyncEventMock).toHaveBeenCalledTimes(1);
-        expect(runDueAutoCreativeProjectsMock).toHaveBeenCalledTimes(1);
+        expect(runDueAutomationsMock).toHaveBeenCalledTimes(1);
     });
 
-    it("keeps creative auto checks bound to source-fetch sync rather than news sync", async () => {
+    it("keeps automation auto checks bound to source-fetch sync rather than news sync", async () => {
         getDbMock.mockResolvedValue({
             select: vi.fn().mockResolvedValue([]),
         });
 
         await renderApp();
 
-        expect(runDueAutoCreativeProjectsMock).toHaveBeenCalledTimes(1);
+        expect(runDueAutomationsMock).toHaveBeenCalledTimes(1);
 
         dispatchNewsSyncEventMock();
         await settle();
 
-        expect(runDueAutoCreativeProjectsMock).toHaveBeenCalledTimes(1);
+        expect(runDueAutomationsMock).toHaveBeenCalledTimes(1);
 
         dispatchSourceFetchSyncEventMock();
         await settle();
 
-        expect(runDueAutoCreativeProjectsMock).toHaveBeenCalledTimes(2);
+        expect(runDueAutomationsMock).toHaveBeenCalledTimes(2);
     });
 });

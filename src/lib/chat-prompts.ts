@@ -41,18 +41,18 @@ ${contextLines.join("\n")}
 Answer the user's question primarily with the supplied context. If the context is sparse or missing facts, say that clearly instead of inventing details.`);
 }
 
-export type CreativeCardDiscussionSystemPromptInput = {
+export type AutomationReportDiscussionSystemPromptInput = {
   title: string;
   bodyMarkdown: string;
   enableWebSearch?: boolean;
 };
 
-export function buildCreativeCardDiscussionSystemPrompt({
+export function buildAutomationReportDiscussionSystemPrompt({
   title,
   bodyMarkdown,
   enableWebSearch = false,
-}: CreativeCardDiscussionSystemPromptInput): string {
-  return appendChatMarkdownFormatting(`You are discussing a creative report you generated.
+}: AutomationReportDiscussionSystemPromptInput): string {
+  return appendChatMarkdownFormatting(`You are discussing an automation report you generated.
 Report Data:
 Title: ${title}
 Body:

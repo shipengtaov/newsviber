@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  creativeReportSchema,
+  automationReportSchema,
   normalizeProviderModelId,
   resolveProviderFlavor,
 } from "@/lib/ai";
@@ -69,10 +69,10 @@ describe("AI provider helpers", () => {
   });
 });
 
-describe("Creative report schema", () => {
-  it("validates the creative report schema", () => {
+describe("automation report schema", () => {
+  it("validates the automation report schema", () => {
     expect(
-      creativeReportSchema.parse({
+      automationReportSchema.parse({
         title: "AI News Desk",
         markdown: "## Market pulse\nModel providers are shipping faster.",
       }),

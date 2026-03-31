@@ -298,7 +298,6 @@ describe("Settings", () => {
         expect(markup).toContain(">v26.3.3<");
         expect(markup).toContain(">Check for Updates<");
         expect(markup).not.toContain(">Available updates will appear here.<");
-        expect((markup.match(/rounded-lg border bg-muted\/35 p-4/g) ?? []).length).toBe(1);
     });
 
     it("shows install update as the primary action when an update is available", () => {

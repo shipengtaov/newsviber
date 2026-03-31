@@ -1,27 +1,27 @@
 import { invoke } from "@tauri-apps/api/core";
-import type { CreativeReport } from "@/lib/ai";
+import type { AutomationReportDraft } from "@/lib/ai";
 import { resolveArticlePreview } from "@/lib/article-html";
-import { dispatchCreativeSyncEvent } from "@/lib/creative-events";
+import { dispatchAutomationSyncEvent } from "@/lib/automation-events";
 import { getDb } from "@/lib/db";
 import { formatUtcDateTime } from "@/lib/time";
 
-export type CreativeProject = {
+export type AutomationProject = {
     id: number;
     name: string;
     prompt: string;
     cycle_mode: string;
     auto_enabled: boolean;
     auto_interval_minutes: number;
-    max_articles_per_card: number;
-    min_articles_per_card: number;
+    max_articles_per_report: number;
+    min_articles_per_report: number;
     web_search_enabled: boolean;
     last_auto_checked_at: string | null;
     last_auto_generated_at: string | null;
     source_ids: number[];
-    unread_card_count: number;
+    unread_report_count: number;
 };
 
-export type CreativeCard = {
+export type AutomationReport = {
     id: number;
     project_id: number;
     title: string;
@@ -33,14 +33,14 @@ export type CreativeCard = {
     created_at: string;
 };
 
-export type CreativeSourceOption = {
+export type AutomationSourceOption = {
     id: number;
     name: string;
     active: boolean;
     article_count: number;
 };
 
-export type CreativeArticleCandidate = {
+export type AutomationArticleCandidate = {
     id: number;
     source_id: number;
     source_name: string;
@@ -51,47 +51,47 @@ export type CreativeArticleCandidate = {
     is_consumed: boolean;
 };
 
-export type SaveCreativeProjectInput = {
+export type SaveAutomationProjectInput = {
     name: string;
     prompt: string;
     auto_enabled: boolean;
     auto_interval_minutes: number;
-    max_articles_per_card: number;
-    min_articles_per_card: number;
+    max_articles_per_report: number;
+    min_articles_per_report: number;
     web_search_enabled: boolean;
     use_all_sources: boolean;
     source_ids: number[];
 };
 
-export type CreativeCardPage = {
-    cards: CreativeCard[];
+export type AutomationReportPage = {
+    reports: AutomationReport[];
     totalCount: number;
 };
 
-export type GenerateCreativeCardInput = {
+export type GenerateAutomationReportInput = {
     projectId: number;
     articleIds: number[];
     mode: "manual" | "auto";
     checkedAt?: string;
 };
 
-type SaveCreativeProjectCommandInput = {
+type SaveAutomationProjectCommandInput = {
     projectId: number | null;
     name: string;
     prompt: string;
     autoEnabled: boolean;
     autoIntervalMinutes: number;
-    maxArticlesPerCard: number;
-    minArticlesPerCard: number;
+    maxArticlesPerReport: number;
+    minArticlesPerReport: number;
     webSearchEnabled: boolean;
     sourceIds: number[];
 };
 
-type SaveCreativeProjectCommandResult = {
+type SaveAutomationProjectCommandResult = {
     projectId: number;
 };
 
-type PersistCreativeCardCommandInput = {
+type PersistAutomationReportCommandInput = {
     projectId: number;
     title: string;
     fullReport: string;
@@ -101,27 +101,27 @@ type PersistCreativeCardCommandInput = {
     checkedAt: string | null;
 };
 
-type PersistCreativeCardCommandResult = {
-    cardId: number;
+type PersistAutomationReportCommandResult = {
+    reportId: number;
 };
 
-type CreativeProjectRow = {
+type AutomationProjectRow = {
     id: number;
     name: string;
     prompt: string;
     cycle_mode: string;
     auto_enabled: number | boolean;
     auto_interval_minutes: number;
-    max_articles_per_card: number;
-    min_articles_per_card: number;
+    max_articles_per_report: number;
+    min_articles_per_report: number;
     web_search_enabled: number | boolean;
     last_auto_checked_at: string | null;
     last_auto_generated_at: string | null;
     source_ids_csv: string | null;
-    unread_card_count: number | null;
+    unread_report_count: number | null;
 };
 
-type CreativeCardRow = {
+type AutomationReportRow = {
     id: number;
     project_id: number;
     title: string;
@@ -133,14 +133,14 @@ type CreativeCardRow = {
     created_at: string;
 };
 
-type CreativeSourceRow = {
+type AutomationSourceRow = {
     id: number;
     name: string;
     active: number | boolean;
     article_count: number | null;
 };
 
-type CreativeArticleCandidateRow = {
+type AutomationArticleCandidateRow = {
     id: number;
     source_id: number;
     source_name: string;
@@ -151,7 +151,7 @@ type CreativeArticleCandidateRow = {
     is_consumed: number | boolean;
 };
 
-type CreativeArticleContextRow = {
+type AutomationArticleContextRow = {
     id: number;
     source_id: number;
     source_name: string;
@@ -163,8 +163,8 @@ type CreativeArticleContextRow = {
 };
 
 const DEFAULT_AUTO_INTERVAL_MINUTES = 60;
-const DEFAULT_MAX_ARTICLES_PER_CARD = 12;
-const DEFAULT_MIN_ARTICLES_PER_CARD = 1;
+const DEFAULT_MAX_ARTICLES_PER_REPORT = 12;
+const DEFAULT_MIN_ARTICLES_PER_REPORT = 1;
 const DEFAULT_CANDIDATE_LIMIT = 200;
 const MAX_CONTEXT_CHARS_PER_ARTICLE = 1200;
 
@@ -176,24 +176,24 @@ const PROJECT_SELECT_BASE_SQL = `
         p.cycle_mode,
         p.auto_enabled,
         p.auto_interval_minutes,
-        p.max_articles_per_card,
-        p.min_articles_per_card,
+        p.max_articles_per_report,
+        p.min_articles_per_report,
         p.web_search_enabled,
         p.last_auto_checked_at,
         p.last_auto_generated_at,
         (
             SELECT COUNT(*)
-            FROM creative_cards unread_cards
-            WHERE unread_cards.project_id = p.id
-              AND unread_cards.is_read = 0
-        ) AS unread_card_count,
+            FROM automation_reports unread_reports
+            WHERE unread_reports.project_id = p.id
+              AND unread_reports.is_read = 0
+        ) AS unread_report_count,
         GROUP_CONCAT(ps.source_id) AS source_ids_csv
-    FROM creative_projects p
-    LEFT JOIN creative_project_sources ps ON ps.project_id = p.id
+    FROM automation_projects p
+    LEFT JOIN automation_project_sources ps ON ps.project_id = p.id
 `;
 
-const inFlightProjectGenerations = new Map<number, Promise<CreativeCard>>();
-const inFlightAutoChecks = new Map<number, Promise<CreativeCard | null>>();
+const inFlightProjectGenerations = new Map<number, Promise<AutomationReport>>();
+const inFlightAutoChecks = new Map<number, Promise<AutomationReport | null>>();
 
 function normalizeBoolean(value: unknown): boolean {
     if (typeof value === "boolean") {
@@ -232,7 +232,7 @@ function parseCsvNumbers(csv: string | null): number[] {
     return Array.from(seen);
 }
 
-function normalizeCreativeProject(row: CreativeProjectRow): CreativeProject {
+function normalizeAutomationProject(row: AutomationProjectRow): AutomationProject {
     return {
         id: row.id,
         name: row.name,
@@ -240,17 +240,17 @@ function normalizeCreativeProject(row: CreativeProjectRow): CreativeProject {
         cycle_mode: row.cycle_mode,
         auto_enabled: normalizeBoolean(row.auto_enabled),
         auto_interval_minutes: normalizePositiveInteger(row.auto_interval_minutes, DEFAULT_AUTO_INTERVAL_MINUTES),
-        max_articles_per_card: normalizePositiveInteger(row.max_articles_per_card, DEFAULT_MAX_ARTICLES_PER_CARD),
-        min_articles_per_card: normalizePositiveInteger(row.min_articles_per_card, DEFAULT_MIN_ARTICLES_PER_CARD),
+        max_articles_per_report: normalizePositiveInteger(row.max_articles_per_report, DEFAULT_MAX_ARTICLES_PER_REPORT),
+        min_articles_per_report: normalizePositiveInteger(row.min_articles_per_report, DEFAULT_MIN_ARTICLES_PER_REPORT),
         web_search_enabled: normalizeBoolean(row.web_search_enabled),
         last_auto_checked_at: row.last_auto_checked_at ?? null,
         last_auto_generated_at: row.last_auto_generated_at ?? null,
         source_ids: parseCsvNumbers(row.source_ids_csv),
-        unread_card_count: Math.max(0, Number(row.unread_card_count) || 0),
+        unread_report_count: Math.max(0, Number(row.unread_report_count) || 0),
     };
 }
 
-function normalizeCreativeCard(row: CreativeCardRow): CreativeCard {
+function normalizeAutomationReport(row: AutomationReportRow): AutomationReport {
     const generationMode = row.generation_mode === "auto" ? "auto" : "manual";
 
     return {
@@ -266,7 +266,7 @@ function normalizeCreativeCard(row: CreativeCardRow): CreativeCard {
     };
 }
 
-function normalizeCreativeSource(row: CreativeSourceRow): CreativeSourceOption {
+function normalizeAutomationSource(row: AutomationSourceRow): AutomationSourceOption {
     return {
         id: row.id,
         name: row.name,
@@ -275,7 +275,7 @@ function normalizeCreativeSource(row: CreativeSourceRow): CreativeSourceOption {
     };
 }
 
-function normalizeCreativeArticleCandidate(row: CreativeArticleCandidateRow): CreativeArticleCandidate {
+function normalizeAutomationArticleCandidate(row: AutomationArticleCandidateRow): AutomationArticleCandidate {
     return {
         id: row.id,
         source_id: row.source_id,
@@ -334,12 +334,12 @@ function buildProjectScopeCondition(projectId: number, params: unknown[], articl
     return `(
         NOT EXISTS (
             SELECT 1
-            FROM creative_project_sources scope_sources
+            FROM automation_project_sources scope_sources
             WHERE scope_sources.project_id = ${noScopeProjectParam}
         )
         OR ${articleAlias}.source_id IN (
             SELECT scoped_sources.source_id
-            FROM creative_project_sources scoped_sources
+            FROM automation_project_sources scoped_sources
             WHERE scoped_sources.project_id = ${scopedProjectParam}
         )
     )`;
@@ -350,9 +350,9 @@ function buildConsumedExistsExpression(projectId: number, params: unknown[], art
 
     return `EXISTS (
         SELECT 1
-        FROM creative_card_articles consumed_articles
-        JOIN creative_cards consumed_cards ON consumed_cards.id = consumed_articles.card_id
-        WHERE consumed_cards.project_id = ${projectParam}
+        FROM automation_report_articles consumed_articles
+        JOIN automation_reports consumed_reports ON consumed_reports.id = consumed_articles.report_id
+        WHERE consumed_reports.project_id = ${projectParam}
           AND consumed_articles.article_id = ${articleAlias}.id
     )`;
 }
@@ -363,7 +363,7 @@ export function summarizeArticleContextText(summary: string | null, content: str
     return base.slice(0, MAX_CONTEXT_CHARS_PER_ARTICLE);
 }
 
-export function buildCreativePrompt(project: CreativeProject, articles: CreativeArticleContextRow[]): string {
+export function buildAutomationPrompt(project: AutomationProject, articles: AutomationArticleContextRow[]): string {
     const contextLines = articles.map((article, index) => {
         const publishedAt = formatUtcDateTime(article.published_at, "Unknown");
         const contextText = summarizeArticleContextText(article.summary, article.content);
@@ -411,9 +411,9 @@ Selected News Context:
 ${contextLines}`;
 }
 
-async function getCreativeProject(projectId: number): Promise<CreativeProject | null> {
+async function getAutomationProject(projectId: number): Promise<AutomationProject | null> {
     const db = await getDb();
-    const rows = await db.select<CreativeProjectRow[]>(
+    const rows = await db.select<AutomationProjectRow[]>(
         `
             ${PROJECT_SELECT_BASE_SQL}
             WHERE p.id = $1
@@ -427,12 +427,12 @@ async function getCreativeProject(projectId: number): Promise<CreativeProject | 
         return null;
     }
 
-    return normalizeCreativeProject(rows[0]);
+    return normalizeAutomationProject(rows[0]);
 }
 
-async function getCreativeCard(cardId: number): Promise<CreativeCard | null> {
+async function getAutomationReport(reportId: number): Promise<AutomationReport | null> {
     const db = await getDb();
-    const rows = await db.select<CreativeCardRow[]>(
+    const rows = await db.select<AutomationReportRow[]>(
         `
             SELECT
                 id,
@@ -444,21 +444,21 @@ async function getCreativeCard(cardId: number): Promise<CreativeCard | null> {
                 is_read,
                 is_favorite,
                 created_at
-            FROM creative_cards
+            FROM automation_reports
             WHERE id = $1
             LIMIT 1
         `,
-        [cardId],
+        [reportId],
     );
 
     if (rows.length === 0) {
         return null;
     }
 
-    return normalizeCreativeCard(rows[0]);
+    return normalizeAutomationReport(rows[0]);
 }
 
-async function loadArticlesForGeneration(projectId: number, articleIds: number[]): Promise<CreativeArticleContextRow[]> {
+async function loadArticlesForGeneration(projectId: number, articleIds: number[]): Promise<AutomationArticleContextRow[]> {
     const sanitizedArticleIds = sanitizeArticleIds(articleIds);
     if (sanitizedArticleIds.length === 0) {
         return [];
@@ -469,7 +469,7 @@ async function loadArticlesForGeneration(projectId: number, articleIds: number[]
     const scopeCondition = buildProjectScopeCondition(projectId, params);
     const db = await getDb();
 
-    const rows = await db.select<CreativeArticleContextRow[]>(
+    const rows = await db.select<AutomationArticleContextRow[]>(
         `
             SELECT
                 a.id,
@@ -492,28 +492,28 @@ async function loadArticlesForGeneration(projectId: number, articleIds: number[]
     return rows;
 }
 
-async function requestCreativeReport(
-    project: CreativeProject,
-    articles: CreativeArticleContextRow[],
-): Promise<CreativeReport> {
-    const { generateCreativeReport } = await import("@/lib/ai");
-    return generateCreativeReport({
-        prompt: buildCreativePrompt(project, articles),
+async function requestAutomationReport(
+    project: AutomationProject,
+    articles: AutomationArticleContextRow[],
+): Promise<AutomationReportDraft> {
+    const { generateAutomationReportDraft } = await import("@/lib/ai");
+    return generateAutomationReportDraft({
+        prompt: buildAutomationPrompt(project, articles),
         enableWebSearch: project.web_search_enabled,
     });
 }
 
-async function persistCreativeCard(input: PersistCreativeCardCommandInput): Promise<number> {
-    const result = await invoke<PersistCreativeCardCommandResult>("persist_creative_card_cmd", { input });
-    return result.cardId;
+async function persistAutomationReport(input: PersistAutomationReportCommandInput): Promise<number> {
+    const result = await invoke<PersistAutomationReportCommandResult>("persist_automation_report_cmd", { input });
+    return result.reportId;
 }
 
-async function performCardGeneration(
-    project: CreativeProject,
+async function performReportGeneration(
+    project: AutomationProject,
     articleIds: number[],
     mode: "manual" | "auto",
     checkedAt?: string,
-): Promise<CreativeCard> {
+): Promise<AutomationReport> {
     const articles = await loadArticlesForGeneration(project.id, articleIds);
     const sanitizedArticleIds = sanitizeArticleIds(articleIds);
 
@@ -525,9 +525,9 @@ async function performCardGeneration(
         throw new Error("Some selected articles are no longer available for this project.");
     }
 
-    const generatedReport = await requestCreativeReport(project, articles);
+    const generatedReport = await requestAutomationReport(project, articles);
 
-    const cardId = await persistCreativeCard({
+    const reportId = await persistAutomationReport({
         projectId: project.id,
         title: generatedReport.title.trim() || "Untitled Insight",
         fullReport: generatedReport.markdown.trim(),
@@ -537,29 +537,29 @@ async function performCardGeneration(
         checkedAt: checkedAt ?? null,
     });
 
-    const savedCard = await getCreativeCard(cardId);
-    if (!savedCard) {
-        throw new Error("Failed to load the generated creative card.");
+    const savedReport = await getAutomationReport(reportId);
+    if (!savedReport) {
+        throw new Error("Failed to load the generated report.");
     }
 
-    dispatchCreativeSyncEvent();
-    return savedCard;
+    dispatchAutomationSyncEvent();
+    return savedReport;
 }
 
 async function updateAutoCheckTimestamp(projectId: number, checkedAt: string) {
     const db = await getDb();
     await db.execute(
-        "UPDATE creative_projects SET last_auto_checked_at = $1 WHERE id = $2",
+        "UPDATE automation_projects SET last_auto_checked_at = $1 WHERE id = $2",
         [checkedAt, projectId],
     );
-    dispatchCreativeSyncEvent();
+    dispatchAutomationSyncEvent();
 }
 
 function isProjectGenerationInFlight(projectId: number): boolean {
     return inFlightProjectGenerations.has(projectId);
 }
 
-export function isProjectDueForAutoRun(project: Pick<CreativeProject, "auto_enabled" | "auto_interval_minutes" | "last_auto_checked_at">, now: Date = new Date()): boolean {
+export function isAutomationProjectDueForAutoRun(project: Pick<AutomationProject, "auto_enabled" | "auto_interval_minutes" | "last_auto_checked_at">, now: Date = new Date()): boolean {
     if (!project.auto_enabled) {
         return false;
     }
@@ -577,22 +577,22 @@ export function isProjectDueForAutoRun(project: Pick<CreativeProject, "auto_enab
     return now.getTime() >= lastCheckedAt + intervalMinutes * 60 * 1000;
 }
 
-export async function listCreativeProjects(): Promise<CreativeProject[]> {
+export async function listAutomationProjects(): Promise<AutomationProject[]> {
     const db = await getDb();
-    const rows = await db.select<CreativeProjectRow[]>(
+    const rows = await db.select<AutomationProjectRow[]>(
         `
             ${PROJECT_SELECT_BASE_SQL}
             GROUP BY p.id
             ORDER BY p.id DESC
         `,
     );
-    return rows.map(normalizeCreativeProject);
+    return rows.map(normalizeAutomationProject);
 }
 
-export async function listCreativeCards(
+export async function listAutomationReports(
     projectId: number,
     options: { offset?: number; limit?: number; favoritesOnly?: boolean } = {},
-): Promise<CreativeCardPage> {
+): Promise<AutomationReportPage> {
     const db = await getDb();
     const offset = Math.max(0, options.offset ?? 0);
     const limit = options.limit != null ? Math.max(1, Math.min(200, options.limit)) : undefined;
@@ -602,7 +602,7 @@ export async function listCreativeCards(
         : "project_id = $1";
 
     const countRows = await db.select<{ cnt: number }[]>(
-        `SELECT COUNT(*) AS cnt FROM creative_cards WHERE ${whereClause}`,
+        `SELECT COUNT(*) AS cnt FROM automation_reports WHERE ${whereClause}`,
         [projectId],
     );
     const totalCount = Number(countRows[0]?.cnt) || 0;
@@ -619,7 +619,7 @@ export async function listCreativeCards(
             is_read,
             is_favorite,
             created_at
-        FROM creative_cards
+        FROM automation_reports
         WHERE ${whereClause}
         ORDER BY id DESC
     `;
@@ -631,13 +631,13 @@ export async function listCreativeCards(
         }
     }
 
-    const rows = await db.select<CreativeCardRow[]>(sql, params);
-    return { cards: rows.map(normalizeCreativeCard), totalCount };
+    const rows = await db.select<AutomationReportRow[]>(sql, params);
+    return { reports: rows.map(normalizeAutomationReport), totalCount };
 }
 
-export async function listCreativeSources(): Promise<CreativeSourceOption[]> {
+export async function listAutomationSources(): Promise<AutomationSourceOption[]> {
     const db = await getDb();
-    const rows = await db.select<CreativeSourceRow[]>(
+    const rows = await db.select<AutomationSourceRow[]>(
         `
             SELECT
                 s.id,
@@ -651,10 +651,10 @@ export async function listCreativeSources(): Promise<CreativeSourceOption[]> {
         `,
     );
 
-    return rows.map(normalizeCreativeSource);
+    return rows.map(normalizeAutomationSource);
 }
 
-export async function saveCreativeProject(input: SaveCreativeProjectInput, projectId?: number): Promise<CreativeProject> {
+export async function saveAutomationProject(input: SaveAutomationProjectInput, projectId?: number): Promise<AutomationProject> {
     const name = input.name.trim();
     const prompt = input.prompt.trim();
     if (!name || !prompt) {
@@ -662,61 +662,61 @@ export async function saveCreativeProject(input: SaveCreativeProjectInput, proje
     }
 
     const autoIntervalMinutes = normalizePositiveInteger(input.auto_interval_minutes, DEFAULT_AUTO_INTERVAL_MINUTES);
-    const maxArticlesPerCard = normalizePositiveInteger(input.max_articles_per_card, DEFAULT_MAX_ARTICLES_PER_CARD);
-    const minArticlesPerCard = normalizePositiveInteger(input.min_articles_per_card, DEFAULT_MIN_ARTICLES_PER_CARD);
+    const maxArticlesPerReport = normalizePositiveInteger(input.max_articles_per_report, DEFAULT_MAX_ARTICLES_PER_REPORT);
+    const minArticlesPerReport = normalizePositiveInteger(input.min_articles_per_report, DEFAULT_MIN_ARTICLES_PER_REPORT);
     const selectedSourceIds = input.use_all_sources ? [] : sanitizeSourceIds(input.source_ids);
 
     if (!input.use_all_sources && selectedSourceIds.length === 0) {
         throw new Error("Select at least one source or choose all sources.");
     }
 
-    const commandInput: SaveCreativeProjectCommandInput = {
+    const commandInput: SaveAutomationProjectCommandInput = {
         projectId: projectId ?? null,
         name,
         prompt,
         autoEnabled: input.auto_enabled,
         autoIntervalMinutes,
-        maxArticlesPerCard,
-        minArticlesPerCard,
+        maxArticlesPerReport,
+        minArticlesPerReport,
         webSearchEnabled: input.web_search_enabled,
         sourceIds: selectedSourceIds,
     };
-    const result = await invoke<SaveCreativeProjectCommandResult>("save_creative_project_cmd", { input: commandInput });
+    const result = await invoke<SaveAutomationProjectCommandResult>("save_automation_project_cmd", { input: commandInput });
 
-    const savedProject = await getCreativeProject(result.projectId);
+    const savedProject = await getAutomationProject(result.projectId);
     if (!savedProject) {
         throw new Error("Failed to load the saved project.");
     }
 
-    dispatchCreativeSyncEvent();
+    dispatchAutomationSyncEvent();
     return savedProject;
 }
 
-export async function deleteCreativeProject(projectId: number): Promise<void> {
+export async function deleteAutomationProject(projectId: number): Promise<void> {
     const db = await getDb();
-    await db.execute("DELETE FROM creative_projects WHERE id = $1", [projectId]);
-    dispatchCreativeSyncEvent();
+    await db.execute("DELETE FROM automation_projects WHERE id = $1", [projectId]);
+    dispatchAutomationSyncEvent();
 }
 
-export async function markCreativeCardAsRead(cardId: number): Promise<void> {
+export async function markAutomationReportAsRead(reportId: number): Promise<void> {
     const db = await getDb();
-    await db.execute("UPDATE creative_cards SET is_read = 1 WHERE id = $1", [cardId]);
-    dispatchCreativeSyncEvent();
+    await db.execute("UPDATE automation_reports SET is_read = 1 WHERE id = $1", [reportId]);
+    dispatchAutomationSyncEvent();
 }
 
-export async function setCreativeCardFavorite(cardId: number, isFavorite: boolean): Promise<void> {
+export async function setAutomationReportFavorite(reportId: number, isFavorite: boolean): Promise<void> {
     const db = await getDb();
     await db.execute(
-        "UPDATE creative_cards SET is_favorite = $1 WHERE id = $2",
-        [isFavorite ? 1 : 0, cardId],
+        "UPDATE automation_reports SET is_favorite = $1 WHERE id = $2",
+        [isFavorite ? 1 : 0, reportId],
     );
-    dispatchCreativeSyncEvent();
+    dispatchAutomationSyncEvent();
 }
 
-export async function markAllCreativeCardsAsRead(projectId: number): Promise<void> {
+export async function markAllAutomationReportsAsRead(projectId: number): Promise<void> {
     const db = await getDb();
-    await db.execute("UPDATE creative_cards SET is_read = 1 WHERE project_id = $1 AND is_read = 0", [projectId]);
-    dispatchCreativeSyncEvent();
+    await db.execute("UPDATE automation_reports SET is_read = 1 WHERE project_id = $1 AND is_read = 0", [projectId]);
+    dispatchAutomationSyncEvent();
 }
 
 export async function listProjectCandidateArticles(
@@ -727,7 +727,7 @@ export async function listProjectCandidateArticles(
         sourceId?: number | null;
         limit?: number;
     } = {},
-): Promise<CreativeArticleCandidate[]> {
+): Promise<AutomationArticleCandidate[]> {
     const includeConsumed = Boolean(options.includeConsumed);
     const normalizedSourceId = options.sourceId ? Number.parseInt(String(options.sourceId), 10) : null;
     const search = options.search?.trim().toLowerCase() ?? "";
@@ -749,7 +749,7 @@ export async function listProjectCandidateArticles(
     }
 
     const db = await getDb();
-    const rows = await db.select<CreativeArticleCandidateRow[]>(
+    const rows = await db.select<AutomationArticleCandidateRow[]>(
         `
             SELECT *
             FROM (
@@ -773,20 +773,20 @@ export async function listProjectCandidateArticles(
         params,
     );
 
-    return rows.map(normalizeCreativeArticleCandidate);
+    return rows.map(normalizeAutomationArticleCandidate);
 }
 
-export async function generateCreativeCardForProject(input: GenerateCreativeCardInput): Promise<CreativeCard> {
-    const project = await getCreativeProject(input.projectId);
+export async function generateAutomationReportForProject(input: GenerateAutomationReportInput): Promise<AutomationReport> {
+    const project = await getAutomationProject(input.projectId);
     if (!project) {
-        throw new Error("Creative project not found.");
+        throw new Error("Project not found.");
     }
 
     if (isProjectGenerationInFlight(project.id)) {
-        throw new Error("A card is already being generated for this project.");
+        throw new Error("A report is already being generated for this project.");
     }
 
-    const promise = performCardGeneration(
+    const promise = performReportGeneration(
         project,
         input.articleIds,
         input.mode,
@@ -803,8 +803,8 @@ export async function generateCreativeCardForProject(input: GenerateCreativeCard
     }
 }
 
-async function runAutoGenerationForProject(project: CreativeProject, checkedAt: string): Promise<CreativeCard | null> {
-    if (!project.auto_enabled || !isProjectDueForAutoRun(project, new Date(checkedAt))) {
+async function runAutoGenerationForProject(project: AutomationProject, checkedAt: string): Promise<AutomationReport | null> {
+    if (!project.auto_enabled || !isAutomationProjectDueForAutoRun(project, new Date(checkedAt))) {
         return null;
     }
 
@@ -813,7 +813,7 @@ async function runAutoGenerationForProject(project: CreativeProject, checkedAt: 
     }
 
     const candidates = await listProjectCandidateArticles(project.id, {
-        limit: project.max_articles_per_card,
+        limit: project.max_articles_per_report,
     });
 
     if (candidates.length === 0) {
@@ -821,12 +821,12 @@ async function runAutoGenerationForProject(project: CreativeProject, checkedAt: 
         return null;
     }
 
-    if (candidates.length < project.min_articles_per_card) {
+    if (candidates.length < project.min_articles_per_report) {
         await updateAutoCheckTimestamp(project.id, checkedAt);
         return null;
     }
 
-    return generateCreativeCardForProject({
+    return generateAutomationReportForProject({
         projectId: project.id,
         articleIds: candidates.map((candidate) => candidate.id),
         mode: "auto",
@@ -834,12 +834,12 @@ async function runAutoGenerationForProject(project: CreativeProject, checkedAt: 
     });
 }
 
-export async function runDueAutoCreativeProjects(now: Date = new Date()): Promise<number> {
-    const projects = await listCreativeProjects();
+export async function runDueAutomations(now: Date = new Date()): Promise<number> {
+    const projects = await listAutomationProjects();
     let generatedCount = 0;
 
     for (const project of projects) {
-        if (!project.auto_enabled || !isProjectDueForAutoRun(project, now)) {
+        if (!project.auto_enabled || !isAutomationProjectDueForAutoRun(project, now)) {
             continue;
         }
 
@@ -848,7 +848,7 @@ export async function runDueAutoCreativeProjects(now: Date = new Date()): Promis
             try {
                 await existingAutoCheck;
             } catch (error) {
-                console.error(`Creative auto check failed for project ${project.id}`, error);
+                console.error(`Automation auto check failed for project ${project.id}`, error);
             }
             continue;
         }
@@ -865,12 +865,12 @@ export async function runDueAutoCreativeProjects(now: Date = new Date()): Promis
 
         inFlightAutoChecks.set(project.id, autoCheckPromise);
         try {
-            const generatedCard = await autoCheckPromise;
-            if (generatedCard) {
+            const generatedReport = await autoCheckPromise;
+            if (generatedReport) {
                 generatedCount += 1;
             }
         } catch (error) {
-            console.error(`Creative auto generation failed for project ${project.id}`, error);
+            console.error(`Automation auto generation failed for project ${project.id}`, error);
         } finally {
             if (inFlightAutoChecks.get(project.id) === autoCheckPromise) {
                 inFlightAutoChecks.delete(project.id);

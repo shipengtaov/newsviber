@@ -3,23 +3,23 @@
 import { act, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import CreativeSpace from "@/views/CreativeSpace";
+import Automation from "@/views/Automation";
 
 const {
-    listCreativeProjectsMock,
-    listCreativeCardsMock,
-    listCreativeSourcesMock,
-    markCreativeCardAsReadMock,
-    setCreativeCardFavoriteMock,
+    listAutomationProjectsMock,
+    listAutomationReportsMock,
+    listAutomationSourcesMock,
+    markAutomationReportAsReadMock,
+    setAutomationReportFavoriteMock,
     mockUseMainLayoutScrollContainer,
     useScopedScrollMemoryMock,
     replaceMessagesMock,
 } = vi.hoisted(() => ({
-    listCreativeProjectsMock: vi.fn(),
-    listCreativeCardsMock: vi.fn(),
-    listCreativeSourcesMock: vi.fn(),
-    markCreativeCardAsReadMock: vi.fn(),
-    setCreativeCardFavoriteMock: vi.fn(),
+    listAutomationProjectsMock: vi.fn(),
+    listAutomationReportsMock: vi.fn(),
+    listAutomationSourcesMock: vi.fn(),
+    markAutomationReportAsReadMock: vi.fn(),
+    setAutomationReportFavoriteMock: vi.fn(),
     mockUseMainLayoutScrollContainer: vi.fn(),
     useScopedScrollMemoryMock: vi.fn(),
     replaceMessagesMock: vi.fn(),
@@ -40,12 +40,12 @@ const commonTranslations: Record<string, string> = {
     delete: "Delete",
 };
 
-const creativeTranslations: Record<string, string> = {
-    eyebrow: "Creative",
+const automationTranslations: Record<string, string> = {
+    eyebrow: "Automation",
     projectBoard: "Project board",
     boardDescription: "Board description",
     projects: "Projects",
-    unreadCards: "Unread cards",
+    unreadReports: "Unread reports",
     autoEnabled: "Auto enabled",
     nTotal: "{{count}} total",
     nActive: "{{count}} active",
@@ -54,10 +54,10 @@ const creativeTranslations: Record<string, string> = {
     scopeLabel: "Scope",
     unreadLabel: "Unread",
     projectDescription: "Project description",
-    generateCard: "Generate card",
+    generateReport: "Generate report",
     generating: "Generating",
-    allCards: "All",
-    favoriteCards: "Favorites",
+    allReports: "All",
+    favoriteReports: "Favorites",
     addToFavorites: "Add to favorites",
     removeFromFavorites: "Remove from favorites",
     markAllAsRead: "Mark all as read",
@@ -67,12 +67,12 @@ const creativeTranslations: Record<string, string> = {
     auto: "Auto",
     manual: "Manual",
     run: "run",
-    viewCard: "Card view",
+    viewReport: "Report view",
     viewList: "List view",
-    noCreativeCardsYet: "No cards yet",
-    noFavoriteCardsYet: "No favorited cards yet",
-    favoriteFirstCard: "Favorite a card to keep it pinned here",
-    generateFirstCard: "Generate the first card",
+    noAutomationReportsYet: "No reports yet",
+    noFavoriteReportsYet: "No favorited reports yet",
+    favoriteFirstReport: "Favorite a report to keep it pinned here",
+    generateFirstReport: "Generate the first report",
     focusPrompt: "Focus prompt",
     automation: "Automation",
     enabled: "Enabled",
@@ -82,10 +82,10 @@ const creativeTranslations: Record<string, string> = {
     webSearch: "Web search",
     lastChecked: "Last checked",
     lastGenerated: "Last generated",
-    cards: "Cards",
-    nCards: "{{count}} cards",
+    reports: "Reports",
+    nReports: "{{count}} reports",
     updatedLabel: "Updated",
-    cardsLabel: "Cards",
+    reportsLabel: "Reports",
     minLabel: "Min",
     maxLabel: "Max",
     collapseProjectInfo: "Collapse project info",
@@ -96,8 +96,8 @@ const creativeTranslations: Record<string, string> = {
     generated: "Generated {{date}}",
     everyNMinutes: "Every {{count}} minutes",
     hideDiscussion: "Hide discussion",
-    discussCard: "Discuss card",
-    noCreativeProjectsYet: "No creative projects yet",
+    discussReport: "Discuss report",
+    noAutomationProjectsYet: "No projects yet",
     failedToUpdateFavorite: "Failed to update favorite",
     articlesUnit: "articles",
 };
@@ -110,7 +110,7 @@ vi.mock("react-i18next", () => ({
     useTranslation: (ns?: string) => ({
         t: (key: string, options?: Record<string, unknown>) => {
             const namespace = String(options?.ns ?? ns ?? "common");
-            const dictionary = namespace === "common" ? commonTranslations : creativeTranslations;
+            const dictionary = namespace === "common" ? commonTranslations : automationTranslations;
             return translate(dictionary[key] ?? `${namespace}:${key}`, options);
         },
     }),
@@ -119,39 +119,39 @@ vi.mock("react-i18next", () => ({
 vi.mock("@/lib/i18n", () => ({
     default: {
         t: (key: string, options?: Record<string, unknown>) => {
-            if (key === "creative:allSources") {
+            if (key === "automation:allSources") {
                 return "All sources";
             }
 
-            if (key === "creative:nSelectedSources") {
+            if (key === "automation:nSelectedSources") {
                 return `${options?.count} selected sources`;
             }
 
-            if (key === "creative:manual") {
+            if (key === "automation:manual") {
                 return "Manual";
             }
 
-            if (key === "creative:manualOnly") {
+            if (key === "automation:manualOnly") {
                 return "Manual only";
             }
 
-            if (key === "creative:everyNMinutes") {
+            if (key === "automation:everyNMinutes") {
                 return `Every ${options?.count} minutes`;
             }
 
-            if (key === "creative:noRecentActivity") {
+            if (key === "automation:noRecentActivity") {
                 return "No recent activity";
             }
 
-            if (key === "creative:generated") {
+            if (key === "automation:generated") {
                 return `Generated ${options?.date}`;
             }
 
-            if (key === "creative:checked") {
+            if (key === "automation:checked") {
                 return `Checked ${options?.date}`;
             }
 
-            if (key === "creative:nArticles") {
+            if (key === "automation:nArticles") {
                 return `${options?.count} articles`;
             }
 
@@ -166,29 +166,29 @@ vi.mock("@/hooks/use-toast", () => ({
     }),
 }));
 
-vi.mock("@/lib/creative-events", () => ({
-    addCreativeSyncListener: vi.fn(() => () => {}),
+vi.mock("@/lib/automation-events", () => ({
+    addAutomationSyncListener: vi.fn(() => () => {}),
 }));
 
-vi.mock("@/lib/creative-service", () => ({
-    listCreativeProjects: listCreativeProjectsMock,
-    listCreativeCards: listCreativeCardsMock,
-    listCreativeSources: listCreativeSourcesMock,
-    markCreativeCardAsRead: markCreativeCardAsReadMock,
-    setCreativeCardFavorite: setCreativeCardFavoriteMock,
-    deleteCreativeProject: vi.fn(),
-    generateCreativeCardForProject: vi.fn(),
+vi.mock("@/lib/automation-service", () => ({
+    listAutomationProjects: listAutomationProjectsMock,
+    listAutomationReports: listAutomationReportsMock,
+    listAutomationSources: listAutomationSourcesMock,
+    markAutomationReportAsRead: markAutomationReportAsReadMock,
+    setAutomationReportFavorite: setAutomationReportFavoriteMock,
+    deleteAutomationProject: vi.fn(),
+    generateAutomationReportForProject: vi.fn(),
     listProjectCandidateArticles: vi.fn().mockResolvedValue([]),
-    markAllCreativeCardsAsRead: vi.fn(),
-    saveCreativeProject: vi.fn(),
+    markAllAutomationReportsAsRead: vi.fn(),
+    saveAutomationProject: vi.fn(),
 }));
 
 vi.mock("@/lib/ai", () => ({
-    optimizeCreativeProjectPrompt: vi.fn(),
+    optimizeAutomationProjectPrompt: vi.fn(),
 }));
 
 vi.mock("@/lib/chat-prompts", () => ({
-    buildCreativeCardDiscussionSystemPrompt: vi.fn(() => "prompt"),
+    buildAutomationReportDiscussionSystemPrompt: vi.fn(() => "prompt"),
 }));
 
 vi.mock("@/components/layout/MainLayout", () => ({
@@ -217,9 +217,9 @@ vi.mock("react-markdown", () => ({
     default: ({ children }: { children: string }) => <div data-testid="card-markdown">{children}</div>,
 }));
 
-vi.mock("@/components/creative/CreativeCardDiscussionPanel", () => ({
-    CreativeCardDiscussionRail: ({ children }: { children: ReactNode }) => <div>{children}</div>,
-    CreativeCardDiscussionPanel: () => <div data-testid="discussion-panel">Discussion</div>,
+vi.mock("@/components/automation/AutomationReportDiscussionPanel", () => ({
+    AutomationReportDiscussionRail: ({ children }: { children: ReactNode }) => <div>{children}</div>,
+    AutomationReportDiscussionPanel: () => <div data-testid="discussion-panel">Discussion</div>,
 }));
 
 function createMatchMediaResult(matches: boolean) {
@@ -235,7 +235,7 @@ function createMatchMediaResult(matches: boolean) {
     };
 }
 
-describe("CreativeSpace", () => {
+describe("Automation", () => {
     let container: HTMLDivElement;
     let root: Root;
     let mainScrollContainer: HTMLElement;
@@ -244,17 +244,17 @@ describe("CreativeSpace", () => {
     let previousActEnvironment: boolean | undefined;
 
     beforeEach(() => {
-        listCreativeProjectsMock.mockReset();
-        listCreativeCardsMock.mockReset();
-        listCreativeSourcesMock.mockReset();
-        markCreativeCardAsReadMock.mockReset();
-        setCreativeCardFavoriteMock.mockReset();
+        listAutomationProjectsMock.mockReset();
+        listAutomationReportsMock.mockReset();
+        listAutomationSourcesMock.mockReset();
+        markAutomationReportAsReadMock.mockReset();
+        setAutomationReportFavoriteMock.mockReset();
         mockUseMainLayoutScrollContainer.mockReset();
         useScopedScrollMemoryMock.mockReset();
         replaceMessagesMock.mockReset();
         localStorage.clear();
 
-        listCreativeProjectsMock.mockResolvedValue([
+        listAutomationProjectsMock.mockResolvedValue([
             {
                 id: 1,
                 name: "Project Alpha",
@@ -262,24 +262,24 @@ describe("CreativeSpace", () => {
                 cycle_mode: "manual",
                 auto_enabled: false,
                 auto_interval_minutes: 60,
-                max_articles_per_card: 12,
-                min_articles_per_card: 1,
+                max_articles_per_report: 12,
+                min_articles_per_report: 1,
                 web_search_enabled: true,
                 last_auto_checked_at: null,
                 last_auto_generated_at: "2026-03-30T00:00:00Z",
                 source_ids: [],
-                unread_card_count: 1,
+                unread_report_count: 1,
             },
         ]);
-        listCreativeSourcesMock.mockResolvedValue([
+        listAutomationSourcesMock.mockResolvedValue([
             { id: 1, name: "Example Source", active: true, article_count: 12 },
         ]);
-        listCreativeCardsMock.mockResolvedValue({
-            cards: [
+        listAutomationReportsMock.mockResolvedValue({
+            reports: [
                 {
                     id: 10,
                     project_id: 1,
-                    title: "Card Alpha",
+                    title: "Report Alpha",
                     full_report: "Full report body",
                     generation_mode: "manual",
                     used_article_count: 3,
@@ -290,8 +290,8 @@ describe("CreativeSpace", () => {
             ],
             totalCount: 1,
         });
-        markCreativeCardAsReadMock.mockResolvedValue(undefined);
-        setCreativeCardFavoriteMock.mockResolvedValue(undefined);
+        markAutomationReportAsReadMock.mockResolvedValue(undefined);
+        setAutomationReportFavoriteMock.mockResolvedValue(undefined);
         useScopedScrollMemoryMock.mockReturnValue({
             saveCurrentScopeScroll: vi.fn(),
         });
@@ -326,9 +326,9 @@ describe("CreativeSpace", () => {
         (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = previousActEnvironment;
     });
 
-    function renderCreativeSpace() {
+    function renderAutomation() {
         act(() => {
-            root.render(<CreativeSpace />);
+            root.render(<Automation />);
         });
     }
 
@@ -341,7 +341,7 @@ describe("CreativeSpace", () => {
         });
     }
 
-    async function settleCreativeSpace() {
+    async function settleAutomation() {
         await flushAsyncWork();
         await flushAsyncWork();
     }
@@ -396,8 +396,8 @@ describe("CreativeSpace", () => {
     }
 
     it("does not render the back-to-top button on the project board", async () => {
-        renderCreativeSpace();
-        await settleCreativeSpace();
+        renderAutomation();
+        await settleAutomation();
 
         mainScrollContainer.scrollTop = 360;
         act(() => {
@@ -408,13 +408,13 @@ describe("CreativeSpace", () => {
     });
 
     it("shows the back-to-top button on the project detail page and scrolls the main container to top", async () => {
-        renderCreativeSpace();
-        await settleCreativeSpace();
+        renderAutomation();
+        await settleAutomation();
 
         act(() => {
             getButtonByRoleText("Project Alpha").click();
         });
-        await settleCreativeSpace();
+        await settleAutomation();
 
         expect(queryBackToTopButton()).toBeNull();
 
@@ -434,18 +434,18 @@ describe("CreativeSpace", () => {
     });
 
     it("shows the back-to-top button on the card detail page and resets the tracked containers", async () => {
-        renderCreativeSpace();
-        await settleCreativeSpace();
+        renderAutomation();
+        await settleAutomation();
 
         act(() => {
             getButtonByRoleText("Project Alpha").click();
         });
-        await settleCreativeSpace();
+        await settleAutomation();
 
         act(() => {
-            getButtonByRoleText("Card Alpha").click();
+            getButtonByRoleText("Report Alpha").click();
         });
-        await settleCreativeSpace();
+        await settleAutomation();
 
         expect(queryBackToTopButton()).toBeNull();
 
@@ -472,16 +472,16 @@ describe("CreativeSpace", () => {
     });
 
     it("switches to favorites with a first-page reload and favorites-only empty state", async () => {
-        listCreativeCardsMock.mockImplementation((_projectId: number, options?: { offset?: number; favoritesOnly?: boolean }) => {
+        listAutomationReportsMock.mockImplementation((_projectId: number, options?: { offset?: number; favoritesOnly?: boolean }) => {
             if (options?.favoritesOnly) {
-                return Promise.resolve({ cards: [], totalCount: 0 });
+                return Promise.resolve({ reports: [], totalCount: 0 });
             }
 
             return Promise.resolve({
-                cards: [{
+                reports: [{
                     id: 10,
                     project_id: 1,
-                    title: "Card Alpha",
+                    title: "Report Alpha",
                     full_report: "Full report body",
                     generation_mode: "manual",
                     used_article_count: 3,
@@ -493,13 +493,13 @@ describe("CreativeSpace", () => {
             });
         });
 
-        renderCreativeSpace();
-        await settleCreativeSpace();
+        renderAutomation();
+        await settleAutomation();
 
         act(() => {
             getButtonByRoleText("Project Alpha").click();
         });
-        await settleCreativeSpace();
+        await settleAutomation();
 
         act(() => {
             const pageTwoButton = Array.from(container.querySelectorAll("button")).find((candidate) => candidate.textContent?.trim() === "2");
@@ -509,7 +509,7 @@ describe("CreativeSpace", () => {
 
             pageTwoButton.click();
         });
-        await settleCreativeSpace();
+        await settleAutomation();
 
         act(() => {
             const favoritesButton = Array.from(container.querySelectorAll("button")).find((candidate) => candidate.textContent?.trim() === "Favorites");
@@ -519,65 +519,65 @@ describe("CreativeSpace", () => {
 
             favoritesButton.click();
         });
-        await settleCreativeSpace();
+        await settleAutomation();
 
-        expect(listCreativeCardsMock).toHaveBeenLastCalledWith(1, expect.objectContaining({
+        expect(listAutomationReportsMock).toHaveBeenLastCalledWith(1, expect.objectContaining({
             offset: 0,
             favoritesOnly: true,
         }));
-        expect(container.textContent).toContain("No favorited cards yet");
+        expect(container.textContent).toContain("No favorited reports yet");
     });
 
     it("favorites a card from the grid without opening card detail", async () => {
-        renderCreativeSpace();
-        await settleCreativeSpace();
+        renderAutomation();
+        await settleAutomation();
 
         act(() => {
             getButtonByRoleText("Project Alpha").click();
         });
-        await settleCreativeSpace();
+        await settleAutomation();
 
         act(() => {
             getButtonByAriaLabel("Add to favorites").click();
         });
-        await settleCreativeSpace();
+        await settleAutomation();
 
-        expect(setCreativeCardFavoriteMock).toHaveBeenCalledWith(10, true);
+        expect(setAutomationReportFavoriteMock).toHaveBeenCalledWith(10, true);
         expect(container.querySelector('[data-testid="card-markdown"]')).toBeNull();
         expect(getButtonByAriaLabel("Remove from favorites")).toBeInstanceOf(HTMLButtonElement);
     });
 
     it("favorites a card from the list view without opening card detail", async () => {
-        renderCreativeSpace();
-        await settleCreativeSpace();
+        renderAutomation();
+        await settleAutomation();
 
         act(() => {
             getButtonByRoleText("Project Alpha").click();
         });
-        await settleCreativeSpace();
+        await settleAutomation();
 
         act(() => {
             getButtonByAriaLabel("List view").click();
         });
-        await settleCreativeSpace();
+        await settleAutomation();
 
         act(() => {
             getButtonByAriaLabel("Add to favorites").click();
         });
-        await settleCreativeSpace();
+        await settleAutomation();
 
-        expect(setCreativeCardFavoriteMock).toHaveBeenCalledWith(10, true);
+        expect(setAutomationReportFavoriteMock).toHaveBeenCalledWith(10, true);
         expect(container.querySelector('[data-testid="card-markdown"]')).toBeNull();
     });
 
     it("keeps card detail open when removing a favorite under the favorites filter", async () => {
         let favoritesOnlyHasCard = true;
 
-        listCreativeCardsMock.mockImplementation((_projectId: number, options?: { favoritesOnly?: boolean }) => {
+        listAutomationReportsMock.mockImplementation((_projectId: number, options?: { favoritesOnly?: boolean }) => {
             const favoritedCard = {
                 id: 10,
                 project_id: 1,
-                title: "Card Alpha",
+                title: "Report Alpha",
                 full_report: "Full report body",
                 generation_mode: "manual",
                 used_article_count: 3,
@@ -589,25 +589,25 @@ describe("CreativeSpace", () => {
             if (options?.favoritesOnly) {
                 return Promise.resolve(
                     favoritesOnlyHasCard
-                        ? { cards: [favoritedCard], totalCount: 1 }
-                        : { cards: [], totalCount: 0 },
+                        ? { reports: [favoritedCard], totalCount: 1 }
+                        : { reports: [], totalCount: 0 },
                 );
             }
 
-            return Promise.resolve({ cards: [favoritedCard], totalCount: 1 });
+            return Promise.resolve({ reports: [favoritedCard], totalCount: 1 });
         });
 
-        setCreativeCardFavoriteMock.mockImplementation(async () => {
+        setAutomationReportFavoriteMock.mockImplementation(async () => {
             favoritesOnlyHasCard = false;
         });
 
-        renderCreativeSpace();
-        await settleCreativeSpace();
+        renderAutomation();
+        await settleAutomation();
 
         act(() => {
             getButtonByRoleText("Project Alpha").click();
         });
-        await settleCreativeSpace();
+        await settleAutomation();
 
         act(() => {
             const favoritesButton = Array.from(container.querySelectorAll("button")).find((candidate) => candidate.textContent?.trim() === "Favorites");
@@ -617,17 +617,17 @@ describe("CreativeSpace", () => {
 
             favoritesButton.click();
         });
-        await settleCreativeSpace();
+        await settleAutomation();
 
         act(() => {
-            getButtonByRoleText("Card Alpha").click();
+            getButtonByRoleText("Report Alpha").click();
         });
-        await settleCreativeSpace();
+        await settleAutomation();
 
         act(() => {
             getButtonByAriaLabel("Remove from favorites").click();
         });
-        await settleCreativeSpace();
+        await settleAutomation();
 
         expect(container.querySelector('[data-testid="card-markdown"]')).not.toBeNull();
 
@@ -639,8 +639,8 @@ describe("CreativeSpace", () => {
 
             backButton.click();
         });
-        await settleCreativeSpace();
+        await settleAutomation();
 
-        expect(container.textContent).toContain("No favorited cards yet");
+        expect(container.textContent).toContain("No favorited reports yet");
     });
 });

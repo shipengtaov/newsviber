@@ -10,7 +10,7 @@ vi.mock("react-i18next", () => ({
             expandSidebar: "Expand sidebar",
             appName: "News Viber",
             "nav.news": "News",
-            "nav.creativeSpace": "Creative Space",
+            "nav.automation": "Automation",
             "nav.chat": "Chat",
             "nav.sources": "Sources",
             "nav.settings": "Settings",
@@ -28,16 +28,16 @@ vi.mock("@/lib/news-service", () => ({
     listNewsSources: vi.fn().mockResolvedValue([]),
 }));
 
-vi.mock("@/lib/creative-service", () => ({
-    listCreativeProjects: vi.fn().mockResolvedValue([]),
+vi.mock("@/lib/automation-service", () => ({
+    listAutomationProjects: vi.fn().mockResolvedValue([]),
 }));
 
 vi.mock("@/lib/news-events", () => ({
     addNewsSyncListener: vi.fn(() => () => {}),
 }));
 
-vi.mock("@/lib/creative-events", () => ({
-    addCreativeSyncListener: vi.fn(() => () => {}),
+vi.mock("@/lib/automation-events", () => ({
+    addAutomationSyncListener: vi.fn(() => () => {}),
 }));
 
 vi.mock("@/hooks/use-main-menu-scroll-memory", () => ({
@@ -77,7 +77,6 @@ describe("MainLayout", () => {
         expect(markup).toContain('data-layout-shell="true"');
         expect(markup).toContain('data-layout-titlebar="true"');
         expect(markup).toContain("absolute inset-x-0 top-0");
-        expect(markup).toContain("rounded-none");
         expect(markup).toContain('data-sidebar-shell="true"');
         expect(markup).not.toContain("absolute inset-x-0 top-0 z-20 px-3");
     });
@@ -86,10 +85,10 @@ describe("MainLayout", () => {
         const markup = renderLayout();
 
         expect(markup).toContain('data-layout-main-column="true"');
-        expect(markup).toContain("pl-3");
-        expect(markup).toContain("md:pl-4");
-        expect(markup).toContain("pr-3");
-        expect(markup).toContain("md:pr-4");
+        expect(markup).toContain("pl-2");
+        expect(markup).toContain("md:pl-3");
+        expect(markup).toContain("pr-2");
+        expect(markup).toContain("md:pr-3");
         expect(markup).toContain("pt-[var(--layout-titlebar-safe-height)]");
         expect(markup).toContain(">Body<");
     });

@@ -19,33 +19,33 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { addCreativeSyncListener } from "@/lib/creative-events";
-import { CreativeCardDiscussionPanel, CreativeCardDiscussionRail } from "@/components/creative/CreativeCardDiscussionPanel";
+import { addAutomationSyncListener } from "@/lib/automation-events";
+import { AutomationReportDiscussionPanel, AutomationReportDiscussionRail } from "@/components/automation/AutomationReportDiscussionPanel";
 import {
-    type CreativeArticleCandidate,
-    type CreativeCard,
-    type CreativeProject,
-    type CreativeSourceOption,
-    deleteCreativeProject,
-    generateCreativeCardForProject,
-    listCreativeCards,
-    listCreativeProjects,
-    listCreativeSources,
+    type AutomationArticleCandidate,
+    type AutomationReport,
+    type AutomationProject,
+    type AutomationSourceOption,
+    deleteAutomationProject,
+    generateAutomationReportForProject,
+    listAutomationReports,
+    listAutomationProjects,
+    listAutomationSources,
     listProjectCandidateArticles,
-    markAllCreativeCardsAsRead,
-    markCreativeCardAsRead,
-    saveCreativeProject,
-    setCreativeCardFavorite,
-} from "@/lib/creative-service";
-import { optimizeCreativeProjectPrompt, type Message } from "@/lib/ai";
-import { buildCreativeCardDiscussionSystemPrompt } from "@/lib/chat-prompts";
+    markAllAutomationReportsAsRead,
+    markAutomationReportAsRead,
+    saveAutomationProject,
+    setAutomationReportFavorite,
+} from "@/lib/automation-service";
+import { optimizeAutomationProjectPrompt, type Message } from "@/lib/ai";
+import { buildAutomationReportDiscussionSystemPrompt } from "@/lib/chat-prompts";
 import { useMainLayoutScrollContainer } from "@/components/layout/MainLayout";
 import { PageShell } from "@/components/layout/PageShell";
 import { CONTENT_GUTTER_X_CLASS } from "@/components/layout/layout-spacing";
 import { BackToTopButton } from "@/components/ui/BackToTopButton";
 import { useScopedScrollMemory } from "@/hooks/use-scoped-scroll-memory";
 import { useStreamingConversation } from "@/hooks/use-streaming-conversation";
-import { getCreativeCardBodyMarkdown, getCreativeCardPreviewExcerpt } from "@/lib/creative-card";
+import { getAutomationReportBodyMarkdown, getAutomationReportPreviewExcerpt } from "@/lib/automation-report";
 import { formatUtcDateTime } from "@/lib/time";
 import { cn } from "@/lib/utils";
 import { hasConfiguredWebSearch } from "@/lib/web-search-service";
@@ -58,38 +58,38 @@ type ProjectFormState = {
     webSearchEnabled: boolean;
     autoEnabled: boolean;
     autoIntervalMinutes: string;
-    maxArticlesPerCard: string;
-    minArticlesPerCard: string;
+    maxArticlesPerReport: string;
+    minArticlesPerReport: string;
     useAllSources: boolean;
     sourceIds: number[];
 };
 
 const DEFAULT_AUTO_INTERVAL_MINUTES = "60";
-const DEFAULT_MAX_ARTICLES_PER_CARD = "12";
-const DEFAULT_MIN_ARTICLES_PER_CARD = "1";
+const DEFAULT_MAX_ARTICLES_PER_REPORT = "12";
+const DEFAULT_MIN_ARTICLES_PER_REPORT = "1";
 const GENERATED_TILE_PREVIEW_MAX_LENGTH = 360;
-const DESKTOP_CARD_DISCUSSION_MEDIA_QUERY = "(min-width: 1024px)";
-const CREATIVE_TILE_GRID_CLASS = "grid gap-3 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4";
-const CREATIVE_TILE_CARD_BASE_CLASS = "editor-list-card flex cursor-pointer flex-col overflow-hidden focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2";
-const PROJECT_TILE_CARD_CLASS = `${CREATIVE_TILE_CARD_BASE_CLASS} h-[240px]`;
-const GENERATED_TILE_CARD_CLASS = `${CREATIVE_TILE_CARD_BASE_CLASS} min-h-[220px]`;
-const CREATIVE_TILE_HEADER_CLASS = "px-3 py-2.5 pb-1.5";
-const CREATIVE_TILE_BODY_CLASS = "flex flex-1 flex-col px-3 pb-3 pt-0";
+const DESKTOP_REPORT_DISCUSSION_MEDIA_QUERY = "(min-width: 1024px)";
+const AUTOMATION_TILE_GRID_CLASS = "grid gap-3 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4";
+const AUTOMATION_TILE_CARD_BASE_CLASS = "editor-list-card flex cursor-pointer flex-col overflow-hidden focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2";
+const PROJECT_TILE_CARD_CLASS = `${AUTOMATION_TILE_CARD_BASE_CLASS} h-[240px]`;
+const GENERATED_TILE_CARD_CLASS = `${AUTOMATION_TILE_CARD_BASE_CLASS} min-h-[220px]`;
+const AUTOMATION_TILE_HEADER_CLASS = "px-3 py-2.5 pb-1.5";
+const AUTOMATION_TILE_BODY_CLASS = "flex flex-1 flex-col px-3 pb-3 pt-0";
 type CardViewMode = "card" | "list";
-type CardFilterMode = "all" | "favorites";
-type CreativePaginationItem =
+type ReportFilterMode = "all" | "favorites";
+type AutomationPaginationItem =
     | { type: "page"; page: number }
     | { type: "ellipsis"; key: string };
-const CARD_VIEW_MODE_STORAGE_KEY = "creativeCardViewMode_v1";
+const CARD_VIEW_MODE_STORAGE_KEY = "automationReportViewMode_v1";
 const DEFAULT_PAGE_SIZE = 20;
-const CREATIVE_SPACE_SCROLL_STORAGE_KEY = "creativeSpaceScrollPositions_v1";
-const CREATIVE_BOARD_SCROLL_SCOPE_KEY = "creative:board";
+const AUTOMATION_SPACE_SCROLL_STORAGE_KEY = "automationScrollPositions_v1";
+const AUTOMATION_BOARD_SCROLL_SCOPE_KEY = "automation:board";
 
-function buildCreativeProjectScrollScopeKey(projectId: number): string {
-    return `creative:project:${projectId}`;
+function buildAutomationProjectScrollScopeKey(projectId: number): string {
+    return `automation:project:${projectId}`;
 }
 
-function buildCreativePaginationItems(currentPage: number, totalPages: number): CreativePaginationItem[] {
+function buildAutomationPaginationItems(currentPage: number, totalPages: number): AutomationPaginationItem[] {
     if (totalPages <= 1) return [];
 
     const candidatePages = new Set(
@@ -98,7 +98,7 @@ function buildCreativePaginationItems(currentPage: number, totalPages: number): 
     );
 
     const sortedPages = Array.from(candidatePages).sort((left, right) => left - right);
-    const items: CreativePaginationItem[] = [];
+    const items: AutomationPaginationItem[] = [];
 
     let previousPage: number | null = null;
     for (const page of sortedPages) {
@@ -124,14 +124,14 @@ function createEmptyProjectFormState(): ProjectFormState {
         webSearchEnabled: false,
         autoEnabled: false,
         autoIntervalMinutes: DEFAULT_AUTO_INTERVAL_MINUTES,
-        maxArticlesPerCard: DEFAULT_MAX_ARTICLES_PER_CARD,
-        minArticlesPerCard: DEFAULT_MIN_ARTICLES_PER_CARD,
+        maxArticlesPerReport: DEFAULT_MAX_ARTICLES_PER_REPORT,
+        minArticlesPerReport: DEFAULT_MIN_ARTICLES_PER_REPORT,
         useAllSources: true,
         sourceIds: [],
     };
 }
 
-function createProjectFormState(project?: CreativeProject): ProjectFormState {
+function createProjectFormState(project?: AutomationProject): ProjectFormState {
     if (!project) {
         return createEmptyProjectFormState();
     }
@@ -142,8 +142,8 @@ function createProjectFormState(project?: CreativeProject): ProjectFormState {
         webSearchEnabled: project.web_search_enabled,
         autoEnabled: project.auto_enabled,
         autoIntervalMinutes: String(project.auto_interval_minutes),
-        maxArticlesPerCard: String(project.max_articles_per_card),
-        minArticlesPerCard: String(project.min_articles_per_card),
+        maxArticlesPerReport: String(project.max_articles_per_report),
+        minArticlesPerReport: String(project.min_articles_per_report),
         useAllSources: project.source_ids.length === 0,
         sourceIds: project.source_ids,
     };
@@ -154,12 +154,12 @@ function formatTimestamp(value: string | null): string {
 }
 
 function formatArticleCount(count: number): string {
-    return i18n.t("creative:nArticles", { count });
+    return i18n.t("automation:nArticles", { count });
 }
 
-function formatProjectScope(project: CreativeProject, sources: CreativeSourceOption[]): string {
+function formatProjectScope(project: AutomationProject, sources: AutomationSourceOption[]): string {
     if (project.source_ids.length === 0) {
-        return i18n.t("creative:allSources");
+        return i18n.t("automation:allSources");
     }
 
     const sourceNames = sources
@@ -167,31 +167,31 @@ function formatProjectScope(project: CreativeProject, sources: CreativeSourceOpt
         .map((source) => source.name);
 
     if (sourceNames.length === 0) {
-        return i18n.t("creative:nSelectedSources", { count: project.source_ids.length });
+        return i18n.t("automation:nSelectedSources", { count: project.source_ids.length });
     }
 
     return sourceNames.join(", ");
 }
 
-function formatAutoSummary(project: CreativeProject): string {
+function formatAutoSummary(project: AutomationProject): string {
     if (!project.auto_enabled) {
-        return i18n.t("creative:manualOnly");
+        return i18n.t("automation:manualOnly");
     }
 
-    return i18n.t("creative:everyNMinutes", { count: project.auto_interval_minutes });
+    return i18n.t("automation:everyNMinutes", { count: project.auto_interval_minutes });
 }
 
-function formatCompactAutoSummary(project: CreativeProject): string {
+function formatCompactAutoSummary(project: AutomationProject): string {
     if (!project.auto_enabled) {
-        return i18n.t("creative:manual");
+        return i18n.t("automation:manual");
     }
 
     return `${project.auto_interval_minutes}m`;
 }
 
-function formatProjectScopeSummary(project: CreativeProject, sources: CreativeSourceOption[]): string {
+function formatProjectScopeSummary(project: AutomationProject, sources: AutomationSourceOption[]): string {
     if (project.source_ids.length === 0) {
-        return i18n.t("creative:allSources");
+        return i18n.t("automation:allSources");
     }
 
     const sourceNames = sources
@@ -202,22 +202,22 @@ function formatProjectScopeSummary(project: CreativeProject, sources: CreativeSo
         return sourceNames[0];
     }
 
-    return i18n.t("creative:nSelectedSources", { count: project.source_ids.length });
+    return i18n.t("automation:nSelectedSources", { count: project.source_ids.length });
 }
 
-function formatProjectRecentActivitySummary(project: CreativeProject): string {
+function formatProjectRecentActivitySummary(project: AutomationProject): string {
     if (project.last_auto_generated_at) {
-        return i18n.t("creative:generated", { date: formatTimestamp(project.last_auto_generated_at) });
+        return i18n.t("automation:generated", { date: formatTimestamp(project.last_auto_generated_at) });
     }
 
     if (project.last_auto_checked_at) {
-        return i18n.t("creative:checked", { date: formatTimestamp(project.last_auto_checked_at) });
+        return i18n.t("automation:checked", { date: formatTimestamp(project.last_auto_checked_at) });
     }
 
-    return i18n.t("creative:noRecentActivity");
+    return i18n.t("automation:noRecentActivity");
 }
 
-function formatUnreadCardCount(count: number): string {
+function formatUnreadReportCount(count: number): string {
     return count > 99 ? "99+" : String(Math.max(0, count));
 }
 
@@ -242,7 +242,7 @@ type ProjectDialogProps = {
     projectForm: ProjectFormState;
     setProjectForm: React.Dispatch<React.SetStateAction<ProjectFormState>>;
     isSavingProject: boolean;
-    sources: CreativeSourceOption[];
+    sources: AutomationSourceOption[];
     onSubmit: (event: React.FormEvent) => void;
     onCancel: () => void;
     onToggleProjectSourceSelection: (sourceId: number) => void;
@@ -278,7 +278,7 @@ function ProjectDialog({
     onApplyPromptSuggestion,
     trigger,
 }: ProjectDialogProps) {
-    const { t } = useTranslation("creative");
+    const { t } = useTranslation("automation");
 
     return (
         <>
@@ -286,7 +286,7 @@ function ProjectDialog({
                 {trigger ? <DialogTrigger asChild>{trigger}</DialogTrigger> : null}
                 <DialogContent className="max-h-[90vh] max-w-3xl overflow-y-auto">
                     <DialogHeader>
-                        <DialogTitle>{editingProjectId ? t("editCreativeProject") : t("createCreativeProject")}</DialogTitle>
+                        <DialogTitle>{editingProjectId ? t("editAutomationProject") : t("createAutomationProject")}</DialogTitle>
                         <DialogDescription>
                             {t("projectDialogDesc")}
                         </DialogDescription>
@@ -355,10 +355,10 @@ function ProjectDialog({
                                         checked={projectForm.autoEnabled}
                                         onChange={(event) => setProjectForm((current) => ({ ...current, autoEnabled: event.target.checked }))}
                                     />
-                                    {t("enableAutoCardGeneration")}
+                                    {t("enableAutoReportGeneration")}
                                 </label>
                                 <p className="text-sm text-muted-foreground">
-                                    {t("autoCardGenDesc")}
+                                    {t("autoReportGenDesc")}
                                 </p>
                             </div>
 
@@ -377,23 +377,23 @@ function ProjectDialog({
 
                         <div className="grid gap-4 md:grid-cols-2">
                             <div className="space-y-2">
-                                <Label>{t("minArticlesPerCard")}</Label>
+                                <Label>{t("minArticlesPerReport")}</Label>
                                 <Input
                                     type="number"
                                     min="1"
-                                    value={projectForm.minArticlesPerCard}
-                                    onChange={(event) => setProjectForm((current) => ({ ...current, minArticlesPerCard: event.target.value }))}
+                                    value={projectForm.minArticlesPerReport}
+                                    onChange={(event) => setProjectForm((current) => ({ ...current, minArticlesPerReport: event.target.value }))}
                                 />
                                 <p className="text-xs text-muted-foreground">{t("minArticlesDesc")}</p>
                             </div>
 
                             <div className="space-y-2">
-                                <Label>{t("maxArticlesPerCard")}</Label>
+                                <Label>{t("maxArticlesPerReport")}</Label>
                                 <Input
                                     type="number"
                                     min="1"
-                                    value={projectForm.maxArticlesPerCard}
-                                    onChange={(event) => setProjectForm((current) => ({ ...current, maxArticlesPerCard: event.target.value }))}
+                                    value={projectForm.maxArticlesPerReport}
+                                    onChange={(event) => setProjectForm((current) => ({ ...current, maxArticlesPerReport: event.target.value }))}
                                 />
                                 <p className="text-xs text-muted-foreground">{t("maxArticlesDesc")}</p>
                             </div>
@@ -503,17 +503,17 @@ function ProjectDialog({
     );
 }
 
-export default function CreativeSpace() {
-    const { t } = useTranslation("creative");
+export default function Automation() {
+    const { t } = useTranslation("automation");
     const { toast } = useToast();
     const mainScrollRef = useMainLayoutScrollContainer();
 
-    const [projects, setProjects] = useState<CreativeProject[]>([]);
-    const [cards, setCards] = useState<CreativeCard[]>([]);
-    const [sources, setSources] = useState<CreativeSourceOption[]>([]);
-    const [totalCardCount, setTotalCardCount] = useState(0);
+    const [projects, setProjects] = useState<AutomationProject[]>([]);
+    const [reports, setReports] = useState<AutomationReport[]>([]);
+    const [sources, setSources] = useState<AutomationSourceOption[]>([]);
+    const [totalReportCount, setTotalReportCount] = useState(0);
     const [currentPage, setCurrentPage] = useState(0);
-    const [cardFilterMode, setCardFilterMode] = useState<CardFilterMode>("all");
+    const [reportFilterMode, setReportFilterMode] = useState<ReportFilterMode>("all");
     const [cardViewMode, setCardViewMode] = useState<CardViewMode>(() => {
         if (typeof window === "undefined") return "card";
         const stored = localStorage.getItem(CARD_VIEW_MODE_STORAGE_KEY);
@@ -521,8 +521,8 @@ export default function CreativeSpace() {
     });
 
     const [activeProjectId, setActiveProjectId] = useState<number | null>(null);
-    const [activeCardId, setActiveCardId] = useState<number | null>(null);
-    const [activeCardSnapshot, setActiveCardSnapshot] = useState<CreativeCard | null>(null);
+    const [activeReportId, setActiveReportId] = useState<number | null>(null);
+    const [activeReportSnapshot, setActiveReportSnapshot] = useState<AutomationReport | null>(null);
 
     const [projectDialogOpen, setProjectDialogOpen] = useState(false);
     const [editingProjectId, setEditingProjectId] = useState<number | null>(null);
@@ -533,27 +533,27 @@ export default function CreativeSpace() {
     const [promptSuggestionOriginal, setPromptSuggestionOriginal] = useState("");
     const [promptSuggestionDraft, setPromptSuggestionDraft] = useState("");
     const [deletingProjectId, setDeletingProjectId] = useState<number | null>(null);
-    const [pendingDeleteProject, setPendingDeleteProject] = useState<CreativeProject | null>(null);
+    const [pendingDeleteProject, setPendingDeleteProject] = useState<AutomationProject | null>(null);
 
     const [manualDialogOpen, setManualDialogOpen] = useState(false);
-    const [articleCandidates, setArticleCandidates] = useState<CreativeArticleCandidate[]>([]);
+    const [articleCandidates, setArticleCandidates] = useState<AutomationArticleCandidate[]>([]);
     const [candidateSearch, setCandidateSearch] = useState("");
     const [candidateSourceId, setCandidateSourceId] = useState("all");
     const [includeConsumed, setIncludeConsumed] = useState(false);
     const [selectedArticleIds, setSelectedArticleIds] = useState<number[]>([]);
     const [isLoadingCandidates, setIsLoadingCandidates] = useState(false);
     const [isGenerating, setIsGenerating] = useState(false);
-    const [isMarkingAllCardsRead, setIsMarkingAllCardsRead] = useState(false);
-    const [favoriteMutationCardIds, setFavoriteMutationCardIds] = useState<number[]>([]);
+    const [isMarkingAllReportsRead, setIsMarkingAllReportsRead] = useState(false);
+    const [favoriteMutationReportIds, setFavoriteMutationReportIds] = useState<number[]>([]);
     const [isProjectInfoOpen, setIsProjectInfoOpen] = useState(false);
     const [isProjectActionsOpen, setIsProjectActionsOpen] = useState(false);
-    const [isCardDiscussionOpen, setIsCardDiscussionOpen] = useState(false);
-    const [isDesktopCardDiscussionLayout, setIsDesktopCardDiscussionLayout] = useState<boolean>(() => {
+    const [isReportDiscussionOpen, setIsReportDiscussionOpen] = useState(false);
+    const [isDesktopReportDiscussionLayout, setIsDesktopReportDiscussionLayout] = useState<boolean>(() => {
         if (typeof window === "undefined") {
             return false;
         }
 
-        return window.matchMedia(DESKTOP_CARD_DISCUSSION_MEDIA_QUERY).matches;
+        return window.matchMedia(DESKTOP_REPORT_DISCUSSION_MEDIA_QUERY).matches;
     });
 
     const [chatInput, setChatInput] = useState("");
@@ -564,58 +564,58 @@ export default function CreativeSpace() {
         send: sendChatMessage,
         replaceMessages: replaceChatMessages,
     } = useStreamingConversation();
-    const markingCardReadIdsRef = useRef(new Set<number>());
+    const markingReportReadIdsRef = useRef(new Set<number>());
     const promptOptimizationRequestIdRef = useRef(0);
     const projectDialogOpenRef = useRef(projectDialogOpen);
     const projectActionsPanelRef = useRef<HTMLDivElement | null>(null);
-    const cardBodyScrollRef = useRef<HTMLDivElement | null>(null);
-    const cardDiscussionScrollRef = useRef<HTMLDivElement | null>(null);
-    const cardDiscussionToggleButtonRef = useRef<HTMLButtonElement | null>(null);
+    const reportBodyScrollRef = useRef<HTMLDivElement | null>(null);
+    const reportDiscussionScrollRef = useRef<HTMLDivElement | null>(null);
+    const reportDiscussionToggleButtonRef = useRef<HTMLButtonElement | null>(null);
 
     const activeProject = projects.find((project) => project.id === activeProjectId) ?? null;
-    const activeCardFromList = activeCardId === null
+    const activeReportFromList = activeReportId === null
         ? null
-        : cards.find((card) => card.id === activeCardId) ?? null;
-    const activeCard = activeCardFromList ?? activeCardSnapshot;
+        : reports.find((card) => card.id === activeReportId) ?? null;
+    const activeReport = activeReportFromList ?? activeReportSnapshot;
     const activeProjectWebSearchStatus = !activeProject?.web_search_enabled
         ? "disabled"
         : hasConfiguredWebSearch()
             ? "ready"
             : "unavailable";
-    const activeCardBodyMarkdown = activeCard ? getCreativeCardBodyMarkdown(activeCard) : "";
+    const activeReportBodyMarkdown = activeReport ? getAutomationReportBodyMarkdown(activeReport) : "";
     const activeProjectUnreadCount = activeProject
-        ? activeProject.unread_card_count
+        ? activeProject.unread_report_count
         : 0;
     const scopedSources = activeProject
         ? sources.filter((source) => activeProject.source_ids.length === 0 || activeProject.source_ids.includes(source.id))
         : [];
     const autoEnabledProjectCount = projects.filter((project) => project.auto_enabled).length;
-    const totalUnreadCardCount = projects.reduce((total, project) => total + project.unread_card_count, 0);
-    const totalPages = Math.max(1, Math.ceil(totalCardCount / DEFAULT_PAGE_SIZE));
-    const paginationItems = totalPages > 1 ? buildCreativePaginationItems(currentPage, totalPages) : [];
+    const totalUnreadReportCount = projects.reduce((total, project) => total + project.unread_report_count, 0);
+    const totalPages = Math.max(1, Math.ceil(totalReportCount / DEFAULT_PAGE_SIZE));
+    const paginationItems = totalPages > 1 ? buildAutomationPaginationItems(currentPage, totalPages) : [];
     const canGoToPreviousPage = currentPage > 0;
     const canGoToNextPage = currentPage < totalPages - 1;
-    const compactPaginationLabel = totalCardCount > 0
+    const compactPaginationLabel = totalReportCount > 0
         ? t("pageXOfY", { page: currentPage + 1, total: totalPages })
         : "";
     const backToTopLabel = t("backToTop", { ns: "common" });
-    const creativeScrollScopeKey = activeCardId !== null
+    const automationScrollScopeKey = activeReportId !== null
         ? null
         : activeProject !== null
-            ? buildCreativeProjectScrollScopeKey(activeProject.id)
-            : CREATIVE_BOARD_SCROLL_SCOPE_KEY;
+            ? buildAutomationProjectScrollScopeKey(activeProject.id)
+            : AUTOMATION_BOARD_SCROLL_SCOPE_KEY;
     const projectDetailBackToTopTargetRefs = useMemo(
         () => [mainScrollRef],
         [mainScrollRef],
     );
-    const cardDetailBackToTopTargetRefs = useMemo(
-        () => [mainScrollRef, cardBodyScrollRef],
+    const reportDetailBackToTopTargetRefs = useMemo(
+        () => [mainScrollRef, reportBodyScrollRef],
         [mainScrollRef],
     );
-    const { saveCurrentScopeScroll: saveCreativeScrollPosition } = useScopedScrollMemory({
+    const { saveCurrentScopeScroll: saveAutomationScrollPosition } = useScopedScrollMemory({
         containerRef: mainScrollRef,
-        storageKey: CREATIVE_SPACE_SCROLL_STORAGE_KEY,
-        scopeKey: creativeScrollScopeKey,
+        storageKey: AUTOMATION_SPACE_SCROLL_STORAGE_KEY,
+        scopeKey: automationScrollScopeKey,
     });
 
     useEffect(() => {
@@ -628,12 +628,12 @@ export default function CreativeSpace() {
     }, [projectDialogOpen]);
 
     useEffect(() => {
-        const mediaQueryList = window.matchMedia(DESKTOP_CARD_DISCUSSION_MEDIA_QUERY);
+        const mediaQueryList = window.matchMedia(DESKTOP_REPORT_DISCUSSION_MEDIA_QUERY);
         const handleChange = (event: MediaQueryListEvent) => {
-            setIsDesktopCardDiscussionLayout(event.matches);
+            setIsDesktopReportDiscussionLayout(event.matches);
         };
 
-        setIsDesktopCardDiscussionLayout(mediaQueryList.matches);
+        setIsDesktopReportDiscussionLayout(mediaQueryList.matches);
         mediaQueryList.addEventListener("change", handleChange);
 
         return () => {
@@ -643,43 +643,43 @@ export default function CreativeSpace() {
 
     useEffect(() => {
         if (activeProjectId === null) {
-            setCards([]);
-            setTotalCardCount(0);
+            setReports([]);
+            setTotalReportCount(0);
             setCurrentPage(0);
-            setCardFilterMode("all");
-            setActiveCardId(null);
-            setActiveCardSnapshot(null);
+            setReportFilterMode("all");
+            setActiveReportId(null);
+            setActiveReportSnapshot(null);
             return;
         }
 
         setCurrentPage(0);
-        setCardFilterMode("all");
-        void loadCards(activeProjectId, 0, "all");
+        setReportFilterMode("all");
+        void loadReports(activeProjectId, 0, "all");
     }, [activeProjectId]);
 
     useEffect(() => {
-        if (activeCardId === null) {
-            setActiveCardSnapshot(null);
+        if (activeReportId === null) {
+            setActiveReportSnapshot(null);
             return;
         }
 
-        if (activeCardFromList) {
-            setActiveCardSnapshot(activeCardFromList);
+        if (activeReportFromList) {
+            setActiveReportSnapshot(activeReportFromList);
         }
-    }, [activeCardFromList, activeCardId]);
+    }, [activeReportFromList, activeReportId]);
 
     useEffect(() => {
-        if (!isCardDiscussionOpen) {
+        if (!isReportDiscussionOpen) {
             return;
         }
 
-        const container = cardDiscussionScrollRef.current;
+        const container = reportDiscussionScrollRef.current;
         if (!container) {
             return;
         }
 
         container.scrollTop = container.scrollHeight;
-    }, [chatMessages, chatStreamPhase, isCardDiscussionOpen]);
+    }, [chatMessages, chatStreamPhase, isReportDiscussionOpen]);
 
     useEffect(() => {
         if (!manualDialogOpen || !activeProject) {
@@ -719,24 +719,24 @@ export default function CreativeSpace() {
     }, [activeProject, manualDialogOpen, includeConsumed, candidateSearch, candidateSourceId, toast]);
 
     useEffect(() => {
-        return addCreativeSyncListener(() => {
+        return addAutomationSyncListener(() => {
             void loadProjects();
             void loadSources();
 
             if (activeProjectId !== null) {
-                void loadCards(activeProjectId, currentPage, cardFilterMode);
+                void loadReports(activeProjectId, currentPage, reportFilterMode);
             }
 
             if (manualDialogOpen && activeProjectId !== null) {
                 void refreshCandidateArticles(activeProjectId);
             }
         });
-    }, [activeProjectId, currentPage, manualDialogOpen, includeConsumed, candidateSearch, candidateSourceId, cardFilterMode]);
+    }, [activeProjectId, currentPage, manualDialogOpen, includeConsumed, candidateSearch, candidateSourceId, reportFilterMode]);
 
     useEffect(() => {
         replaceChatMessages([]);
         setChatInput("");
-    }, [activeCardId, replaceChatMessages]);
+    }, [activeReportId, replaceChatMessages]);
 
     useEffect(() => {
         setIsProjectInfoOpen(false);
@@ -744,8 +744,8 @@ export default function CreativeSpace() {
     }, [activeProjectId]);
 
     useEffect(() => {
-        setIsCardDiscussionOpen(false);
-    }, [activeCardId]);
+        setIsReportDiscussionOpen(false);
+    }, [activeReportId]);
 
     useEffect(() => {
         if (!isProjectActionsOpen) {
@@ -775,12 +775,12 @@ export default function CreativeSpace() {
 
     async function loadProjects() {
         try {
-            const result = await listCreativeProjects();
+            const result = await listAutomationProjects();
             setProjects(result);
 
             if (activeProjectId !== null && !result.some((project) => project.id === activeProjectId)) {
                 setActiveProjectId(null);
-                setActiveCardId(null);
+                setActiveReportId(null);
             }
 
             if (editingProjectId !== null && !result.some((project) => project.id === editingProjectId)) {
@@ -791,11 +791,11 @@ export default function CreativeSpace() {
         }
     }
 
-    async function loadCards(projectId: number, page?: number, filterMode: CardFilterMode = cardFilterMode) {
+    async function loadReports(projectId: number, page?: number, filterMode: ReportFilterMode = reportFilterMode) {
         try {
             const targetPage = Math.max(0, page ?? currentPage);
             const offset = targetPage * DEFAULT_PAGE_SIZE;
-            const result = await listCreativeCards(projectId, {
+            const result = await listAutomationReports(projectId, {
                 offset,
                 limit: DEFAULT_PAGE_SIZE,
                 favoritesOnly: filterMode === "favorites",
@@ -804,12 +804,12 @@ export default function CreativeSpace() {
 
             if (targetPage > maxPage) {
                 setCurrentPage(maxPage);
-                await loadCards(projectId, maxPage, filterMode);
+                await loadReports(projectId, maxPage, filterMode);
                 return;
             }
 
-            setCards(result.cards);
-            setTotalCardCount(result.totalCount);
+            setReports(result.reports);
+            setTotalReportCount(result.totalCount);
         } catch (error) {
             console.error(error);
         }
@@ -817,7 +817,7 @@ export default function CreativeSpace() {
 
     async function loadSources() {
         try {
-            const result = await listCreativeSources();
+            const result = await listAutomationSources();
             setSources(result);
         } catch (error) {
             console.error(error);
@@ -842,10 +842,10 @@ export default function CreativeSpace() {
             project.id === projectId
                 ? {
                     ...project,
-                    unread_card_count: Math.max(
+                    unread_report_count: Math.max(
                         0,
                         typeof nextUnreadCount === "function"
-                            ? nextUnreadCount(project.unread_card_count)
+                            ? nextUnreadCount(project.unread_report_count)
                             : nextUnreadCount,
                     ),
                 }
@@ -853,76 +853,76 @@ export default function CreativeSpace() {
         )));
     }
 
-    function updateLoadedCard(cardId: number, updater: (card: CreativeCard) => CreativeCard) {
-        setCards((currentCards) => currentCards.map((card) => (
-            card.id === cardId ? updater(card) : card
+    function updateLoadedReport(reportId: number, updater: (card: AutomationReport) => AutomationReport) {
+        setReports((currentReports) => currentReports.map((card) => (
+            card.id === reportId ? updater(card) : card
         )));
-        setActiveCardSnapshot((currentCard) => (
-            currentCard?.id === cardId ? updater(currentCard) : currentCard
+        setActiveReportSnapshot((currentCard) => (
+            currentCard?.id === reportId ? updater(currentCard) : currentCard
         ));
     }
 
-    function setFavoriteMutationPending(cardId: number, isPending: boolean) {
-        setFavoriteMutationCardIds((currentIds) => {
+    function setFavoriteMutationPending(reportId: number, isPending: boolean) {
+        setFavoriteMutationReportIds((currentIds) => {
             if (isPending) {
-                return currentIds.includes(cardId) ? currentIds : [...currentIds, cardId];
+                return currentIds.includes(reportId) ? currentIds : [...currentIds, reportId];
             }
 
-            return currentIds.filter((currentId) => currentId !== cardId);
+            return currentIds.filter((currentId) => currentId !== reportId);
         });
     }
 
-    function isFavoriteMutationPending(cardId: number): boolean {
-        return favoriteMutationCardIds.includes(cardId);
+    function isFavoriteMutationPending(reportId: number): boolean {
+        return favoriteMutationReportIds.includes(reportId);
     }
 
-    function getFavoriteActionLabel(card: CreativeCard): string {
+    function getFavoriteActionLabel(card: AutomationReport): string {
         return card.is_favorite ? t("removeFromFavorites") : t("addToFavorites");
     }
 
-    function applyOptimisticFavoriteState(cardId: number, isFavorite: boolean) {
-        setCards((currentCards) => {
-            const nextCards = currentCards.map((card) => (
-                card.id === cardId ? { ...card, is_favorite: isFavorite } : card
+    function applyOptimisticFavoriteState(reportId: number, isFavorite: boolean) {
+        setReports((currentReports) => {
+            const nextCards = currentReports.map((card) => (
+                card.id === reportId ? { ...card, is_favorite: isFavorite } : card
             ));
 
-            return cardFilterMode === "favorites"
+            return reportFilterMode === "favorites"
                 ? nextCards.filter((card) => card.is_favorite)
                 : nextCards;
         });
-        setActiveCardSnapshot((currentCard) => (
-            currentCard?.id === cardId
+        setActiveReportSnapshot((currentCard) => (
+            currentCard?.id === reportId
                 ? { ...currentCard, is_favorite: isFavorite }
                 : currentCard
         ));
 
-        if (cardFilterMode === "favorites" && !isFavorite) {
-            setTotalCardCount((currentCount) => Math.max(0, currentCount - 1));
+        if (reportFilterMode === "favorites" && !isFavorite) {
+            setTotalReportCount((currentCount) => Math.max(0, currentCount - 1));
         }
     }
 
-    function openCreativeCard(cardId: number, cardSnapshot?: CreativeCard) {
-        const targetCard = cardSnapshot ?? cards.find((card) => card.id === cardId);
-        saveCreativeScrollPosition();
-        setActiveCardId(cardId);
-        setActiveCardSnapshot(targetCard ?? null);
+    function openAutomationReport(reportId: number, reportSnapshot?: AutomationReport) {
+        const targetReport = reportSnapshot ?? reports.find((card) => card.id === reportId);
+        saveAutomationScrollPosition();
+        setActiveReportId(reportId);
+        setActiveReportSnapshot(targetReport ?? null);
 
-        if (!targetCard || targetCard.is_read || markingCardReadIdsRef.current.has(cardId)) {
+        if (!targetReport || targetReport.is_read || markingReportReadIdsRef.current.has(reportId)) {
             return;
         }
 
-        markingCardReadIdsRef.current.add(cardId);
-        updateLoadedCard(cardId, (card) => ({ ...card, is_read: true }));
-        updateProjectUnreadCount(targetCard.project_id, (currentCount) => currentCount - 1);
+        markingReportReadIdsRef.current.add(reportId);
+        updateLoadedReport(reportId, (card) => ({ ...card, is_read: true }));
+        updateProjectUnreadCount(targetReport.project_id, (currentCount) => currentCount - 1);
 
-        void markCreativeCardAsRead(cardId)
+        void markAutomationReportAsRead(reportId)
             .catch(async (error) => {
-                toast({ title: t("failedToMarkCardAsRead"), description: String(error), variant: "destructive" });
+                toast({ title: t("failedToMarkReportAsRead"), description: String(error), variant: "destructive" });
                 await loadProjects();
-                await loadCards(targetCard.project_id, currentPage, cardFilterMode);
+                await loadReports(targetReport.project_id, currentPage, reportFilterMode);
             })
             .finally(() => {
-                markingCardReadIdsRef.current.delete(cardId);
+                markingReportReadIdsRef.current.delete(reportId);
             });
     }
 
@@ -948,7 +948,7 @@ export default function CreativeSpace() {
         setProjectDialogOpen(true);
     }
 
-    function openEditProjectDialog(project: CreativeProject) {
+    function openEditProjectDialog(project: AutomationProject) {
         resetPromptSuggestionState();
         setIsProjectActionsOpen(false);
         setEditingProjectId(project.id);
@@ -957,11 +957,11 @@ export default function CreativeSpace() {
     }
 
     function openProjectDetail(projectId: number) {
-        saveCreativeScrollPosition();
+        saveAutomationScrollPosition();
         setActiveProjectId(projectId);
     }
 
-    function openDeleteProjectDialog(project: CreativeProject) {
+    function openDeleteProjectDialog(project: AutomationProject) {
         setIsProjectActionsOpen(false);
         setPendingDeleteProject(project);
     }
@@ -985,20 +985,20 @@ export default function CreativeSpace() {
         openProjectDetail(projectId);
     }
 
-    function handleGeneratedCardKeyDown(event: React.KeyboardEvent<HTMLDivElement>, cardId: number) {
+    function handleGeneratedReportKeyDown(event: React.KeyboardEvent<HTMLDivElement>, reportId: number) {
         if (event.key !== "Enter" && event.key !== " ") {
             return;
         }
 
         event.preventDefault();
-        openCreativeCard(cardId);
+        openAutomationReport(reportId);
     }
 
-    function stopCardEventPropagation(event: React.SyntheticEvent<HTMLElement>) {
+    function stopReportEventPropagation(event: React.SyntheticEvent<HTMLElement>) {
         event.stopPropagation();
     }
 
-    async function handleSetCardFavorite(card: CreativeCard, isFavorite: boolean) {
+    async function handleSetReportFavorite(card: AutomationReport, isFavorite: boolean) {
         if (isFavoriteMutationPending(card.id)) {
             return;
         }
@@ -1007,16 +1007,16 @@ export default function CreativeSpace() {
         applyOptimisticFavoriteState(card.id, isFavorite);
 
         try {
-            await setCreativeCardFavorite(card.id, isFavorite);
+            await setAutomationReportFavorite(card.id, isFavorite);
 
-            if (activeProjectId !== null && cardFilterMode === "favorites") {
-                await loadCards(activeProjectId, currentPage, cardFilterMode);
+            if (activeProjectId !== null && reportFilterMode === "favorites") {
+                await loadReports(activeProjectId, currentPage, reportFilterMode);
             }
         } catch (error) {
-            updateLoadedCard(card.id, (currentCard) => ({ ...currentCard, is_favorite: card.is_favorite }));
+            updateLoadedReport(card.id, (currentCard) => ({ ...currentCard, is_favorite: card.is_favorite }));
 
             if (activeProjectId !== null) {
-                await loadCards(activeProjectId, currentPage, cardFilterMode);
+                await loadReports(activeProjectId, currentPage, reportFilterMode);
             }
 
             toast({ title: t("failedToUpdateFavorite"), description: String(error), variant: "destructive" });
@@ -1025,25 +1025,25 @@ export default function CreativeSpace() {
         }
     }
 
-    async function handleMarkAllCardsRead() {
-        if (!activeProject || isMarkingAllCardsRead || activeProjectUnreadCount === 0) {
+    async function handleMarkAllReportsRead() {
+        if (!activeProject || isMarkingAllReportsRead || activeProjectUnreadCount === 0) {
             return;
         }
 
-        setIsMarkingAllCardsRead(true);
-        setCards((currentCards) => currentCards.map((card) => (
+        setIsMarkingAllReportsRead(true);
+        setReports((currentReports) => currentReports.map((card) => (
             card.project_id === activeProject.id ? { ...card, is_read: true } : card
         )));
         updateProjectUnreadCount(activeProject.id, 0);
 
         try {
-            await markAllCreativeCardsAsRead(activeProject.id);
+            await markAllAutomationReportsAsRead(activeProject.id);
         } catch (error) {
-            toast({ title: t("failedToMarkAllCardsAsRead"), description: String(error), variant: "destructive" });
+            toast({ title: t("failedToMarkAllReportsAsRead"), description: String(error), variant: "destructive" });
             await loadProjects();
-            await loadCards(activeProject.id, currentPage, cardFilterMode);
+            await loadReports(activeProject.id, currentPage, reportFilterMode);
         } finally {
-            setIsMarkingAllCardsRead(false);
+            setIsMarkingAllReportsRead(false);
         }
     }
 
@@ -1052,15 +1052,15 @@ export default function CreativeSpace() {
         setIsSavingProject(true);
 
         try {
-            const savedProject = await saveCreativeProject(
+            const savedProject = await saveAutomationProject(
                 {
                     name: projectForm.name,
                     prompt: projectForm.prompt,
                     web_search_enabled: projectForm.webSearchEnabled,
                     auto_enabled: projectForm.autoEnabled,
                     auto_interval_minutes: Number.parseInt(projectForm.autoIntervalMinutes, 10),
-                    max_articles_per_card: Number.parseInt(projectForm.maxArticlesPerCard, 10),
-                    min_articles_per_card: Number.parseInt(projectForm.minArticlesPerCard, 10),
+                    max_articles_per_report: Number.parseInt(projectForm.maxArticlesPerReport, 10),
+                    min_articles_per_report: Number.parseInt(projectForm.minArticlesPerReport, 10),
                     use_all_sources: projectForm.useAllSources,
                     source_ids: projectForm.sourceIds,
                 },
@@ -1076,7 +1076,7 @@ export default function CreativeSpace() {
             toast({ title: editingProjectId ? t("projectUpdated") : t("projectCreated") });
             await loadProjects();
             if (activeProjectId === savedProject.id) {
-                await loadCards(savedProject.id, currentPage, cardFilterMode);
+                await loadReports(savedProject.id, currentPage, reportFilterMode);
             }
         } catch (error) {
             toast({ title: t("failedToSaveProject"), description: String(error), variant: "destructive" });
@@ -1089,7 +1089,7 @@ export default function CreativeSpace() {
         setDeletingProjectId(projectId);
         setIsProjectActionsOpen(false);
         try {
-            await deleteCreativeProject(projectId);
+            await deleteAutomationProject(projectId);
             toast({ title: t("projectDeleted") });
             setPendingDeleteProject(null);
 
@@ -1118,15 +1118,15 @@ export default function CreativeSpace() {
     }
 
     function leaveProjectDetail() {
-        saveCreativeScrollPosition();
+        saveAutomationScrollPosition();
         setManualDialogOpen(false);
         closeProjectDialog();
         setSelectedArticleIds([]);
-        setIsCardDiscussionOpen(false);
+        setIsReportDiscussionOpen(false);
         setIsProjectInfoOpen(false);
         setIsProjectActionsOpen(false);
-        setActiveCardId(null);
-        setActiveCardSnapshot(null);
+        setActiveReportId(null);
+        setActiveReportSnapshot(null);
         setActiveProjectId(null);
     }
 
@@ -1135,22 +1135,22 @@ export default function CreativeSpace() {
         localStorage.setItem(CARD_VIEW_MODE_STORAGE_KEY, mode);
     }
 
-    function handleCardFilterModeChange(mode: CardFilterMode) {
-        if (mode === cardFilterMode || activeProjectId === null) {
+    function handleReportFilterModeChange(mode: ReportFilterMode) {
+        if (mode === reportFilterMode || activeProjectId === null) {
             return;
         }
 
-        setCardFilterMode(mode);
+        setReportFilterMode(mode);
         setCurrentPage(0);
-        void loadCards(activeProjectId, 0, mode);
+        void loadReports(activeProjectId, 0, mode);
         mainScrollRef.current?.scrollTo?.({ top: 0, behavior: "smooth" });
     }
 
-    function goToCardPage(page: number) {
+    function goToReportPage(page: number) {
         const nextPage = Math.max(0, page);
         if (nextPage === currentPage || !activeProjectId) return;
         setCurrentPage(nextPage);
-        void loadCards(activeProjectId, nextPage, cardFilterMode);
+        void loadReports(activeProjectId, nextPage, reportFilterMode);
         mainScrollRef.current?.scrollTo?.({ top: 0, behavior: "smooth" });
     }
 
@@ -1238,9 +1238,9 @@ export default function CreativeSpace() {
                 return currentSelectedIds.filter((currentId) => currentId !== articleId);
             }
 
-            if (currentSelectedIds.length >= activeProject.max_articles_per_card) {
+            if (currentSelectedIds.length >= activeProject.max_articles_per_report) {
                 toast({
-                    title: t("selectUpToN", { count: activeProject.max_articles_per_card }),
+                    title: t("selectUpToN", { count: activeProject.max_articles_per_report }),
                     variant: "destructive",
                 });
                 return currentSelectedIds;
@@ -1261,7 +1261,7 @@ export default function CreativeSpace() {
         setIsOptimizingPrompt(true);
 
         try {
-            const optimizedPrompt = await optimizeCreativeProjectPrompt(rawPrompt);
+            const optimizedPrompt = await optimizeAutomationProjectPrompt(rawPrompt);
             if (!projectDialogOpenRef.current || promptOptimizationRequestIdRef.current !== requestId) {
                 return;
             }
@@ -1299,7 +1299,7 @@ export default function CreativeSpace() {
 
         setIsGenerating(true);
         try {
-            const generatedCard = await generateCreativeCardForProject({
+            const generatedReport = await generateAutomationReportForProject({
                 projectId: activeProject.id,
                 articleIds: selectedArticleIds,
                 mode: "manual",
@@ -1307,14 +1307,14 @@ export default function CreativeSpace() {
 
             setCurrentPage(0);
             await loadProjects();
-            await loadCards(activeProject.id, 0, cardFilterMode);
-            if (cardFilterMode === "all") {
-                setCards((currentCards) => [generatedCard, ...currentCards.filter((card) => card.id !== generatedCard.id)]);
+            await loadReports(activeProject.id, 0, reportFilterMode);
+            if (reportFilterMode === "all") {
+                setReports((currentReports) => [generatedReport, ...currentReports.filter((card) => card.id !== generatedReport.id)]);
             }
-            openCreativeCard(generatedCard.id, generatedCard);
+            openAutomationReport(generatedReport.id, generatedReport);
             setManualDialogOpen(false);
             setSelectedArticleIds([]);
-            toast({ title: t("cardGenerated") });
+            toast({ title: t("reportGenerated") });
         } catch (error) {
             toast({ title: t("generationFailed"), description: String(error), variant: "destructive" });
         } finally {
@@ -1324,7 +1324,7 @@ export default function CreativeSpace() {
 
     async function handleChat(event: FormEvent<HTMLFormElement>) {
         event.preventDefault();
-        if (!chatInput.trim() || isChatStreaming || !activeCard) {
+        if (!chatInput.trim() || isChatStreaming || !activeReport) {
             return;
         }
 
@@ -1334,9 +1334,9 @@ export default function CreativeSpace() {
         await sendChatMessage({
             content: inputValue,
             buildConversation: async (history, userMessage) => {
-                const systemPrompt = buildCreativeCardDiscussionSystemPrompt({
-                    title: activeCard.title,
-                    bodyMarkdown: activeCardBodyMarkdown,
+                const systemPrompt = buildAutomationReportDiscussionSystemPrompt({
+                    title: activeReport.title,
+                    bodyMarkdown: activeReportBodyMarkdown,
                     enableWebSearch: activeProject?.web_search_enabled,
                 });
 
@@ -1378,12 +1378,12 @@ export default function CreativeSpace() {
         );
     }
 
-    function closeCardDiscussion() {
-        setIsCardDiscussionOpen(false);
-        cardDiscussionToggleButtonRef.current?.focus();
+    function closeReportDiscussion() {
+        setIsReportDiscussionOpen(false);
+        reportDiscussionToggleButtonRef.current?.focus();
     }
 
-    if (activeCard) {
+    if (activeReport) {
         return (
             <>
                 <div className={cn("flex h-full min-h-0 flex-col gap-2 bg-background py-2 md:py-3 lg:flex-row lg:gap-0", CONTENT_GUTTER_X_CLASS)}>
@@ -1393,15 +1393,15 @@ export default function CreativeSpace() {
                                 <div className="mx-auto flex w-full max-w-4xl flex-col gap-2 px-3 py-2 md:px-4">
                                     <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
                                         <div className="min-w-0">
-                                            <Button variant="ghost" size="sm" onClick={() => setActiveCardId(null)} className="-ml-2 w-fit">
+                                            <Button variant="ghost" size="sm" onClick={() => setActiveReportId(null)} className="-ml-2 w-fit">
                                                 <ArrowLeft className="h-3.5 w-3.5" /> {t("back", { ns: "common" })}
                                             </Button>
                                             <div className="mt-1.5 space-y-2">
-                                                <div className="text-balance text-base font-semibold leading-tight md:text-lg">{activeCard.title}</div>
+                                                <div className="text-balance text-base font-semibold leading-tight md:text-lg">{activeReport.title}</div>
                                                 <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
-                                                    <span>{activeCard.generation_mode === "auto" ? t("auto") : t("manual")} {t("run")}</span>
-                                                    <span>{formatArticleCount(activeCard.used_article_count)}</span>
-                                                    <span className="tabular-nums">{formatTimestamp(activeCard.created_at)}</span>
+                                                    <span>{activeReport.generation_mode === "auto" ? t("auto") : t("manual")} {t("run")}</span>
+                                                    <span>{formatArticleCount(activeReport.used_article_count)}</span>
+                                                    <span className="tabular-nums">{formatTimestamp(activeReport.created_at)}</span>
                                                 </div>
                                             </div>
                                         </div>
@@ -1412,44 +1412,44 @@ export default function CreativeSpace() {
                                                 size="icon"
                                                 className={cn(
                                                     "h-8 w-8 shrink-0 rounded-full",
-                                                    activeCard.is_favorite && "text-amber-500 hover:text-amber-600",
+                                                    activeReport.is_favorite && "text-amber-500 hover:text-amber-600",
                                                 )}
                                                 onClick={() => {
-                                                    void handleSetCardFavorite(activeCard, !activeCard.is_favorite);
+                                                    void handleSetReportFavorite(activeReport, !activeReport.is_favorite);
                                                 }}
-                                                aria-label={getFavoriteActionLabel(activeCard)}
-                                                title={getFavoriteActionLabel(activeCard)}
-                                                disabled={isFavoriteMutationPending(activeCard.id)}
+                                                aria-label={getFavoriteActionLabel(activeReport)}
+                                                title={getFavoriteActionLabel(activeReport)}
+                                                disabled={isFavoriteMutationPending(activeReport.id)}
                                             >
-                                                <Star className={cn("h-3.5 w-3.5", activeCard.is_favorite && "fill-current")} />
+                                                <Star className={cn("h-3.5 w-3.5", activeReport.is_favorite && "fill-current")} />
                                             </Button>
                                             <Button
-                                                ref={cardDiscussionToggleButtonRef}
-                                                variant={isCardDiscussionOpen ? "default" : "outline"}
+                                                ref={reportDiscussionToggleButtonRef}
+                                                variant={isReportDiscussionOpen ? "default" : "outline"}
                                                 size="sm"
-                                                onClick={() => setIsCardDiscussionOpen((open) => !open)}
+                                                onClick={() => setIsReportDiscussionOpen((open) => !open)}
                                                 className="shrink-0 self-start"
                                             >
                                                 <MessageSquare className="h-3.5 w-3.5" />
-                                                {isCardDiscussionOpen ? t("hideDiscussion") : t("discussCard")}
+                                                {isReportDiscussionOpen ? t("hideDiscussion") : t("discussReport")}
                                             </Button>
                                         </div>
                                     </div>
                                 </div>
                             </div>
 
-                            <div ref={cardBodyScrollRef} className="min-h-0 flex-1 overflow-y-auto">
+                            <div ref={reportBodyScrollRef} className="min-h-0 flex-1 overflow-y-auto">
                                 <div className="mx-auto w-full max-w-4xl px-3 py-3 md:px-4 md:py-4">
                                     <div className="prose prose-sm max-w-none break-words dark:prose-invert">
-                                        <ReactMarkdown>{activeCardBodyMarkdown}</ReactMarkdown>
+                                        <ReactMarkdown>{activeReportBodyMarkdown}</ReactMarkdown>
                                     </div>
                                 </div>
                             </div>
                         </div>
                     </div>
 
-                    <CreativeCardDiscussionRail open={isDesktopCardDiscussionLayout && isCardDiscussionOpen}>
-                        <CreativeCardDiscussionPanel
+                    <AutomationReportDiscussionRail open={isDesktopReportDiscussionLayout && isReportDiscussionOpen}>
+                        <AutomationReportDiscussionPanel
                             variant="inline"
                             chatMessages={chatMessages}
                             isChatStreaming={isChatStreaming}
@@ -1458,20 +1458,20 @@ export default function CreativeSpace() {
                             chatInput={chatInput}
                             onChatInputChange={setChatInput}
                             onChatSubmit={handleChat}
-                            onClose={closeCardDiscussion}
+                            onClose={closeReportDiscussion}
                             showCloseButton
-                            scrollRef={cardDiscussionScrollRef}
+                            scrollRef={reportDiscussionScrollRef}
                         />
-                    </CreativeCardDiscussionRail>
+                    </AutomationReportDiscussionRail>
 
-                    {!isDesktopCardDiscussionLayout ? (
-                        <Sheet modal={false} open={isCardDiscussionOpen} onOpenChange={setIsCardDiscussionOpen}>
+                    {!isDesktopReportDiscussionLayout ? (
+                        <Sheet modal={false} open={isReportDiscussionOpen} onOpenChange={setIsReportDiscussionOpen}>
                             <SheetContent
                                 side="right"
                                 className="w-full max-w-xl p-0 sm:max-w-xl"
                                 showOverlay={false}
                             >
-                                <CreativeCardDiscussionPanel
+                                <AutomationReportDiscussionPanel
                                     variant="sheet"
                                     chatMessages={chatMessages}
                                     isChatStreaming={isChatStreaming}
@@ -1480,13 +1480,13 @@ export default function CreativeSpace() {
                                     chatInput={chatInput}
                                     onChatInputChange={setChatInput}
                                     onChatSubmit={handleChat}
-                                    scrollRef={cardDiscussionScrollRef}
+                                    scrollRef={reportDiscussionScrollRef}
                                 />
                             </SheetContent>
                         </Sheet>
                     ) : null}
                 </div>
-                <BackToTopButton targetRefs={cardDetailBackToTopTargetRefs} label={backToTopLabel} />
+                <BackToTopButton targetRefs={reportDetailBackToTopTargetRefs} label={backToTopLabel} />
             </>
         );
     }
@@ -1511,20 +1511,20 @@ export default function CreativeSpace() {
                         showDescription: false,
                         stats: [
                             { label: t("scopeLabel"), value: formatProjectScopeSummary(activeProject, sources), tone: "accent" },
-                            { label: t("unreadLabel"), value: formatUnreadCardCount(activeProjectUnreadCount), tone: activeProjectUnreadCount > 0 ? "warning" : "default" },
+                            { label: t("unreadLabel"), value: formatUnreadReportCount(activeProjectUnreadCount), tone: activeProjectUnreadCount > 0 ? "warning" : "default" },
                         ],
                         actions: (
                             <div className="flex flex-wrap items-center gap-2">
                                 <Button size="sm" onClick={openManualGenerateDialog} disabled={isGenerating}>
-                                    <WandSparkles className="h-3.5 w-3.5" /> {isGenerating ? t("generating") : t("generateCard")}
+                                    <WandSparkles className="h-3.5 w-3.5" /> {isGenerating ? t("generating") : t("generateReport")}
                                 </Button>
                                 <Button
                                     variant="outline"
                                     size="sm"
-                                    onClick={handleMarkAllCardsRead}
-                                    disabled={isMarkingAllCardsRead || activeProjectUnreadCount === 0}
+                                    onClick={handleMarkAllReportsRead}
+                                    disabled={isMarkingAllReportsRead || activeProjectUnreadCount === 0}
                                 >
-                                    {isMarkingAllCardsRead ? (
+                                    {isMarkingAllReportsRead ? (
                                         <>
                                             <Loader2 className="h-3.5 w-3.5 animate-spin" /> {t("marking", { ns: "news" })}
                                         </>
@@ -1583,19 +1583,19 @@ export default function CreativeSpace() {
                                 </span>
                                 <span className="inline-flex items-center gap-1.5">
                                     <span className="text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">{t("minLabel")}</span>
-                                    <span className="font-medium text-foreground">{formatArticleCount(activeProject.min_articles_per_card)}</span>
+                                    <span className="font-medium text-foreground">{formatArticleCount(activeProject.min_articles_per_report)}</span>
                                 </span>
                                 <span className="inline-flex items-center gap-1.5">
                                     <span className="text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">{t("maxLabel")}</span>
-                                    <span className="font-medium text-foreground">{formatArticleCount(activeProject.max_articles_per_card)}</span>
+                                    <span className="font-medium text-foreground">{formatArticleCount(activeProject.max_articles_per_report)}</span>
                                 </span>
                                 <span className="inline-flex items-center gap-1.5">
-                                    <span className="text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">{t("cardsLabel")}</span>
-                                    <span className="font-medium text-foreground">{totalCardCount}</span>
+                                    <span className="text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">{t("reportsLabel")}</span>
+                                    <span className="font-medium text-foreground">{totalReportCount}</span>
                                 </span>
                                 <span className="inline-flex items-center gap-1.5">
                                     <span className="text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">{t("unreadLabel")}</span>
-                                    <span className="font-medium text-foreground tabular-nums">{formatUnreadCardCount(activeProjectUnreadCount)}</span>
+                                    <span className="font-medium text-foreground tabular-nums">{formatUnreadReportCount(activeProjectUnreadCount)}</span>
                                 </span>
                                 <span className="inline-flex min-w-0 items-center gap-1.5">
                                     <span className="text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">{t("updatedLabel")}</span>
@@ -1652,12 +1652,12 @@ export default function CreativeSpace() {
                                         value={formatTimestamp(activeProject.last_auto_generated_at)}
                                     />
                                     <ProjectOverviewItem
-                                        label={t("unreadCards")}
-                                        value={formatUnreadCardCount(activeProjectUnreadCount)}
+                                        label={t("unreadReports")}
+                                        value={formatUnreadReportCount(activeProjectUnreadCount)}
                                     />
                                     <ProjectOverviewItem
-                                        label={t("cards")}
-                                        value={t("nCards", { count: totalCardCount })}
+                                        label={t("reports")}
+                                        value={t("nReports", { count: totalReportCount })}
                                     />
                                 </div>
                             </div>
@@ -1670,21 +1670,21 @@ export default function CreativeSpace() {
                             type="button"
                             variant="ghost"
                             size="sm"
-                            className={cn("rounded-none px-3", cardFilterMode === "all" && "bg-accent")}
-                            onClick={() => handleCardFilterModeChange("all")}
-                            aria-pressed={cardFilterMode === "all"}
+                            className={cn("rounded-none px-3", reportFilterMode === "all" && "bg-accent")}
+                            onClick={() => handleReportFilterModeChange("all")}
+                            aria-pressed={reportFilterMode === "all"}
                         >
-                            {t("allCards")}
+                            {t("allReports")}
                         </Button>
                         <Button
                             type="button"
                             variant="ghost"
                             size="sm"
-                            className={cn("rounded-none border-l border-border px-3", cardFilterMode === "favorites" && "bg-accent")}
-                            onClick={() => handleCardFilterModeChange("favorites")}
-                            aria-pressed={cardFilterMode === "favorites"}
+                            className={cn("rounded-none border-l border-border px-3", reportFilterMode === "favorites" && "bg-accent")}
+                            onClick={() => handleReportFilterModeChange("favorites")}
+                            aria-pressed={reportFilterMode === "favorites"}
                         >
-                            {t("favoriteCards")}
+                            {t("favoriteReports")}
                         </Button>
                     </div>
                     <div className="flex items-center justify-between gap-2 sm:justify-end">
@@ -1699,10 +1699,10 @@ export default function CreativeSpace() {
                                 size="icon"
                                 className={cn("h-7 w-7 rounded-none", cardViewMode === "card" && "bg-accent")}
                                 onClick={() => handleCardViewModeChange("card")}
-                                aria-label={t("viewCard")}
-                                title={t("viewCard")}
+                                aria-label={t("viewReport")}
+                                title={t("viewReport")}
                                 aria-pressed={cardViewMode === "card"}
-                                disabled={totalCardCount === 0}
+                                disabled={totalReportCount === 0}
                             >
                                 <LayoutGrid className="h-3.5 w-3.5" />
                             </Button>
@@ -1714,7 +1714,7 @@ export default function CreativeSpace() {
                                 aria-label={t("viewList")}
                                 title={t("viewList")}
                                 aria-pressed={cardViewMode === "list"}
-                                disabled={totalCardCount === 0}
+                                disabled={totalReportCount === 0}
                             >
                                 <List className="h-3.5 w-3.5" />
                             </Button>
@@ -1723,8 +1723,8 @@ export default function CreativeSpace() {
                 </div>
 
                 {cardViewMode === "card" ? (
-                    <div className={CREATIVE_TILE_GRID_CLASS}>
-                        {cards.map((card) => (
+                    <div className={AUTOMATION_TILE_GRID_CLASS}>
+                        {reports.map((card) => (
                             <Card
                                 key={card.id}
                                 className={cn(
@@ -1736,10 +1736,10 @@ export default function CreativeSpace() {
                                 )}
                                 role="button"
                                 tabIndex={0}
-                                onClick={() => openCreativeCard(card.id, card)}
-                                onKeyDown={(event) => handleGeneratedCardKeyDown(event, card.id)}
+                                onClick={() => openAutomationReport(card.id, card)}
+                                onKeyDown={(event) => handleGeneratedReportKeyDown(event, card.id)}
                             >
-                                <CardHeader className={CREATIVE_TILE_HEADER_CLASS}>
+                                <CardHeader className={AUTOMATION_TILE_HEADER_CLASS}>
                                     <div className="flex items-start justify-between gap-3">
                                         <div className="min-w-0 flex-1">
                                             <CardTitle
@@ -1761,10 +1761,10 @@ export default function CreativeSpace() {
                                                     card.is_favorite && "text-amber-500 hover:text-amber-600",
                                                 )}
                                                 onClick={(event) => {
-                                                    stopCardEventPropagation(event);
-                                                    void handleSetCardFavorite(card, !card.is_favorite);
+                                                    stopReportEventPropagation(event);
+                                                    void handleSetReportFavorite(card, !card.is_favorite);
                                                 }}
-                                                onKeyDown={stopCardEventPropagation}
+                                                onKeyDown={stopReportEventPropagation}
                                                 aria-label={getFavoriteActionLabel(card)}
                                                 title={getFavoriteActionLabel(card)}
                                                 disabled={isFavoriteMutationPending(card.id)}
@@ -1781,14 +1781,14 @@ export default function CreativeSpace() {
                                         </span>
                                     </div>
                                 </CardHeader>
-                                <CardContent className={CREATIVE_TILE_BODY_CLASS}>
+                                <CardContent className={AUTOMATION_TILE_BODY_CLASS}>
                                     <p
                                         className={cn(
                                             "line-clamp-5 min-h-[7.5rem] text-sm leading-6",
                                             card.is_read ? "text-muted-foreground" : "text-foreground/78",
                                         )}
                                     >
-                                        {getCreativeCardPreviewExcerpt(card, GENERATED_TILE_PREVIEW_MAX_LENGTH)}
+                                        {getAutomationReportPreviewExcerpt(card, GENERATED_TILE_PREVIEW_MAX_LENGTH)}
                                     </p>
                                 </CardContent>
                             </Card>
@@ -1796,7 +1796,7 @@ export default function CreativeSpace() {
                     </div>
                 ) : (
                     <div className="space-y-1">
-                        {cards.map((card) => (
+                        {reports.map((card) => (
                             <div
                                 key={card.id}
                                 className={cn(
@@ -1807,8 +1807,8 @@ export default function CreativeSpace() {
                                 )}
                                 role="button"
                                 tabIndex={0}
-                                onClick={() => openCreativeCard(card.id, card)}
-                                onKeyDown={(event) => handleGeneratedCardKeyDown(event, card.id)}
+                                onClick={() => openAutomationReport(card.id, card)}
+                                onKeyDown={(event) => handleGeneratedReportKeyDown(event, card.id)}
                             >
                                 {!card.is_read && <span className="mt-2 inline-block h-2 w-2 shrink-0 rounded-full bg-blue-500"></span>}
                                 <div className="min-w-0 flex-1">
@@ -1829,10 +1829,10 @@ export default function CreativeSpace() {
                                                     card.is_favorite && "text-amber-500 hover:text-amber-600",
                                                 )}
                                                 onClick={(event) => {
-                                                    stopCardEventPropagation(event);
-                                                    void handleSetCardFavorite(card, !card.is_favorite);
+                                                    stopReportEventPropagation(event);
+                                                    void handleSetReportFavorite(card, !card.is_favorite);
                                                 }}
-                                                onKeyDown={stopCardEventPropagation}
+                                                onKeyDown={stopReportEventPropagation}
                                                 aria-label={getFavoriteActionLabel(card)}
                                                 title={getFavoriteActionLabel(card)}
                                                 disabled={isFavoriteMutationPending(card.id)}
@@ -1846,7 +1846,7 @@ export default function CreativeSpace() {
                                         "mt-0.5 line-clamp-1 text-sm leading-5",
                                         card.is_read ? "text-muted-foreground" : "text-foreground/78",
                                     )}>
-                                        {getCreativeCardPreviewExcerpt(card, 160)}
+                                        {getAutomationReportPreviewExcerpt(card, 160)}
                                     </p>
                                     <div className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
                                         <span>{card.generation_mode === "auto" ? t("auto") : t("manual")}</span>
@@ -1859,11 +1859,11 @@ export default function CreativeSpace() {
                     </div>
                 )}
 
-                {cards.length === 0 && (
+                {reports.length === 0 && (
                     <div className="editor-empty">
                         <Lightbulb className="mb-4 h-10 w-10 text-muted-foreground/30" />
-                        <p>{cardFilterMode === "favorites" ? t("noFavoriteCardsYet") : t("noCreativeCardsYet")}</p>
-                        <p className="text-sm">{cardFilterMode === "favorites" ? t("favoriteFirstCard") : t("generateFirstCard")}</p>
+                        <p>{reportFilterMode === "favorites" ? t("noFavoriteReportsYet") : t("noAutomationReportsYet")}</p>
+                        <p className="text-sm">{reportFilterMode === "favorites" ? t("favoriteFirstReport") : t("generateFirstReport")}</p>
                     </div>
                 )}
 
@@ -1873,7 +1873,7 @@ export default function CreativeSpace() {
                             <Button
                                 variant="ghost"
                                 size="sm"
-                                onClick={() => goToCardPage(Math.max(0, currentPage - 1))}
+                                onClick={() => goToReportPage(Math.max(0, currentPage - 1))}
                                 disabled={!canGoToPreviousPage}
                             >
                                 <ChevronLeft className="h-3.5 w-3.5" />
@@ -1885,7 +1885,7 @@ export default function CreativeSpace() {
                             <Button
                                 variant="ghost"
                                 size="sm"
-                                onClick={() => goToCardPage(currentPage + 1)}
+                                onClick={() => goToReportPage(currentPage + 1)}
                                 disabled={!canGoToNextPage}
                             >
                                 <span className="sr-only">{t("nextPage", { ns: "common" })}</span>
@@ -1897,7 +1897,7 @@ export default function CreativeSpace() {
                             <Button
                                 variant="ghost"
                                 size="sm"
-                                onClick={() => goToCardPage(Math.max(0, currentPage - 1))}
+                                onClick={() => goToReportPage(Math.max(0, currentPage - 1))}
                                 disabled={!canGoToPreviousPage}
                             >
                                 <ChevronLeft className="h-3.5 w-3.5" />
@@ -1927,7 +1927,7 @@ export default function CreativeSpace() {
                                             variant={isCurrentPage ? "default" : "ghost"}
                                             size="sm"
                                             aria-current={isCurrentPage ? "page" : undefined}
-                                            onClick={isCurrentPage ? undefined : () => goToCardPage(item.page)}
+                                            onClick={isCurrentPage ? undefined : () => goToReportPage(item.page)}
                                             className={cn(
                                                 "h-7 min-w-7 px-2 text-xs",
                                                 isCurrentPage && "pointer-events-none",
@@ -1942,7 +1942,7 @@ export default function CreativeSpace() {
                             <Button
                                 variant="ghost"
                                 size="sm"
-                                onClick={() => goToCardPage(currentPage + 1)}
+                                onClick={() => goToReportPage(currentPage + 1)}
                                 disabled={!canGoToNextPage}
                             >
                                 {t("next", { ns: "common" })}
@@ -1955,9 +1955,9 @@ export default function CreativeSpace() {
                 <Dialog open={manualDialogOpen} onOpenChange={setManualDialogOpen}>
                     <DialogContent className="flex max-h-[90vh] max-w-4xl flex-col gap-0 overflow-hidden p-0">
                         <DialogHeader className="shrink-0 border-b px-4 pb-3 pt-4">
-                            <DialogTitle>{t("generateCardDialog")}</DialogTitle>
+                            <DialogTitle>{t("generateReportDialog")}</DialogTitle>
                             <DialogDescription>
-                                {t("selectUpTo", { count: activeProject.max_articles_per_card })}
+                                {t("selectUpTo", { count: activeProject.max_articles_per_report })}
                             </DialogDescription>
                         </DialogHeader>
 
@@ -2000,7 +2000,7 @@ export default function CreativeSpace() {
 
                                 <div className="flex items-center justify-between text-sm">
                                     <span className="text-muted-foreground">
-                                        {t("nSelected", { count: selectedArticleIds.length })} / {t("nMax", { count: activeProject.max_articles_per_card })}
+                                        {t("nSelected", { count: selectedArticleIds.length })} / {t("nMax", { count: activeProject.max_articles_per_report })}
                                     </span>
                                     <Button type="button" variant="ghost" size="sm" onClick={() => setSelectedArticleIds([])} disabled={selectedArticleIds.length === 0}>
                                         {t("clearSelection")}
@@ -2024,7 +2024,7 @@ export default function CreativeSpace() {
 
                                     {!isLoadingCandidates && articleCandidates.map((article) => {
                                         const isSelected = selectedArticleIds.includes(article.id);
-                                        const isSelectionLocked = !isSelected && selectedArticleIds.length >= activeProject.max_articles_per_card;
+                                        const isSelectionLocked = !isSelected && selectedArticleIds.length >= activeProject.max_articles_per_report;
 
                                         return (
                                             <button
@@ -2068,7 +2068,7 @@ export default function CreativeSpace() {
                                 {t("cancel", { ns: "common" })}
                             </Button>
                             <Button type="button" onClick={handleManualGenerate} disabled={selectedArticleIds.length === 0 || isGenerating}>
-                                {isGenerating ? t("generating") : t("generateCard")}
+                                {isGenerating ? t("generating") : t("generateReport")}
                             </Button>
                         </DialogFooter>
                     </DialogContent>
@@ -2097,7 +2097,7 @@ export default function CreativeSpace() {
                 showDescription: false,
                 stats: [
                     { label: t("projects"), value: t("nTotal", { count: projects.length }) },
-                    { label: t("unreadCards"), value: formatUnreadCardCount(totalUnreadCardCount), tone: totalUnreadCardCount > 0 ? "warning" : "default" },
+                    { label: t("unreadReports"), value: formatUnreadReportCount(totalUnreadReportCount), tone: totalUnreadReportCount > 0 ? "warning" : "default" },
                     { label: t("autoEnabled"), value: t("nActive", { count: autoEnabledProjectCount }), tone: "accent" },
                 ],
                 actions: renderProjectDialog(
@@ -2108,14 +2108,14 @@ export default function CreativeSpace() {
             }}
         >
 
-            <div className={CREATIVE_TILE_GRID_CLASS}>
+            <div className={AUTOMATION_TILE_GRID_CLASS}>
                 {projects.map((project) => (
                     <Card
                         key={project.id}
                         className={cn(
                             PROJECT_TILE_CARD_CLASS,
                             "rounded-lg border-border bg-card",
-                            project.unread_card_count > 0
+                            project.unread_report_count > 0
                                 ? "border-sky-200/80 shadow-[0_24px_52px_-40px_rgba(14,165,233,0.32)] dark:border-sky-400/20"
                                 : "shadow-[0_18px_42px_-38px_rgba(15,15,15,0.28)]",
                         )}
@@ -2124,15 +2124,15 @@ export default function CreativeSpace() {
                         onClick={() => openProjectDetail(project.id)}
                         onKeyDown={(event) => handleProjectCardKeyDown(event, project.id)}
                     >
-                        <CardHeader className={CREATIVE_TILE_HEADER_CLASS}>
+                        <CardHeader className={AUTOMATION_TILE_HEADER_CLASS}>
                             <div className="flex items-start justify-between gap-4">
                                 <div className="min-w-0 flex-1">
                                     <CardTitle className="truncate text-xl tracking-tight">{project.name}</CardTitle>
                                 </div>
-                                {project.unread_card_count > 0 && (
+                                {project.unread_report_count > 0 && (
                                     <div className="inline-flex h-11 min-w-[2.75rem] shrink-0 items-center justify-center rounded-full border border-sky-200 bg-sky-100/85 px-2 text-sm font-semibold leading-none tabular-nums text-sky-700 dark:border-sky-400/20 dark:bg-sky-500/15 dark:text-sky-300">
                                         <span>
-                                            {formatUnreadCardCount(project.unread_card_count)}
+                                            {formatUnreadReportCount(project.unread_report_count)}
                                         </span>
                                     </div>
                                 )}
@@ -2141,7 +2141,7 @@ export default function CreativeSpace() {
                                 {project.prompt}
                             </CardDescription>
                         </CardHeader>
-                        <CardContent className={`${CREATIVE_TILE_BODY_CLASS} text-sm text-muted-foreground`}>
+                        <CardContent className={`${AUTOMATION_TILE_BODY_CLASS} text-sm text-muted-foreground`}>
                             <div className="mt-auto border-t border-border pt-3">
                                 <div className="grid grid-cols-3 gap-3 text-left">
                                     <div>
@@ -2156,7 +2156,7 @@ export default function CreativeSpace() {
                                     </div>
                                     <div>
                                         <div className="text-[10px] font-medium uppercase tracking-[0.16em] text-muted-foreground">{t("minLabel")}–{t("maxLabel")}</div>
-                                        <div className="mt-1 text-sm font-medium text-foreground">{project.min_articles_per_card}–{project.max_articles_per_card} {t("articlesUnit")}</div>
+                                        <div className="mt-1 text-sm font-medium text-foreground">{project.min_articles_per_report}–{project.max_articles_per_report} {t("articlesUnit")}</div>
                                     </div>
                                 </div>
                             </div>
@@ -2166,7 +2166,7 @@ export default function CreativeSpace() {
                                     variant="outline"
                                     size="sm"
                                     onClick={(event) => {
-                                        stopCardEventPropagation(event);
+                                        stopReportEventPropagation(event);
                                         openEditProjectDialog(project);
                                     }}
                                 >
@@ -2178,7 +2178,7 @@ export default function CreativeSpace() {
                                     size="sm"
                                     className="ml-auto text-destructive"
                                     onClick={(event) => {
-                                        stopCardEventPropagation(event);
+                                        stopReportEventPropagation(event);
                                         openDeleteProjectDialog(project);
                                     }}
                                     disabled={deletingProjectId === project.id}
@@ -2194,7 +2194,7 @@ export default function CreativeSpace() {
 
                 {projects.length === 0 && (
                     <div className="editor-empty col-span-full">
-                        {t("noCreativeProjectsYet")}
+                        {t("noAutomationProjectsYet")}
                     </div>
                 )}
             </div>

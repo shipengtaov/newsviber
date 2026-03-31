@@ -2,9 +2,9 @@ import { useEffect, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/utils";
-import { Newspaper, Rss, MessageSquare, Lightbulb, Settings } from "lucide-react";
-import { addCreativeSyncListener } from "@/lib/creative-events";
-import { listCreativeProjects } from "@/lib/creative-service";
+import { Newspaper, Rss, MessageSquare, Bot, Settings } from "lucide-react";
+import { addAutomationSyncListener } from "@/lib/automation-events";
+import { listAutomationProjects } from "@/lib/automation-service";
 import { addNewsSyncListener } from "@/lib/news-events";
 import { listNewsSources } from "@/lib/news-service";
 import { useAppUpdate } from "@/components/update/AppUpdateProvider";
@@ -17,7 +17,7 @@ type NavItem = {
     name: string;
     path: string;
     icon: typeof Newspaper;
-    unreadScope?: "news" | "creative";
+    unreadScope?: "news" | "automation";
 };
 
 export function Sidebar({ collapsed }: SidebarProps) {
@@ -25,10 +25,10 @@ export function Sidebar({ collapsed }: SidebarProps) {
     const location = useLocation();
     const { currentVersion } = useAppUpdate();
     const [hasNewsUnread, setHasNewsUnread] = useState(false);
-    const [hasCreativeUnread, setHasCreativeUnread] = useState(false);
+    const [hasAutomationUnread, setHasAutomationUnread] = useState(false);
     const navItems: NavItem[] = [
         { name: t("nav.news"), path: "/", icon: Newspaper, unreadScope: "news" },
-        { name: t("nav.creativeSpace"), path: "/creative", icon: Lightbulb, unreadScope: "creative" },
+        { name: t("nav.automation"), path: "/automation", icon: Bot, unreadScope: "automation" },
         { name: t("nav.chat"), path: "/chat", icon: MessageSquare },
         { name: t("nav.sources"), path: "/sources", icon: Rss },
         { name: t("nav.settings"), path: "/settings", icon: Settings },
@@ -51,31 +51,31 @@ export function Sidebar({ collapsed }: SidebarProps) {
             }
         }
 
-        async function refreshCreativeUnreadState() {
+        async function refreshAutomationUnreadState() {
             try {
-                const projects = await listCreativeProjects();
+                const projects = await listAutomationProjects();
                 if (!isDisposed) {
-                    setHasCreativeUnread(projects.some((project) => project.unread_card_count > 0));
+                    setHasAutomationUnread(projects.some((project) => project.unread_report_count > 0));
                 }
             } catch (error) {
-                console.error("Failed to refresh sidebar creative unread state", error);
+                console.error("Failed to refresh sidebar automation unread state", error);
             }
         }
 
         void refreshNewsUnreadState();
-        void refreshCreativeUnreadState();
+        void refreshAutomationUnreadState();
 
         const removeNewsSyncListener = addNewsSyncListener(() => {
             void refreshNewsUnreadState();
         });
-        const removeCreativeSyncListener = addCreativeSyncListener(() => {
-            void refreshCreativeUnreadState();
+        const removeAutomationSyncListener = addAutomationSyncListener(() => {
+            void refreshAutomationUnreadState();
         });
 
         return () => {
             isDisposed = true;
             removeNewsSyncListener();
-            removeCreativeSyncListener();
+            removeAutomationSyncListener();
         };
     }, []);
 
@@ -119,8 +119,8 @@ export function Sidebar({ collapsed }: SidebarProps) {
                             : location.pathname === item.path || location.pathname.startsWith(`${item.path}/`);
                         const hasUnreadIndicator = item.unreadScope === "news"
                             ? hasNewsUnread
-                            : item.unreadScope === "creative"
-                                ? hasCreativeUnread
+                            : item.unreadScope === "automation"
+                                ? hasAutomationUnread
                                 : false;
                         return (
                             <Link

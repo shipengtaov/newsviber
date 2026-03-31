@@ -325,6 +325,173 @@ pub fn get_migrations() -> Vec<Migration> {
                 ALTER TABLE creative_cards ADD COLUMN is_favorite BOOLEAN NOT NULL DEFAULT 0;
             ",
             kind: MigrationKind::Up,
+        },
+        Migration {
+            version: 13,
+            description: "rename_creative_tables_to_automation",
+            sql: "
+                PRAGMA foreign_keys=OFF;
+
+                ALTER TABLE creative_projects RENAME TO creative_projects_old;
+                ALTER TABLE creative_project_sources RENAME TO creative_project_sources_old;
+                ALTER TABLE creative_cards RENAME TO creative_cards_old;
+                ALTER TABLE creative_card_articles RENAME TO creative_card_articles_old;
+
+                CREATE TABLE automation_projects (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    name TEXT NOT NULL,
+                    prompt TEXT NOT NULL,
+                    cycle_mode TEXT NOT NULL,
+                    filter_source_id INTEGER,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    auto_enabled BOOLEAN NOT NULL DEFAULT 0,
+                    auto_interval_minutes INTEGER NOT NULL DEFAULT 60,
+                    max_articles_per_card INTEGER NOT NULL DEFAULT 12,
+                    last_auto_checked_at DATETIME,
+                    last_auto_generated_at DATETIME,
+                    min_articles_per_card INTEGER NOT NULL DEFAULT 1,
+                    web_search_enabled BOOLEAN NOT NULL DEFAULT 0
+                );
+
+                INSERT INTO automation_projects (
+                    id,
+                    name,
+                    prompt,
+                    cycle_mode,
+                    filter_source_id,
+                    created_at,
+                    auto_enabled,
+                    auto_interval_minutes,
+                    max_articles_per_card,
+                    last_auto_checked_at,
+                    last_auto_generated_at,
+                    min_articles_per_card,
+                    web_search_enabled
+                )
+                SELECT
+                    id,
+                    name,
+                    prompt,
+                    cycle_mode,
+                    filter_source_id,
+                    created_at,
+                    auto_enabled,
+                    auto_interval_minutes,
+                    max_articles_per_card,
+                    last_auto_checked_at,
+                    last_auto_generated_at,
+                    min_articles_per_card,
+                    web_search_enabled
+                FROM creative_projects_old;
+
+                CREATE TABLE automation_project_sources (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    project_id INTEGER NOT NULL,
+                    source_id INTEGER NOT NULL,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY(project_id) REFERENCES automation_projects(id) ON DELETE CASCADE,
+                    FOREIGN KEY(source_id) REFERENCES sources(id) ON DELETE CASCADE
+                );
+
+                INSERT INTO automation_project_sources (
+                    id,
+                    project_id,
+                    source_id,
+                    created_at
+                )
+                SELECT
+                    id,
+                    project_id,
+                    source_id,
+                    created_at
+                FROM creative_project_sources_old;
+
+                CREATE TABLE automation_reports (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    project_id INTEGER NOT NULL,
+                    title TEXT NOT NULL,
+                    full_report TEXT,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    generation_mode TEXT NOT NULL DEFAULT 'manual',
+                    used_article_count INTEGER NOT NULL DEFAULT 0,
+                    is_read BOOLEAN NOT NULL DEFAULT 0,
+                    is_favorite BOOLEAN NOT NULL DEFAULT 0,
+                    FOREIGN KEY(project_id) REFERENCES automation_projects(id) ON DELETE CASCADE
+                );
+
+                INSERT INTO automation_reports (
+                    id,
+                    project_id,
+                    title,
+                    full_report,
+                    created_at,
+                    generation_mode,
+                    used_article_count,
+                    is_read,
+                    is_favorite
+                )
+                SELECT
+                    id,
+                    project_id,
+                    title,
+                    full_report,
+                    created_at,
+                    generation_mode,
+                    used_article_count,
+                    is_read,
+                    is_favorite
+                FROM creative_cards_old;
+
+                CREATE TABLE automation_report_articles (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    report_id INTEGER NOT NULL,
+                    article_id INTEGER NOT NULL,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY(report_id) REFERENCES automation_reports(id) ON DELETE CASCADE,
+                    FOREIGN KEY(article_id) REFERENCES articles(id) ON DELETE CASCADE
+                );
+
+                INSERT INTO automation_report_articles (
+                    id,
+                    report_id,
+                    article_id,
+                    created_at
+                )
+                SELECT
+                    id,
+                    card_id,
+                    article_id,
+                    created_at
+                FROM creative_card_articles_old;
+
+                DROP TABLE creative_card_articles_old;
+                DROP TABLE creative_cards_old;
+                DROP TABLE creative_project_sources_old;
+                DROP TABLE creative_projects_old;
+
+                CREATE UNIQUE INDEX IF NOT EXISTS idx_automation_project_sources_unique
+                    ON automation_project_sources(project_id, source_id);
+                CREATE INDEX IF NOT EXISTS idx_automation_project_sources_project
+                    ON automation_project_sources(project_id);
+                CREATE UNIQUE INDEX IF NOT EXISTS idx_automation_report_articles_unique
+                    ON automation_report_articles(report_id, article_id);
+                CREATE INDEX IF NOT EXISTS idx_automation_report_articles_article
+                    ON automation_report_articles(article_id);
+                CREATE INDEX IF NOT EXISTS idx_automation_reports_project_created
+                    ON automation_reports(project_id, created_at DESC);
+
+                PRAGMA foreign_keys=ON;
+            ",
+            kind: MigrationKind::Up,
+        },
+        Migration {
+            version: 14,
+            description: "rename_automation_project_card_columns_to_report",
+            sql: "
+                ALTER TABLE automation_projects RENAME COLUMN max_articles_per_card TO max_articles_per_report;
+                ALTER TABLE automation_projects RENAME COLUMN min_articles_per_card TO min_articles_per_report;
+            ",
+            kind: MigrationKind::Up,
         }
     ]
 }

@@ -29,16 +29,16 @@ export type Message = {
   content: string;
 };
 
-export const creativeReportSchema = z.object({
+export const automationReportSchema = z.object({
   title: z.string().describe("A concise, catchy title for the insight."),
   markdown: z.string().describe(
     "The markdown body of the report, following the user's requested structure when possible. Do not repeat the full report title as a top-level heading.",
   ),
 });
 
-export type CreativeReport = z.infer<typeof creativeReportSchema>;
+export type AutomationReportDraft = z.infer<typeof automationReportSchema>;
 
-const optimizeCreativePromptSchema = z.object({
+const optimizeAutomationPromptSchema = z.object({
   optimized_prompt: z.string().describe(
     "A refined version of the user's prompt as a single prompt block, with no explanation or code fences.",
   ),
@@ -238,7 +238,7 @@ function hasToolErrorInContent(
   return content.some((part) => part.type === "tool-error");
 }
 
-type GenerateCreativeReportInput = {
+type GenerateAutomationReportDraftInput = {
   prompt: string;
   enableWebSearch: boolean;
 };
@@ -612,12 +612,12 @@ export async function streamConversation(
   }
 }
 
-async function attemptGenerateCreativeReport(input: GenerateCreativeReportInput): Promise<CreativeReport> {
+async function attemptGenerateAutomationReportDraft(input: GenerateAutomationReportDraftInput): Promise<AutomationReportDraft> {
   const tools = canEnableWebSearch(input.enableWebSearch) ? createWebSearchToolSet() : undefined;
   const result = await generateText({
     model: resolveModel(),
     prompt: input.prompt,
-    output: Output.object({ schema: creativeReportSchema }),
+    output: Output.object({ schema: automationReportSchema }),
     ...(tools ? { tools, stopWhen: stepCountIs(WEB_SEARCH_REPORT_STOP_STEPS) } : {}),
   });
 
@@ -625,21 +625,21 @@ async function attemptGenerateCreativeReport(input: GenerateCreativeReportInput)
     throw new WebSearchFallbackError("Web search tool execution failed.");
   }
 
-  return creativeReportSchema.parse(result.output);
+  return automationReportSchema.parse(result.output);
 }
 
-export async function generateCreativeReport(input: GenerateCreativeReportInput): Promise<CreativeReport> {
+export async function generateAutomationReportDraft(input: GenerateAutomationReportDraftInput): Promise<AutomationReportDraft> {
   const { provider } = getActiveAIProviderSettings();
 
   try {
     try {
-      return await attemptGenerateCreativeReport(input);
+      return await attemptGenerateAutomationReportDraft(input);
     } catch (error) {
       if (!input.enableWebSearch || !shouldRetryWithoutWebSearch(error)) {
         throw error;
       }
 
-      return attemptGenerateCreativeReport({
+      return attemptGenerateAutomationReportDraft({
         ...input,
         enableWebSearch: false,
       });
@@ -649,7 +649,7 @@ export async function generateCreativeReport(input: GenerateCreativeReportInput)
   }
 }
 
-export async function optimizeCreativeProjectPrompt(rawPrompt: string): Promise<string> {
+export async function optimizeAutomationProjectPrompt(rawPrompt: string): Promise<string> {
   const { provider } = getActiveAIProviderSettings();
   const trimmedPrompt = rawPrompt.trim();
   if (!trimmedPrompt) {
@@ -659,8 +659,8 @@ export async function optimizeCreativeProjectPrompt(rawPrompt: string): Promise<
   try {
     const result = await generateObject({
       model: resolveModel(),
-      schema: optimizeCreativePromptSchema,
-      prompt: `You are improving a creative analysis prompt for a news intelligence workspace.
+      schema: optimizeAutomationPromptSchema,
+      prompt: `You are improving an automation project prompt for a news intelligence workspace.
 
 Rewrite the user's prompt so it is clearer, more actionable, and more likely to produce a strong report.
 

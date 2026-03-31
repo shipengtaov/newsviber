@@ -11,9 +11,10 @@ describe("PageShell", () => {
         );
 
         expect(markup).toContain('class="mx-auto w-full');
-        expect(markup).toContain("px-3");
-        expect(markup).toContain("md:px-4");
-        expect(markup).toContain("py-3");
+        expect(markup).toContain("px-2");
+        expect(markup).toContain("md:px-3");
+        expect(markup).toContain("py-2");
+        expect(markup).toContain("md:py-3");
         expect(markup).toContain("max-w-6xl");
         expect(markup).toContain(">Body<");
     });

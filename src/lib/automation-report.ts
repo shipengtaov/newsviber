@@ -1,4 +1,4 @@
-type CreativeCardContentSource = {
+type AutomationReportContentSource = {
   full_report?: string | null;
 };
 
@@ -17,16 +17,16 @@ function markdownToPlainText(markdown: string): string {
     .trim();
 }
 
-export function getCreativeCardBodyMarkdown(card: CreativeCardContentSource): string {
-  const fullReport = (card.full_report ?? "").trim();
+export function getAutomationReportBodyMarkdown(report: AutomationReportContentSource): string {
+  const fullReport = (report.full_report ?? "").trim();
   return fullReport || "_No content provided._";
 }
 
-export function getCreativeCardPreviewExcerpt(
-  card: CreativeCardContentSource,
+export function getAutomationReportPreviewExcerpt(
+  report: AutomationReportContentSource,
   maxLength = 220,
 ): string {
-  const plainText = markdownToPlainText(getCreativeCardBodyMarkdown(card));
+  const plainText = markdownToPlainText(getAutomationReportBodyMarkdown(report));
   if (!plainText) {
     return "No content provided.";
   }

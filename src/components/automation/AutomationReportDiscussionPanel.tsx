@@ -9,7 +9,7 @@ import { type Message } from "@/lib/ai";
 import { type StreamPhase } from "@/hooks/use-streaming-conversation";
 import { cn } from "@/lib/utils";
 
-type CreativeCardDiscussionPanelProps = {
+type AutomationReportDiscussionPanelProps = {
     variant?: "inline" | "sheet";
     chatMessages: Message[];
     isChatStreaming: boolean;
@@ -24,19 +24,19 @@ type CreativeCardDiscussionPanelProps = {
     className?: string;
 };
 
-type CreativeCardDiscussionRailProps = {
+type AutomationReportDiscussionRailProps = {
     open: boolean;
     children: ReactNode;
     className?: string;
 };
 
-function CreativeCardDiscussionHeader({
+function AutomationReportDiscussionHeader({
     variant,
     webSearchStatus = "disabled",
     onClose,
     showCloseButton,
-}: Pick<CreativeCardDiscussionPanelProps, "variant" | "webSearchStatus" | "onClose" | "showCloseButton">) {
-    const { t } = useTranslation("creative");
+}: Pick<AutomationReportDiscussionPanelProps, "variant" | "webSearchStatus" | "onClose" | "showCloseButton">) {
+    const { t } = useTranslation("automation");
     const webSearchNotice = webSearchStatus === "ready"
         ? t("webSearchReady")
         : webSearchStatus === "unavailable"
@@ -46,8 +46,8 @@ function CreativeCardDiscussionHeader({
     if (variant === "sheet") {
         return (
             <SheetHeader className="shrink-0 border-b border-border px-4 pb-3 pt-3 text-left">
-                <SheetTitle>{t("discussCard")}</SheetTitle>
-                <SheetDescription>{t("discussCardDesc")}</SheetDescription>
+                <SheetTitle>{t("discussReport")}</SheetTitle>
+                <SheetDescription>{t("discussReportDesc")}</SheetDescription>
                 {webSearchNotice ? (
                     <p
                         className={cn(
@@ -66,8 +66,8 @@ function CreativeCardDiscussionHeader({
         <div className="shrink-0 border-b border-border px-4 pb-3 pt-3">
             <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0 space-y-2">
-                    <h2 className="text-lg font-semibold text-foreground">{t("discussCard")}</h2>
-                    <p className="text-sm text-muted-foreground">{t("discussCardDesc")}</p>
+                    <h2 className="text-lg font-semibold text-foreground">{t("discussReport")}</h2>
+                    <p className="text-sm text-muted-foreground">{t("discussReportDesc")}</p>
                     {webSearchNotice ? (
                         <p
                             className={cn(
@@ -97,7 +97,7 @@ function CreativeCardDiscussionHeader({
     );
 }
 
-export function CreativeCardDiscussionPanel({
+export function AutomationReportDiscussionPanel({
     variant = "inline",
     chatMessages,
     isChatStreaming,
@@ -110,12 +110,12 @@ export function CreativeCardDiscussionPanel({
     showCloseButton = false,
     scrollRef,
     className,
-}: CreativeCardDiscussionPanelProps) {
-    const { t } = useTranslation("creative");
+}: AutomationReportDiscussionPanelProps) {
+    const { t } = useTranslation("automation");
 
     return (
         <div className={cn("flex h-full min-h-0 flex-col", className)}>
-            <CreativeCardDiscussionHeader
+            <AutomationReportDiscussionHeader
                 variant={variant}
                 webSearchStatus={webSearchStatus}
                 onClose={onClose}
@@ -196,11 +196,11 @@ export function CreativeCardDiscussionPanel({
     );
 }
 
-export function CreativeCardDiscussionRail({
+export function AutomationReportDiscussionRail({
     open,
     children,
     className,
-}: CreativeCardDiscussionRailProps) {
+}: AutomationReportDiscussionRailProps) {
     return (
         <div
             className={cn(

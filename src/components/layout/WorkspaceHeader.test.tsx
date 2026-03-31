@@ -24,8 +24,8 @@ describe("WorkspaceHeader", () => {
 
         expect(markup).toContain('<h1 class="sr-only">News overview</h1>');
         expect(markup).not.toContain("font-display font-semibold tracking-[-0.04em] text-foreground text-2xl md:text-[1.9rem]");
-        expect(markup).toContain('class="flex flex-col gap-3.5"');
-        expect(countOccurrences(markup, 'class="stat-pill ')).toBe(2);
+        expect(markup).toContain('class="flex flex-col gap-2.5"');
+        expect(countOccurrences(markup, 'class="stat-pill"')).toBe(2);
         expect(countOccurrences(markup, ">Refresh<")).toBe(1);
     });
 
@@ -47,8 +47,8 @@ describe("WorkspaceHeader", () => {
 
         expect(markup).toContain('<h1 class="sr-only">News overview</h1>');
         expect(markup).not.toContain("font-display font-semibold tracking-[-0.04em] text-foreground text-2xl md:text-[1.9rem]");
-        expect(markup).toContain('class="flex flex-col gap-2.5"');
-        expect(countOccurrences(markup, 'class="stat-pill ')).toBe(2);
+        expect(markup).toContain('class="flex flex-col gap-2"');
+        expect(countOccurrences(markup, 'class="stat-pill"')).toBe(2);
         expect(countOccurrences(markup, ">Refresh<")).toBe(1);
     });
 });

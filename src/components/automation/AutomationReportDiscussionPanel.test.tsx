@@ -1,12 +1,12 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
-import { CreativeCardDiscussionPanel, CreativeCardDiscussionRail } from "@/components/creative/CreativeCardDiscussionPanel";
+import { AutomationReportDiscussionPanel, AutomationReportDiscussionRail } from "@/components/automation/AutomationReportDiscussionPanel";
 
 vi.mock("react-i18next", () => ({
     useTranslation: () => ({
         t: (key: string) => ({
-            discussCard: "Discuss Card",
-            discussCardDesc: "Ask follow-up questions or expand the report with AI.",
+            discussReport: "Discuss Report",
+            discussReportDesc: "Ask follow-up questions or expand the report with AI.",
             expandReport: "Expand on this report with AI.",
             exploreFurther: "Explore further...",
             closeDiscussion: "Close discussion",
@@ -18,10 +18,10 @@ vi.mock("react-i18next", () => ({
     }),
 }));
 
-describe("CreativeCardDiscussionPanel", () => {
+describe("AutomationReportDiscussionPanel", () => {
     it("renders the inline panel without requiring sheet context", () => {
         const markup = renderToStaticMarkup(
-            <CreativeCardDiscussionPanel
+            <AutomationReportDiscussionPanel
                 variant="inline"
                 chatMessages={[]}
                 isChatStreaming={false}
@@ -33,7 +33,7 @@ describe("CreativeCardDiscussionPanel", () => {
             />,
         );
 
-        expect(markup).toContain("Discuss Card");
+        expect(markup).toContain("Discuss Report");
         expect(markup).toContain("Ask follow-up questions or expand the report with AI.");
         expect(markup).toContain("Expand on this report with AI.");
         expect(markup).toContain("Explore further...");
@@ -41,7 +41,7 @@ describe("CreativeCardDiscussionPanel", () => {
 
     it("renders the web search notice when live search is available", () => {
         const markup = renderToStaticMarkup(
-            <CreativeCardDiscussionPanel
+            <AutomationReportDiscussionPanel
                 variant="inline"
                 chatMessages={[]}
                 isChatStreaming={false}
@@ -59,9 +59,9 @@ describe("CreativeCardDiscussionPanel", () => {
 
     it("keeps the desktop rail mounted but hidden when closed", () => {
         const markup = renderToStaticMarkup(
-            <CreativeCardDiscussionRail open={false}>
+            <AutomationReportDiscussionRail open={false}>
                 <div>Discussion body</div>
-            </CreativeCardDiscussionRail>,
+            </AutomationReportDiscussionRail>,
         );
 
         expect(markup).toContain('data-open="false"');

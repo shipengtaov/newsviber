@@ -6,7 +6,7 @@ import { Sidebar } from "@/components/layout/Sidebar";
 const translations: Record<string, string> = {
     appName: "News Viber",
     "nav.news": "News",
-    "nav.creativeSpace": "Creative Space",
+    "nav.automation": "Automation",
     "nav.chat": "Chat",
     "nav.sources": "Sources",
     "nav.settings": "Settings",
@@ -28,16 +28,16 @@ vi.mock("@/lib/news-service", () => ({
     listNewsSources: vi.fn().mockResolvedValue([]),
 }));
 
-vi.mock("@/lib/creative-service", () => ({
-    listCreativeProjects: vi.fn().mockResolvedValue([]),
+vi.mock("@/lib/automation-service", () => ({
+    listAutomationProjects: vi.fn().mockResolvedValue([]),
 }));
 
 vi.mock("@/lib/news-events", () => ({
     addNewsSyncListener: vi.fn(() => () => {}),
 }));
 
-vi.mock("@/lib/creative-events", () => ({
-    addCreativeSyncListener: vi.fn(() => () => {}),
+vi.mock("@/lib/automation-events", () => ({
+    addAutomationSyncListener: vi.fn(() => () => {}),
 }));
 
 function renderSidebar(pathname: string, collapsed = false): string {
@@ -53,7 +53,7 @@ describe("Sidebar", () => {
         const markup = renderSidebar("/");
         const labels = [
             translations["nav.news"],
-            translations["nav.creativeSpace"],
+            translations["nav.automation"],
             translations["nav.chat"],
             translations["nav.sources"],
             translations["nav.settings"],
@@ -82,9 +82,9 @@ describe("Sidebar", () => {
 
         expect(expandedMarkup).toContain('data-sidebar-shell="true"');
         expect(expandedMarkup).toContain("border-r");
-        expect(expandedMarkup).toContain("w-64");
+        expect(expandedMarkup).toContain("w-56");
         expect(expandedMarkup).not.toContain("w-[18.75rem]");
-        expect(collapsedMarkup).toContain("w-20");
+        expect(collapsedMarkup).toContain("w-16");
     });
 
     it("keeps the icon rail anchored in collapsed mode", () => {
@@ -92,18 +92,16 @@ describe("Sidebar", () => {
 
         expect(markup).toContain("pt-[var(--layout-titlebar-safe-height)]");
         expect(markup).not.toContain("surface-panel flex h-full shrink-0 flex-col overflow-hidden px-2 py-3");
-        expect(markup).toContain("grid-cols-[3rem_0fr] gap-0");
-        expect(markup).not.toContain("grid-cols-[3rem_0fr] justify-center");
-        expect(markup).toContain("mt-4 flex-1 space-y-1.5 px-2");
-        expect(markup).toContain("grid-cols-[1.25rem_0fr] gap-0 px-3.5");
-        expect(markup).not.toContain("grid-cols-[1.25rem_0fr] justify-center");
+        expect(markup).toContain("grid-cols-[2rem_0fr] gap-0");
+        expect(markup).toContain("mt-2 flex-1 space-y-0.5 px-0.5");
+        expect(markup).toContain("grid-cols-[1.25rem_0fr] gap-0 px-2.5");
     });
 
     it("keeps the active state logic for non-root routes", () => {
-        const markup = renderSidebar("/creative");
+        const markup = renderSidebar("/automation");
 
-        expect(markup).toContain(`title="${translations["nav.creativeSpace"]}" aria-current="page"`);
-        expect(markup).toContain(`title="${translations["nav.creativeSpace"]}" aria-current="page" data-active="true"`);
+        expect(markup).toContain(`title="${translations["nav.automation"]}" aria-current="page"`);
+        expect(markup).toContain(`title="${translations["nav.automation"]}" aria-current="page" data-active="true"`);
         expect(markup).toContain(`title="${translations["nav.sources"]}" data-active="false"`);
     });
 });

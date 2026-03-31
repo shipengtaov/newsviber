@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
-  getCreativeCardBodyMarkdown,
-  getCreativeCardPreviewExcerpt,
-} from "@/lib/creative-card";
+  getAutomationReportBodyMarkdown,
+  getAutomationReportPreviewExcerpt,
+} from "@/lib/automation-report";
 
-describe("creative card helpers", () => {
+describe("automation report helpers", () => {
   it("returns the stored markdown body without rewriting headings", () => {
-    expect(getCreativeCardBodyMarkdown({
+    expect(getAutomationReportBodyMarkdown({
       full_report: "# Weekly Brief\n\n## Opportunities\nLaunch faster.",
     })).toBe(
       "# Weekly Brief\n\n## Opportunities\nLaunch faster.",
@@ -15,13 +15,13 @@ describe("creative card helpers", () => {
 
   it("builds a readable preview excerpt from markdown content", () => {
     expect(
-      getCreativeCardPreviewExcerpt({
+      getAutomationReportPreviewExcerpt({
         full_report: "# Weekly Brief\n\n## Opportunities\n- Launch faster\n- Talk to customers",
       }, 80),
     ).toBe("Weekly Brief Opportunities Launch faster Talk to customers");
   });
 
   it("returns a placeholder when no content exists", () => {
-    expect(getCreativeCardBodyMarkdown({})).toBe("_No content provided._");
+    expect(getAutomationReportBodyMarkdown({})).toBe("_No content provided._");
   });
 });

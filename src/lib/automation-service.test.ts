@@ -1,19 +1,19 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 const {
-    dispatchCreativeSyncEventMock,
-    generateCreativeReportMock,
+    dispatchAutomationSyncEventMock,
+    generateAutomationReportDraftMock,
     getDbMock,
     invokeMock,
 } = vi.hoisted(() => ({
-    dispatchCreativeSyncEventMock: vi.fn(),
-    generateCreativeReportMock: vi.fn(),
+    dispatchAutomationSyncEventMock: vi.fn(),
+    generateAutomationReportDraftMock: vi.fn(),
     getDbMock: vi.fn(),
     invokeMock: vi.fn(),
 }));
 
-vi.mock("@/lib/creative-events", () => ({
-    dispatchCreativeSyncEvent: dispatchCreativeSyncEventMock,
+vi.mock("@/lib/automation-events", () => ({
+    dispatchAutomationSyncEvent: dispatchAutomationSyncEventMock,
 }));
 
 vi.mock("@/lib/db", () => ({
@@ -29,45 +29,45 @@ vi.mock("@/lib/ai", async () => {
 
     return {
         ...actual,
-        generateCreativeReport: generateCreativeReportMock,
+        generateAutomationReportDraft: generateAutomationReportDraftMock,
     };
 });
 
 import {
-    buildCreativePrompt,
-    generateCreativeCardForProject,
-    listCreativeCards,
-    listCreativeProjects,
-    markAllCreativeCardsAsRead,
-    markCreativeCardAsRead,
-    setCreativeCardFavorite,
+    buildAutomationPrompt,
+    generateAutomationReportForProject,
+    listAutomationReports,
+    listAutomationProjects,
+    markAllAutomationReportsAsRead,
+    markAutomationReportAsRead,
+    setAutomationReportFavorite,
     summarizeArticleContextText,
-} from "@/lib/creative-service";
+} from "@/lib/automation-service";
 
-const baseCreativeProject = {
+const baseAutomationProject = {
     id: 1,
     name: "Founder ideas",
     prompt: "Please find startup patterns.",
     cycle_mode: "manual",
     auto_enabled: false,
     auto_interval_minutes: 60,
-    max_articles_per_card: 12,
-    min_articles_per_card: 1,
+    max_articles_per_report: 12,
+    min_articles_per_report: 1,
     web_search_enabled: false,
     last_auto_checked_at: null,
     last_auto_generated_at: null,
     source_ids: [],
-    unread_card_count: 0,
+    unread_report_count: 0,
 };
 
 afterEach(() => {
-    dispatchCreativeSyncEventMock.mockReset();
-    generateCreativeReportMock.mockReset();
+    dispatchAutomationSyncEventMock.mockReset();
+    generateAutomationReportDraftMock.mockReset();
     getDbMock.mockReset();
     invokeMock.mockReset();
 });
 
-describe("creative service context helpers", () => {
+describe("automation service context helpers", () => {
     it("strips HTML from article context before sending it to the model", () => {
         expect(summarizeArticleContextText(
             "<p>Strong <strong>signal</strong> with <a href=\"https://example.com\">evidence</a>.</p>",
@@ -83,9 +83,9 @@ describe("creative service context helpers", () => {
     });
 
     it("builds a prompt that leaves report structure up to the user's focus prompt", () => {
-        const prompt = buildCreativePrompt(
+        const prompt = buildAutomationPrompt(
             {
-                ...baseCreativeProject,
+                ...baseAutomationProject,
                 prompt: "请给我 Key Signals、Ideas 和 Next Actions 三段结构。",
             },
             [{
@@ -109,9 +109,9 @@ describe("creative service context helpers", () => {
     });
 
     it("adds web search guidance when the project enables it", () => {
-        const prompt = buildCreativePrompt(
+        const prompt = buildAutomationPrompt(
             {
-                ...baseCreativeProject,
+                ...baseAutomationProject,
                 web_search_enabled: true,
             },
             [{
@@ -133,7 +133,7 @@ describe("creative service context helpers", () => {
 
     it("persists the generated markdown body directly into full_report", async () => {
         const selectMock = vi.fn(async (query: string) => {
-            if (query.includes("FROM creative_projects p")) {
+            if (query.includes("FROM automation_projects p")) {
                 return [{
                     id: 7,
                     name: "Founder ideas",
@@ -141,13 +141,13 @@ describe("creative service context helpers", () => {
                     cycle_mode: "manual",
                     auto_enabled: 0,
                     auto_interval_minutes: 60,
-                    max_articles_per_card: 12,
-                    min_articles_per_card: 1,
+                    max_articles_per_report: 12,
+                    min_articles_per_report: 1,
                     web_search_enabled: 0,
                     last_auto_checked_at: null,
                     last_auto_generated_at: null,
                     source_ids_csv: null,
-                    unread_card_count: 0,
+                    unread_report_count: 0,
                 }];
             }
 
@@ -164,7 +164,7 @@ describe("creative service context helpers", () => {
                 }];
             }
 
-            if (query.includes("FROM creative_cards")) {
+            if (query.includes("FROM automation_reports")) {
                 return [{
                     id: 44,
                     project_id: 7,
@@ -185,26 +185,26 @@ describe("creative service context helpers", () => {
             select: selectMock,
             execute: vi.fn(),
         });
-        generateCreativeReportMock.mockResolvedValue({
+        generateAutomationReportDraftMock.mockResolvedValue({
             title: "Signals for builders",
             markdown: "## Key Signals\n- Faster inference\n",
         });
-        invokeMock.mockResolvedValue({ cardId: 44 });
+        invokeMock.mockResolvedValue({ reportId: 44 });
 
-        const card = await generateCreativeCardForProject({
+        const card = await generateAutomationReportForProject({
             projectId: 7,
             articleIds: [11],
             mode: "manual",
         });
 
-        expect(generateCreativeReportMock).toHaveBeenCalledWith(expect.objectContaining({
+        expect(generateAutomationReportDraftMock).toHaveBeenCalledWith(expect.objectContaining({
             enableWebSearch: false,
             prompt: expect.stringContaining("Return a JSON object with:"),
         }));
         expect(invokeMock).toHaveBeenCalledTimes(1);
 
         const [commandName, payload] = invokeMock.mock.calls[0];
-        expect(commandName).toBe("persist_creative_card_cmd");
+        expect(commandName).toBe("persist_automation_report_cmd");
         expect(payload.input).toMatchObject({
             projectId: 7,
             title: "Signals for builders",
@@ -221,11 +221,11 @@ describe("creative service context helpers", () => {
             title: "Signals for builders",
             full_report: "## Key Signals\n- Faster inference",
         });
-        expect(dispatchCreativeSyncEventMock).toHaveBeenCalledTimes(1);
+        expect(dispatchAutomationSyncEventMock).toHaveBeenCalledTimes(1);
     });
 });
 
-describe("creative service unread state", () => {
+describe("automation service unread state", () => {
     it("maps unread project counts from project queries", async () => {
         getDbMock.mockResolvedValue({
             select: vi.fn().mockResolvedValue([{
@@ -235,25 +235,25 @@ describe("creative service unread state", () => {
                 cycle_mode: "manual",
                 auto_enabled: 1,
                 auto_interval_minutes: 30,
-                max_articles_per_card: 9,
-                min_articles_per_card: 1,
+                max_articles_per_report: 9,
+                min_articles_per_report: 1,
                 web_search_enabled: 1,
                 last_auto_checked_at: "2026-03-13T00:00:00Z",
                 last_auto_generated_at: "2026-03-13T01:00:00Z",
                 source_ids_csv: "1,2",
-                unread_card_count: 4,
+                unread_report_count: 4,
             }]),
             execute: vi.fn(),
         });
 
-        await expect(listCreativeProjects()).resolves.toEqual([expect.objectContaining({
+        await expect(listAutomationProjects()).resolves.toEqual([expect.objectContaining({
             id: 3,
             source_ids: [1, 2],
-            unread_card_count: 4,
+            unread_report_count: 4,
         })]);
     });
 
-    it("maps card read state from card queries", async () => {
+    it("maps report read state from report queries", async () => {
         const selectMock = vi.fn()
             .mockResolvedValueOnce([{ cnt: 1 }])
             .mockResolvedValueOnce([{
@@ -273,8 +273,8 @@ describe("creative service unread state", () => {
             execute: vi.fn(),
         });
 
-        await expect(listCreativeCards(3)).resolves.toEqual({
-            cards: [expect.objectContaining({
+        await expect(listAutomationReports(3)).resolves.toEqual({
+            reports: [expect.objectContaining({
                 id: 18,
                 generation_mode: "auto",
                 is_read: true,
@@ -304,8 +304,8 @@ describe("creative service unread state", () => {
             execute: vi.fn(),
         });
 
-        await expect(listCreativeCards(3, { favoritesOnly: true })).resolves.toEqual({
-            cards: [expect.objectContaining({
+        await expect(listAutomationReports(3, { favoritesOnly: true })).resolves.toEqual({
+            reports: [expect.objectContaining({
                 id: 18,
                 is_favorite: true,
             })],
@@ -314,7 +314,7 @@ describe("creative service unread state", () => {
 
         expect(selectMock).toHaveBeenNthCalledWith(
             1,
-            "SELECT COUNT(*) AS cnt FROM creative_cards WHERE project_id = $1 AND is_favorite = 1",
+            "SELECT COUNT(*) AS cnt FROM automation_reports WHERE project_id = $1 AND is_favorite = 1",
             [3],
         );
         expect(selectMock).toHaveBeenNthCalledWith(
@@ -324,51 +324,51 @@ describe("creative service unread state", () => {
         );
     });
 
-    it("marks a single card as read and dispatches sync", async () => {
+    it("marks a single report as read and dispatches sync", async () => {
         const executeMock = vi.fn().mockResolvedValue(undefined);
         getDbMock.mockResolvedValue({
             select: vi.fn(),
             execute: executeMock,
         });
 
-        await markCreativeCardAsRead(18);
+        await markAutomationReportAsRead(18);
 
         expect(executeMock).toHaveBeenCalledWith(
-            "UPDATE creative_cards SET is_read = 1 WHERE id = $1",
+            "UPDATE automation_reports SET is_read = 1 WHERE id = $1",
             [18],
         );
-        expect(dispatchCreativeSyncEventMock).toHaveBeenCalledTimes(1);
+        expect(dispatchAutomationSyncEventMock).toHaveBeenCalledTimes(1);
     });
 
-    it("marks all cards in a project as read and dispatches sync", async () => {
+    it("marks all reports in a project as read and dispatches sync", async () => {
         const executeMock = vi.fn().mockResolvedValue(undefined);
         getDbMock.mockResolvedValue({
             select: vi.fn(),
             execute: executeMock,
         });
 
-        await markAllCreativeCardsAsRead(7);
+        await markAllAutomationReportsAsRead(7);
 
         expect(executeMock).toHaveBeenCalledWith(
-            "UPDATE creative_cards SET is_read = 1 WHERE project_id = $1 AND is_read = 0",
+            "UPDATE automation_reports SET is_read = 1 WHERE project_id = $1 AND is_read = 0",
             [7],
         );
-        expect(dispatchCreativeSyncEventMock).toHaveBeenCalledTimes(1);
+        expect(dispatchAutomationSyncEventMock).toHaveBeenCalledTimes(1);
     });
 
-    it("updates a card favorite state and dispatches sync", async () => {
+    it("updates a report favorite state and dispatches sync", async () => {
         const executeMock = vi.fn().mockResolvedValue(undefined);
         getDbMock.mockResolvedValue({
             select: vi.fn(),
             execute: executeMock,
         });
 
-        await setCreativeCardFavorite(18, true);
+        await setAutomationReportFavorite(18, true);
 
         expect(executeMock).toHaveBeenCalledWith(
-            "UPDATE creative_cards SET is_favorite = $1 WHERE id = $2",
+            "UPDATE automation_reports SET is_favorite = $1 WHERE id = $2",
             [1, 18],
         );
-        expect(dispatchCreativeSyncEventMock).toHaveBeenCalledTimes(1);
+        expect(dispatchAutomationSyncEventMock).toHaveBeenCalledTimes(1);
     });
 });

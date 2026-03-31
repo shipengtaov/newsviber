@@ -51,7 +51,7 @@ vi.mock("@/lib/web-search-service", () => ({
   WebSearchUnavailableError: class WebSearchUnavailableError extends Error {},
 }));
 
-import { generateCreativeReport, streamConversation } from "@/lib/ai";
+import { generateAutomationReportDraft, streamConversation } from "@/lib/ai";
 
 function textDelta(text: string) {
   return {
@@ -70,7 +70,7 @@ afterEach(() => {
 });
 
 describe("AI web search fallback", () => {
-  it("retries creative report generation without web search after a tool failure", async () => {
+  it("retries automation report generation without web search after a tool failure", async () => {
     generateTextMock
       .mockResolvedValueOnce({
         output: {
@@ -97,7 +97,7 @@ describe("AI web search fallback", () => {
         }],
       });
 
-    await expect(generateCreativeReport({
+    await expect(generateAutomationReportDraft({
       prompt: "Summarize the latest AI news.",
       enableWebSearch: true,
     })).resolves.toEqual({
@@ -126,7 +126,7 @@ describe("AI web search fallback", () => {
       }],
     });
 
-    await generateCreativeReport({
+    await generateAutomationReportDraft({
       prompt: "Summarize the latest AI news.",
       enableWebSearch: true,
     });

@@ -6,27 +6,27 @@ use tauri::AppHandle;
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct SaveCreativeProjectCommandInput {
+pub struct SaveAutomationProjectCommandInput {
     pub project_id: Option<i64>,
     pub name: String,
     pub prompt: String,
     pub auto_enabled: bool,
     pub auto_interval_minutes: i64,
-    pub max_articles_per_card: i64,
-    pub min_articles_per_card: i64,
+    pub max_articles_per_report: i64,
+    pub min_articles_per_report: i64,
     pub web_search_enabled: bool,
     pub source_ids: Vec<i64>,
 }
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct SaveCreativeProjectCommandResult {
+pub struct SaveAutomationProjectCommandResult {
     pub project_id: i64,
 }
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct PersistCreativeCardCommandInput {
+pub struct PersistAutomationReportCommandInput {
     pub project_id: i64,
     pub title: String,
     pub full_report: String,
@@ -38,8 +38,8 @@ pub struct PersistCreativeCardCommandInput {
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct PersistCreativeCardCommandResult {
-    pub card_id: i64,
+pub struct PersistAutomationReportCommandResult {
+    pub report_id: i64,
 }
 
 fn normalize_positive_i64(value: i64, fallback: i64) -> i64 {
@@ -58,7 +58,7 @@ fn normalize_unique_ids(ids: Vec<i64>) -> Vec<i64> {
         .collect()
 }
 
-async fn connect_creative_db(app: &AppHandle) -> Result<SqliteConnection, String> {
+async fn connect_automation_db(app: &AppHandle) -> Result<SqliteConnection, String> {
     let db_url = db::app_database_url(app)?;
     SqliteConnection::connect(&db_url)
         .await
@@ -66,10 +66,10 @@ async fn connect_creative_db(app: &AppHandle) -> Result<SqliteConnection, String
 }
 
 #[tauri::command]
-pub async fn save_creative_project_cmd(
+pub async fn save_automation_project_cmd(
     app: AppHandle,
-    input: SaveCreativeProjectCommandInput,
-) -> Result<SaveCreativeProjectCommandResult, String> {
+    input: SaveAutomationProjectCommandInput,
+) -> Result<SaveAutomationProjectCommandResult, String> {
     let name = input.name.trim();
     let prompt = input.prompt.trim();
     if name.is_empty() || prompt.is_empty() {
@@ -77,11 +77,11 @@ pub async fn save_creative_project_cmd(
     }
 
     let auto_interval_minutes = normalize_positive_i64(input.auto_interval_minutes, 60);
-    let max_articles_per_card = normalize_positive_i64(input.max_articles_per_card, 12);
-    let min_articles_per_card = normalize_positive_i64(input.min_articles_per_card, 1);
+    let max_articles_per_report = normalize_positive_i64(input.max_articles_per_report, 12);
+    let min_articles_per_report = normalize_positive_i64(input.min_articles_per_report, 1);
     let source_ids = normalize_unique_ids(input.source_ids);
 
-    let mut connection = connect_creative_db(&app).await?;
+    let mut connection = connect_automation_db(&app).await?;
     let mut transaction = connection
         .begin()
         .await
@@ -91,15 +91,15 @@ pub async fn save_creative_project_cmd(
         let project_id = if let Some(project_id) = input.project_id {
             let query_result = sqlx::query(
                 "
-                    UPDATE creative_projects
+                    UPDATE automation_projects
                     SET
                         name = ?,
                         prompt = ?,
                         cycle_mode = 'manual',
                         auto_enabled = ?,
                         auto_interval_minutes = ?,
-                        max_articles_per_card = ?,
-                        min_articles_per_card = ?,
+                        max_articles_per_report = ?,
+                        min_articles_per_report = ?,
                         web_search_enabled = ?
                     WHERE id = ?
                 ",
@@ -108,8 +108,8 @@ pub async fn save_creative_project_cmd(
             .bind(prompt)
             .bind(if input.auto_enabled { 1_i64 } else { 0_i64 })
             .bind(auto_interval_minutes)
-            .bind(max_articles_per_card)
-            .bind(min_articles_per_card)
+            .bind(max_articles_per_report)
+            .bind(min_articles_per_report)
             .bind(if input.web_search_enabled { 1_i64 } else { 0_i64 })
             .bind(project_id)
             .execute(&mut *transaction)
@@ -117,22 +117,22 @@ pub async fn save_creative_project_cmd(
             .map_err(|error| error.to_string())?;
 
             if query_result.rows_affected() == 0 {
-                return Err("Creative project not found.".into());
+                return Err("Project not found.".into());
             }
 
             project_id
         } else {
             sqlx::query(
                 "
-                    INSERT INTO creative_projects
+                    INSERT INTO automation_projects
                         (
                             name,
                             prompt,
                             cycle_mode,
                             auto_enabled,
                             auto_interval_minutes,
-                            max_articles_per_card,
-                            min_articles_per_card,
+                            max_articles_per_report,
+                            min_articles_per_report,
                             web_search_enabled
                         )
                     VALUES (?, ?, 'manual', ?, ?, ?, ?, ?)
@@ -142,8 +142,8 @@ pub async fn save_creative_project_cmd(
             .bind(prompt)
             .bind(if input.auto_enabled { 1_i64 } else { 0_i64 })
             .bind(auto_interval_minutes)
-            .bind(max_articles_per_card)
-            .bind(min_articles_per_card)
+            .bind(max_articles_per_report)
+            .bind(min_articles_per_report)
             .bind(if input.web_search_enabled { 1_i64 } else { 0_i64 })
             .execute(&mut *transaction)
             .await
@@ -151,7 +151,7 @@ pub async fn save_creative_project_cmd(
             .last_insert_rowid()
         };
 
-        sqlx::query("DELETE FROM creative_project_sources WHERE project_id = ?")
+        sqlx::query("DELETE FROM automation_project_sources WHERE project_id = ?")
             .bind(project_id)
             .execute(&mut *transaction)
             .await
@@ -159,7 +159,7 @@ pub async fn save_creative_project_cmd(
 
         for source_id in source_ids {
             sqlx::query(
-                "INSERT INTO creative_project_sources (project_id, source_id) VALUES (?, ?)",
+                "INSERT INTO automation_project_sources (project_id, source_id) VALUES (?, ?)",
             )
             .bind(project_id)
             .bind(source_id)
@@ -178,7 +178,7 @@ pub async fn save_creative_project_cmd(
                 .commit()
                 .await
                 .map_err(|error| error.to_string())?;
-            Ok(SaveCreativeProjectCommandResult { project_id })
+            Ok(SaveAutomationProjectCommandResult { project_id })
         }
         Err(error) => {
             let _ = transaction.rollback().await;
@@ -188,11 +188,11 @@ pub async fn save_creative_project_cmd(
 }
 
 #[tauri::command]
-pub async fn persist_creative_card_cmd(
+pub async fn persist_automation_report_cmd(
     app: AppHandle,
-    input: PersistCreativeCardCommandInput,
-) -> Result<PersistCreativeCardCommandResult, String> {
-    let PersistCreativeCardCommandInput {
+    input: PersistAutomationReportCommandInput,
+) -> Result<PersistAutomationReportCommandResult, String> {
+    let PersistAutomationReportCommandInput {
         project_id,
         title,
         full_report,
@@ -209,23 +209,23 @@ pub async fn persist_creative_card_cmd(
 
     let article_ids = normalize_unique_ids(article_ids);
     if article_ids.is_empty() {
-        return Err("At least one article is required to persist a creative card.".into());
+        return Err("At least one article is required to persist a report.".into());
     }
 
     if used_article_count != article_ids.len() as i64 {
         return Err("Used article count does not match the supplied article ids.".into());
     }
 
-    let mut connection = connect_creative_db(&app).await?;
+    let mut connection = connect_automation_db(&app).await?;
     let mut transaction = connection
         .begin()
         .await
         .map_err(|error| error.to_string())?;
 
     let result: Result<i64, String> = async {
-        let card_id = sqlx::query(
+        let report_id = sqlx::query(
             "
-                INSERT INTO creative_cards
+                INSERT INTO automation_reports
                     (
                         project_id,
                         title,
@@ -247,8 +247,8 @@ pub async fn persist_creative_card_cmd(
         .last_insert_rowid();
 
         for article_id in article_ids {
-            sqlx::query("INSERT INTO creative_card_articles (card_id, article_id) VALUES (?, ?)")
-                .bind(card_id)
+            sqlx::query("INSERT INTO automation_report_articles (report_id, article_id) VALUES (?, ?)")
+                .bind(report_id)
                 .bind(article_id)
                 .execute(&mut *transaction)
                 .await
@@ -258,7 +258,7 @@ pub async fn persist_creative_card_cmd(
         if let Some(checked_at) = checked_at {
             sqlx::query(
                 "
-                    UPDATE creative_projects
+                    UPDATE automation_projects
                     SET
                         last_auto_checked_at = ?,
                         last_auto_generated_at = ?
@@ -273,17 +273,17 @@ pub async fn persist_creative_card_cmd(
             .map_err(|error| error.to_string())?;
         }
 
-        Ok(card_id)
+        Ok(report_id)
     }
     .await;
 
     match result {
-        Ok(card_id) => {
+        Ok(report_id) => {
             transaction
                 .commit()
                 .await
                 .map_err(|error| error.to_string())?;
-            Ok(PersistCreativeCardCommandResult { card_id })
+            Ok(PersistAutomationReportCommandResult { report_id })
         }
         Err(error) => {
             let _ = transaction.rollback().await;

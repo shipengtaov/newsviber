@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  buildCreativeCardDiscussionSystemPrompt,
+  buildAutomationReportDiscussionSystemPrompt,
   buildGlobalChatSystemPrompt,
   getChatMarkdownFormattingInstructions,
 } from "@/lib/chat-prompts";
@@ -18,8 +18,8 @@ describe("chat prompt builders", () => {
     expect(prompt).toContain(getChatMarkdownFormattingInstructions());
   });
 
-  it("preserves creative card context while appending markdown guidance", () => {
-    const prompt = buildCreativeCardDiscussionSystemPrompt({
+  it("preserves automation report context while appending markdown guidance", () => {
+    const prompt = buildAutomationReportDiscussionSystemPrompt({
       title: "AI News Desk",
       bodyMarkdown: "## Market pulse\nProvider updates",
     });
@@ -29,8 +29,8 @@ describe("chat prompt builders", () => {
     expect(prompt).toContain(getChatMarkdownFormattingInstructions());
   });
 
-  it("adds web search guidance for creative card discussion when enabled", () => {
-    const prompt = buildCreativeCardDiscussionSystemPrompt({
+  it("adds web search guidance for automation report discussion when enabled", () => {
+    const prompt = buildAutomationReportDiscussionSystemPrompt({
       title: "AI News Desk",
       bodyMarkdown: "## Market pulse\nProvider updates",
       enableWebSearch: true,

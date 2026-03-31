@@ -1,5 +1,5 @@
 mod chat;
-mod creative;
+mod automation;
 mod db;
 pub mod fetchers;
 
@@ -371,8 +371,8 @@ pub fn run() {
             chat::save_chat_thread_scope_cmd,
             chat::persist_chat_message_cmd,
             chat::delete_chat_thread_cmd,
-            creative::save_creative_project_cmd,
-            creative::persist_creative_card_cmd
+            automation::save_automation_project_cmd,
+            automation::persist_automation_report_cmd
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

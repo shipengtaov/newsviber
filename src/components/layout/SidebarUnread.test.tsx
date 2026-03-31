@@ -7,13 +7,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Sidebar } from "@/components/layout/Sidebar";
 
 const {
-    creativeListeners,
-    listCreativeProjectsMock,
+    automationListeners,
+    listAutomationProjectsMock,
     listNewsSourcesMock,
     newsListeners,
 } = vi.hoisted(() => ({
-    creativeListeners: new Set<() => void>(),
-    listCreativeProjectsMock: vi.fn(),
+    automationListeners: new Set<() => void>(),
+    listAutomationProjectsMock: vi.fn(),
     listNewsSourcesMock: vi.fn(),
     newsListeners: new Set<() => void>(),
 }));
@@ -23,7 +23,7 @@ vi.mock("react-i18next", () => ({
         t: (key: string) => ({
             appName: "News Viber",
             "nav.news": "News",
-            "nav.creativeSpace": "Creative Space",
+            "nav.automation": "Automation",
             "nav.chat": "Chat",
             "nav.sources": "Sources",
             "nav.settings": "Settings",
@@ -41,8 +41,8 @@ vi.mock("@/lib/news-service", () => ({
     listNewsSources: listNewsSourcesMock,
 }));
 
-vi.mock("@/lib/creative-service", () => ({
-    listCreativeProjects: listCreativeProjectsMock,
+vi.mock("@/lib/automation-service", () => ({
+    listAutomationProjects: listAutomationProjectsMock,
 }));
 
 vi.mock("@/lib/news-events", () => ({
@@ -54,11 +54,11 @@ vi.mock("@/lib/news-events", () => ({
     }),
 }));
 
-vi.mock("@/lib/creative-events", () => ({
-    addCreativeSyncListener: vi.fn((listener: () => void) => {
-        creativeListeners.add(listener);
+vi.mock("@/lib/automation-events", () => ({
+    addAutomationSyncListener: vi.fn((listener: () => void) => {
+        automationListeners.add(listener);
         return () => {
-            creativeListeners.delete(listener);
+            automationListeners.delete(listener);
         };
     }),
 }));
@@ -75,13 +75,13 @@ describe("Sidebar unread indicators", () => {
     let previousActEnvironment: boolean | undefined;
 
     beforeEach(() => {
-        creativeListeners.clear();
+        automationListeners.clear();
         newsListeners.clear();
-        listCreativeProjectsMock.mockReset();
+        listAutomationProjectsMock.mockReset();
         listNewsSourcesMock.mockReset();
 
         listNewsSourcesMock.mockResolvedValue([]);
-        listCreativeProjectsMock.mockResolvedValue([]);
+        listAutomationProjectsMock.mockResolvedValue([]);
 
         const actEnvironment = globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean };
         previousActEnvironment = actEnvironment.IS_REACT_ACT_ENVIRONMENT;
@@ -134,29 +134,29 @@ describe("Sidebar unread indicators", () => {
         expect(unreadDot?.className).toContain("unread-badge");
         expect(unreadDot?.className).toContain("ring-primary");
         expect(unreadDot?.parentElement?.className).toContain("unread-badge-container");
-        expect(container.querySelector('[data-sidebar-unread="creative"]')).toBeNull();
+        expect(container.querySelector('[data-sidebar-unread="automation"]')).toBeNull();
     });
 
-    it("shows a dot for Creative Space when there are unread cards", async () => {
-        listCreativeProjectsMock.mockResolvedValueOnce([{
+    it("shows a dot for Automation when there are unread reports", async () => {
+        listAutomationProjectsMock.mockResolvedValueOnce([{
             id: 2,
             name: "Signals",
             prompt: "Summarize",
             cycle_mode: "manual",
             auto_enabled: false,
             auto_interval_minutes: 60,
-            max_articles_per_card: 12,
-            min_articles_per_card: 1,
+            max_articles_per_report: 12,
+            min_articles_per_report: 1,
             web_search_enabled: false,
             last_auto_checked_at: null,
             last_auto_generated_at: null,
             source_ids: [],
-            unread_card_count: 2,
+            unread_report_count: 2,
         }]);
 
-        await renderSidebar("/creative");
+        await renderSidebar("/automation");
 
-        expect(container.querySelector('[data-sidebar-unread="creative"]')).not.toBeNull();
+        expect(container.querySelector('[data-sidebar-unread="automation"]')).not.toBeNull();
         expect(container.querySelector('[data-sidebar-unread="news"]')).toBeNull();
     });
 
@@ -164,14 +164,14 @@ describe("Sidebar unread indicators", () => {
         await renderSidebar("/");
 
         expect(container.querySelector('[data-sidebar-unread="news"]')).toBeNull();
-        expect(container.querySelector('[data-sidebar-unread="creative"]')).toBeNull();
+        expect(container.querySelector('[data-sidebar-unread="automation"]')).toBeNull();
     });
 
     it("refreshes the two dots independently when sync events fire", async () => {
         await renderSidebar("/");
 
         expect(container.querySelector('[data-sidebar-unread="news"]')).toBeNull();
-        expect(container.querySelector('[data-sidebar-unread="creative"]')).toBeNull();
+        expect(container.querySelector('[data-sidebar-unread="automation"]')).toBeNull();
 
         listNewsSourcesMock.mockResolvedValueOnce([{
             id: 1,
@@ -191,30 +191,30 @@ describe("Sidebar unread indicators", () => {
         await settle();
 
         expect(container.querySelector('[data-sidebar-unread="news"]')).not.toBeNull();
-        expect(container.querySelector('[data-sidebar-unread="creative"]')).toBeNull();
+        expect(container.querySelector('[data-sidebar-unread="automation"]')).toBeNull();
 
-        listCreativeProjectsMock.mockResolvedValueOnce([{
+        listAutomationProjectsMock.mockResolvedValueOnce([{
             id: 2,
             name: "Signals",
             prompt: "Summarize",
             cycle_mode: "manual",
             auto_enabled: false,
             auto_interval_minutes: 60,
-            max_articles_per_card: 12,
-            min_articles_per_card: 1,
+            max_articles_per_report: 12,
+            min_articles_per_report: 1,
             web_search_enabled: false,
             last_auto_checked_at: null,
             last_auto_generated_at: null,
             source_ids: [],
-            unread_card_count: 2,
+            unread_report_count: 2,
         }]);
 
         await act(async () => {
-            creativeListeners.forEach((listener) => listener());
+            automationListeners.forEach((listener) => listener());
         });
         await settle();
 
         expect(container.querySelector('[data-sidebar-unread="news"]')).not.toBeNull();
-        expect(container.querySelector('[data-sidebar-unread="creative"]')).not.toBeNull();
+        expect(container.querySelector('[data-sidebar-unread="automation"]')).not.toBeNull();
     });
 });

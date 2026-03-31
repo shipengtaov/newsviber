@@ -5,10 +5,10 @@ import NewsDetail from "@/views/NewsDetail";
 import SourceManager from "@/views/SourceManager";
 import SourceForm from "@/views/SourceForm";
 import GlobalChat from "@/views/GlobalChat";
-import CreativeSpace from "@/views/CreativeSpace";
+import Automation from "@/views/Automation";
 import Settings from "@/views/Settings";
 import { useEffect } from "react";
-import { runDueAutoCreativeProjects } from "@/lib/creative-service";
+import { runDueAutomations } from "@/lib/automation-service";
 import { getDb } from "@/lib/db";
 import { dispatchNewsSyncEvent } from "@/lib/news-events";
 import { registerExportSourcesOpmlMenuHandler } from "@/lib/source-opml-export";
@@ -43,20 +43,20 @@ function App() {
 
   useEffect(() => {
     let isBackgroundCheckRunning = false;
-    let isCreativeCheckRunning = false;
+    let isAutomationCheckRunning = false;
 
-    async function runCreativeCheck() {
-      if (isCreativeCheckRunning) {
+    async function runAutomationCheck() {
+      if (isAutomationCheckRunning) {
         return;
       }
 
-      isCreativeCheckRunning = true;
+      isAutomationCheckRunning = true;
       try {
-        await runDueAutoCreativeProjects();
+        await runDueAutomations();
       } catch (err) {
-        console.error("Creative auto task err", err);
+        console.error("Automation task err", err);
       } finally {
-        isCreativeCheckRunning = false;
+        isAutomationCheckRunning = false;
       }
     }
 
@@ -83,7 +83,7 @@ function App() {
           .filter((source) => isSourceDueForFetch(source));
 
         if (dueSources.length === 0) {
-          await runCreativeCheck();
+          await runAutomationCheck();
           return;
         }
 
@@ -92,7 +92,7 @@ function App() {
           dispatchSourceFetchSyncEvent();
           dispatchNewsSyncEvent();
         }
-        await runCreativeCheck();
+        await runAutomationCheck();
       } catch (err) {
         console.error("BG task err", err);
       } finally {
@@ -105,7 +105,7 @@ function App() {
       void backgroundCheck();
     }, 60 * 1000);
     const removeSourceSyncListener = addSourceFetchSyncListener(() => {
-      void runCreativeCheck();
+      void runAutomationCheck();
     });
 
     return () => {
@@ -126,7 +126,7 @@ function App() {
             <Route path="/sources/edit/:id" element={<SourceForm />} />
             <Route path="/chat" element={<GlobalChat />} />
             <Route path="/chat/:threadId" element={<GlobalChat />} />
-            <Route path="/creative" element={<CreativeSpace />} />
+            <Route path="/automation" element={<Automation />} />
             <Route path="/settings" element={<Settings />} />
           </Route>
         </Routes>

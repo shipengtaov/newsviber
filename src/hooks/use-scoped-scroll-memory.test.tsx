@@ -102,7 +102,7 @@ describe("useScopedScrollMemory", () => {
     }
 
     it("restores board and project scroll positions independently", async () => {
-        renderHarness("creative:board");
+        renderHarness("automation:board");
         await flushAnimationFrame();
 
         const api = requireHarnessApi();
@@ -111,7 +111,7 @@ describe("useScopedScrollMemory", () => {
             api.saveCurrentScopeScroll();
         });
 
-        renderHarness("creative:project:7");
+        renderHarness("automation:project:7");
         await flushAnimationFrame();
 
         expect(api.container.scrollTop).toBe(0);
@@ -130,17 +130,17 @@ describe("useScopedScrollMemory", () => {
             api.saveCurrentScopeScroll();
         });
 
-        renderHarness("creative:project:7");
+        renderHarness("automation:project:7");
         await flushAnimationFrame();
         expect(api.container.scrollTop).toBe(420);
 
-        renderHarness("creative:board");
+        renderHarness("automation:board");
         await flushAnimationFrame();
         expect(api.container.scrollTop).toBe(120);
     });
 
     it("keeps different project scopes isolated", async () => {
-        renderHarness("creative:project:1");
+        renderHarness("automation:project:1");
         await flushAnimationFrame();
 
         const api = requireHarnessApi();
@@ -149,7 +149,7 @@ describe("useScopedScrollMemory", () => {
             api.saveCurrentScopeScroll();
         });
 
-        renderHarness("creative:project:2");
+        renderHarness("automation:project:2");
         await flushAnimationFrame();
         expect(api.container.scrollTop).toBe(0);
 
@@ -158,11 +158,11 @@ describe("useScopedScrollMemory", () => {
             api.saveCurrentScopeScroll();
         });
 
-        renderHarness("creative:project:1");
+        renderHarness("automation:project:1");
         await flushAnimationFrame();
         expect(api.container.scrollTop).toBe(110);
 
-        renderHarness("creative:project:2");
+        renderHarness("automation:project:2");
         await flushAnimationFrame();
         expect(api.container.scrollTop).toBe(270);
     });
