@@ -121,5 +121,8 @@
     "connectingToModel": "Connessione al modello...",
     "streaming": "Streaming...",
     "exploreFurther": "Esplora ulteriormente...",
-    "closeDiscussion": "Chiudi discussione"
+    "closeDiscussion": "Chiudi discussione",
+    "viewCard": "Vista schede",
+    "viewList": "Vista elenco",
+    "pageXOfY": "Pagina {{page}} di {{total}}"
 }

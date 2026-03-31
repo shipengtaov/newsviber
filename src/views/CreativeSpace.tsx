@@ -48,7 +48,7 @@ import { formatUtcDateTime } from "@/lib/time";
 import { cn } from "@/lib/utils";
 import { hasConfiguredWebSearch } from "@/lib/web-search-service";
 import ReactMarkdown from "react-markdown";
-import { ArrowLeft, ChevronDown, ChevronUp, Ellipsis, Lightbulb, Loader2, MessageSquare, Pencil, Plus, Trash2, WandSparkles } from "lucide-react";
+import { ArrowLeft, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Ellipsis, LayoutGrid, Lightbulb, List, Loader2, MessageSquare, MoreHorizontal, Pencil, Plus, Trash2, WandSparkles } from "lucide-react";
 
 type ProjectFormState = {
     name: string;
@@ -73,11 +73,45 @@ const PROJECT_TILE_CARD_CLASS = `${CREATIVE_TILE_CARD_BASE_CLASS} h-[240px]`;
 const GENERATED_TILE_CARD_CLASS = `${CREATIVE_TILE_CARD_BASE_CLASS} min-h-[220px]`;
 const CREATIVE_TILE_HEADER_CLASS = "px-3 py-2.5 pb-1.5";
 const CREATIVE_TILE_BODY_CLASS = "flex flex-1 flex-col px-3 pb-3 pt-0";
+type CardViewMode = "card" | "list";
+type CreativePaginationItem =
+    | { type: "page"; page: number }
+    | { type: "ellipsis"; key: string };
+const CARD_VIEW_MODE_STORAGE_KEY = "creativeCardViewMode_v1";
+const DEFAULT_PAGE_SIZE = 20;
 const CREATIVE_SPACE_SCROLL_STORAGE_KEY = "creativeSpaceScrollPositions_v1";
 const CREATIVE_BOARD_SCROLL_SCOPE_KEY = "creative:board";
 
 function buildCreativeProjectScrollScopeKey(projectId: number): string {
     return `creative:project:${projectId}`;
+}
+
+function buildCreativePaginationItems(currentPage: number, totalPages: number): CreativePaginationItem[] {
+    if (totalPages <= 1) return [];
+
+    const candidatePages = new Set(
+        [0, totalPages - 1, currentPage - 1, currentPage, currentPage + 1]
+            .filter((page) => page >= 0 && page < totalPages),
+    );
+
+    const sortedPages = Array.from(candidatePages).sort((left, right) => left - right);
+    const items: CreativePaginationItem[] = [];
+
+    let previousPage: number | null = null;
+    for (const page of sortedPages) {
+        if (previousPage !== null) {
+            const gap = page - previousPage;
+            if (gap === 2) {
+                items.push({ type: "page", page: previousPage + 1 });
+            } else if (gap > 2) {
+                items.push({ type: "ellipsis", key: `ellipsis-${previousPage}-${page}` });
+            }
+        }
+        items.push({ type: "page", page });
+        previousPage = page;
+    }
+
+    return items;
 }
 
 function createEmptyProjectFormState(): ProjectFormState {
@@ -474,6 +508,13 @@ export default function CreativeSpace() {
     const [projects, setProjects] = useState<CreativeProject[]>([]);
     const [cards, setCards] = useState<CreativeCard[]>([]);
     const [sources, setSources] = useState<CreativeSourceOption[]>([]);
+    const [totalCardCount, setTotalCardCount] = useState(0);
+    const [currentPage, setCurrentPage] = useState(0);
+    const [cardViewMode, setCardViewMode] = useState<CardViewMode>(() => {
+        if (typeof window === "undefined") return "card";
+        const stored = localStorage.getItem(CARD_VIEW_MODE_STORAGE_KEY);
+        return stored === "list" ? "list" : "card";
+    });
 
     const [activeProjectId, setActiveProjectId] = useState<number | null>(null);
     const [activeCardId, setActiveCardId] = useState<number | null>(null);
@@ -533,15 +574,20 @@ export default function CreativeSpace() {
             : "unavailable";
     const activeCardBodyMarkdown = activeCard ? getCreativeCardBodyMarkdown(activeCard) : "";
     const activeProjectUnreadCount = activeProject
-        ? cards.length === 0
-            ? activeProject.unread_card_count
-            : cards.filter((card) => !card.is_read).length
+        ? activeProject.unread_card_count
         : 0;
     const scopedSources = activeProject
         ? sources.filter((source) => activeProject.source_ids.length === 0 || activeProject.source_ids.includes(source.id))
         : [];
     const autoEnabledProjectCount = projects.filter((project) => project.auto_enabled).length;
     const totalUnreadCardCount = projects.reduce((total, project) => total + project.unread_card_count, 0);
+    const totalPages = Math.max(1, Math.ceil(totalCardCount / DEFAULT_PAGE_SIZE));
+    const paginationItems = totalPages > 1 ? buildCreativePaginationItems(currentPage, totalPages) : [];
+    const canGoToPreviousPage = currentPage > 0;
+    const canGoToNextPage = currentPage < totalPages - 1;
+    const compactPaginationLabel = totalPages > 0
+        ? t("pageXOfY", { page: currentPage + 1, total: totalPages })
+        : "";
     const creativeScrollScopeKey = activeCardId !== null
         ? null
         : activeProject !== null
@@ -579,11 +625,14 @@ export default function CreativeSpace() {
     useEffect(() => {
         if (activeProjectId === null) {
             setCards([]);
+            setTotalCardCount(0);
+            setCurrentPage(0);
             setActiveCardId(null);
             return;
         }
 
-        void loadCards(activeProjectId);
+        setCurrentPage(0);
+        void loadCards(activeProjectId, 0);
     }, [activeProjectId]);
 
     useEffect(() => {
@@ -642,14 +691,14 @@ export default function CreativeSpace() {
             void loadSources();
 
             if (activeProjectId !== null) {
-                void loadCards(activeProjectId);
+                void loadCards(activeProjectId, currentPage);
             }
 
             if (manualDialogOpen && activeProjectId !== null) {
                 void refreshCandidateArticles(activeProjectId);
             }
         });
-    }, [activeProjectId, manualDialogOpen, includeConsumed, candidateSearch, candidateSourceId]);
+    }, [activeProjectId, currentPage, manualDialogOpen, includeConsumed, candidateSearch, candidateSourceId]);
 
     useEffect(() => {
         replaceChatMessages([]);
@@ -709,12 +758,15 @@ export default function CreativeSpace() {
         }
     }
 
-    async function loadCards(projectId: number) {
+    async function loadCards(projectId: number, page?: number) {
         try {
-            const result = await listCreativeCards(projectId);
-            setCards(result);
+            const targetPage = page ?? currentPage;
+            const offset = targetPage * DEFAULT_PAGE_SIZE;
+            const result = await listCreativeCards(projectId, { offset, limit: DEFAULT_PAGE_SIZE });
+            setCards(result.cards);
+            setTotalCardCount(result.totalCount);
 
-            if (activeCardId !== null && !result.some((card) => card.id === activeCardId)) {
+            if (activeCardId !== null && !result.cards.some((card) => card.id === activeCardId)) {
                 setActiveCardId(null);
             }
         } catch (error) {
@@ -779,7 +831,7 @@ export default function CreativeSpace() {
             .catch(async (error) => {
                 toast({ title: t("failedToMarkCardAsRead"), description: String(error), variant: "destructive" });
                 await loadProjects();
-                await loadCards(targetCard.project_id);
+                await loadCards(targetCard.project_id, currentPage);
             })
             .finally(() => {
                 markingCardReadIdsRef.current.delete(cardId);
@@ -874,7 +926,7 @@ export default function CreativeSpace() {
         } catch (error) {
             toast({ title: t("failedToMarkAllCardsAsRead"), description: String(error), variant: "destructive" });
             await loadProjects();
-            await loadCards(activeProject.id);
+            await loadCards(activeProject.id, currentPage);
         } finally {
             setIsMarkingAllCardsRead(false);
         }
@@ -909,7 +961,7 @@ export default function CreativeSpace() {
             toast({ title: editingProjectId ? t("projectUpdated") : t("projectCreated") });
             await loadProjects();
             if (activeProjectId === savedProject.id) {
-                await loadCards(savedProject.id);
+                await loadCards(savedProject.id, currentPage);
             }
         } catch (error) {
             toast({ title: t("failedToSaveProject"), description: String(error), variant: "destructive" });
@@ -960,6 +1012,19 @@ export default function CreativeSpace() {
         setIsProjectActionsOpen(false);
         setActiveCardId(null);
         setActiveProjectId(null);
+    }
+
+    function handleCardViewModeChange(mode: CardViewMode) {
+        setCardViewMode(mode);
+        localStorage.setItem(CARD_VIEW_MODE_STORAGE_KEY, mode);
+    }
+
+    function goToCardPage(page: number) {
+        const nextPage = Math.max(0, page);
+        if (nextPage === currentPage || !activeProjectId) return;
+        setCurrentPage(nextPage);
+        void loadCards(activeProjectId, nextPage);
+        mainScrollRef.current?.scrollTo({ top: 0, behavior: "smooth" });
     }
 
     function handleProjectDialogOpenChange(open: boolean) {
@@ -1113,8 +1178,9 @@ export default function CreativeSpace() {
                 mode: "manual",
             });
 
+            setCurrentPage(0);
             await loadProjects();
-            await loadCards(activeProject.id);
+            await loadCards(activeProject.id, 0);
             setCards((currentCards) => [generatedCard, ...currentCards.filter((card) => card.id !== generatedCard.id)]);
             openCreativeCard(generatedCard.id, generatedCard);
             setManualDialogOpen(false);
@@ -1373,7 +1439,7 @@ export default function CreativeSpace() {
                                 </span>
                                 <span className="inline-flex items-center gap-1.5">
                                     <span className="text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">{t("cardsLabel")}</span>
-                                    <span className="font-medium text-foreground">{cards.length}</span>
+                                    <span className="font-medium text-foreground">{totalCardCount}</span>
                                 </span>
                                 <span className="inline-flex items-center gap-1.5">
                                     <span className="text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">{t("unreadLabel")}</span>
@@ -1439,71 +1505,232 @@ export default function CreativeSpace() {
                                     />
                                     <ProjectOverviewItem
                                         label={t("cards")}
-                                        value={t("nCards", { count: cards.length })}
+                                        value={t("nCards", { count: totalCardCount })}
                                     />
                                 </div>
                             </div>
                         )}
                 </div>
 
-                <div className={CREATIVE_TILE_GRID_CLASS}>
-                    {cards.map((card) => (
-                        <Card
-                            key={card.id}
-                            className={cn(
-                                GENERATED_TILE_CARD_CLASS,
-                                "rounded-lg border-border bg-card",
-                                card.is_read
-                                    ? "shadow-[0_18px_44px_-36px_rgba(15,15,15,0.28)]"
-                                    : "border-sky-200/80 bg-sky-50/40 shadow-[0_22px_48px_-40px_rgba(14,165,233,0.35)] dark:border-sky-400/20 dark:bg-sky-500/[0.06]",
-                            )}
-                            role="button"
-                            tabIndex={0}
-                            onClick={() => openCreativeCard(card.id, card)}
-                            onKeyDown={(event) => handleGeneratedCardKeyDown(event, card.id)}
-                        >
-                            <CardHeader className={CREATIVE_TILE_HEADER_CLASS}>
-                                <div className="flex items-start justify-between gap-3">
-                                    <div className="min-w-0 flex-1">
-                                        <CardTitle
+                {totalCardCount > 0 && (
+                    <div className="flex items-center justify-between">
+                        <span className="shrink-0 text-[11px] text-muted-foreground">
+                            {compactPaginationLabel}
+                        </span>
+                        <div className="inline-flex items-center overflow-hidden rounded-md border border-border">
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                className={cn("h-7 w-7 rounded-none", cardViewMode === "card" && "bg-accent")}
+                                onClick={() => handleCardViewModeChange("card")}
+                                aria-label={t("viewCard")}
+                                title={t("viewCard")}
+                                aria-pressed={cardViewMode === "card"}
+                            >
+                                <LayoutGrid className="h-3.5 w-3.5" />
+                            </Button>
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                className={cn("h-7 w-7 rounded-none border-l border-border", cardViewMode === "list" && "bg-accent")}
+                                onClick={() => handleCardViewModeChange("list")}
+                                aria-label={t("viewList")}
+                                title={t("viewList")}
+                                aria-pressed={cardViewMode === "list"}
+                            >
+                                <List className="h-3.5 w-3.5" />
+                            </Button>
+                        </div>
+                    </div>
+                )}
+
+                {cardViewMode === "card" ? (
+                    <div className={CREATIVE_TILE_GRID_CLASS}>
+                        {cards.map((card) => (
+                            <Card
+                                key={card.id}
+                                className={cn(
+                                    GENERATED_TILE_CARD_CLASS,
+                                    "rounded-lg border-border bg-card",
+                                    card.is_read
+                                        ? "shadow-[0_18px_44px_-36px_rgba(15,15,15,0.28)]"
+                                        : "border-sky-200/80 bg-sky-50/40 shadow-[0_22px_48px_-40px_rgba(14,165,233,0.35)] dark:border-sky-400/20 dark:bg-sky-500/[0.06]",
+                                )}
+                                role="button"
+                                tabIndex={0}
+                                onClick={() => openCreativeCard(card.id, card)}
+                                onKeyDown={(event) => handleGeneratedCardKeyDown(event, card.id)}
+                            >
+                                <CardHeader className={CREATIVE_TILE_HEADER_CLASS}>
+                                    <div className="flex items-start justify-between gap-3">
+                                        <div className="min-w-0 flex-1">
+                                            <CardTitle
+                                                className={cn(
+                                                    "line-clamp-2 min-h-[3rem] text-base leading-6 tracking-tight",
+                                                    card.is_read ? "text-foreground/90" : "text-foreground",
+                                                )}
+                                            >
+                                                {card.title}
+                                            </CardTitle>
+                                        </div>
+                                        {!card.is_read && <span className="mt-1 inline-block h-2 w-2 shrink-0 rounded-full bg-blue-500"></span>}
+                                    </div>
+                                    <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+                                        <span className="tabular-nums">{formatUtcDateTime(card.created_at)}</span>
+                                        <span>
+                                            {card.generation_mode === "auto" ? t("auto") : t("manual")} · {formatArticleCount(card.used_article_count)}
+                                        </span>
+                                    </div>
+                                </CardHeader>
+                                <CardContent className={CREATIVE_TILE_BODY_CLASS}>
+                                    <p
+                                        className={cn(
+                                            "line-clamp-5 min-h-[7.5rem] text-sm leading-6",
+                                            card.is_read ? "text-muted-foreground" : "text-foreground/78",
+                                        )}
+                                    >
+                                        {getCreativeCardPreviewExcerpt(card, GENERATED_TILE_PREVIEW_MAX_LENGTH)}
+                                    </p>
+                                </CardContent>
+                            </Card>
+                        ))}
+                    </div>
+                ) : (
+                    <div className="space-y-1">
+                        {cards.map((card) => (
+                            <div
+                                key={card.id}
+                                className={cn(
+                                    "group flex cursor-pointer items-start gap-3 rounded-lg border px-3 py-2.5 transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+                                    card.is_read
+                                        ? "border-border bg-card"
+                                        : "border-sky-200/80 bg-sky-50/40 dark:border-sky-400/20 dark:bg-sky-500/[0.06]",
+                                )}
+                                role="button"
+                                tabIndex={0}
+                                onClick={() => openCreativeCard(card.id, card)}
+                                onKeyDown={(event) => handleGeneratedCardKeyDown(event, card.id)}
+                            >
+                                {!card.is_read && <span className="mt-2 inline-block h-2 w-2 shrink-0 rounded-full bg-blue-500"></span>}
+                                <div className="min-w-0 flex-1">
+                                    <div className="flex items-start justify-between gap-3">
+                                        <span className={cn(
+                                            "line-clamp-1 text-sm font-semibold leading-6",
+                                            card.is_read ? "text-foreground/90" : "text-foreground",
+                                        )}>
+                                            {card.title}
+                                        </span>
+                                        <span className="shrink-0 text-xs tabular-nums text-muted-foreground">{formatUtcDateTime(card.created_at)}</span>
+                                    </div>
+                                    <p className={cn(
+                                        "mt-0.5 line-clamp-1 text-sm leading-5",
+                                        card.is_read ? "text-muted-foreground" : "text-foreground/78",
+                                    )}>
+                                        {getCreativeCardPreviewExcerpt(card, 160)}
+                                    </p>
+                                    <div className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
+                                        <span>{card.generation_mode === "auto" ? t("auto") : t("manual")}</span>
+                                        <span>·</span>
+                                        <span>{formatArticleCount(card.used_article_count)}</span>
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
+
+                {cards.length === 0 && (
+                    <div className="editor-empty">
+                        <Lightbulb className="mb-4 h-10 w-10 text-muted-foreground/30" />
+                        <p>{t("noCreativeCardsYet")}</p>
+                        <p className="text-sm">{t("generateFirstCard")}</p>
+                    </div>
+                )}
+
+                {totalPages > 1 && (
+                    <div className="border-t border-border px-3 py-1.5">
+                        <div className="flex items-center justify-between gap-2 sm:hidden">
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => goToCardPage(Math.max(0, currentPage - 1))}
+                                disabled={!canGoToPreviousPage}
+                            >
+                                <ChevronLeft className="h-3.5 w-3.5" />
+                                <span className="sr-only">{t("previousPage", { ns: "common" })}</span>
+                            </Button>
+                            <span className="min-w-0 flex-1 text-center text-xs text-muted-foreground">
+                                {compactPaginationLabel}
+                            </span>
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => goToCardPage(currentPage + 1)}
+                                disabled={!canGoToNextPage}
+                            >
+                                <span className="sr-only">{t("nextPage", { ns: "common" })}</span>
+                                <ChevronRight className="h-3.5 w-3.5" />
+                            </Button>
+                        </div>
+
+                        <div className="hidden items-center justify-center gap-2 sm:flex">
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => goToCardPage(Math.max(0, currentPage - 1))}
+                                disabled={!canGoToPreviousPage}
+                            >
+                                <ChevronLeft className="h-3.5 w-3.5" />
+                                {t("previous", { ns: "common" })}
+                            </Button>
+
+                            <nav aria-label={t("pagination", { ns: "common" })} className="flex items-center gap-1">
+                                {paginationItems.map((item) => {
+                                    if (item.type === "ellipsis") {
+                                        return (
+                                            <span
+                                                key={item.key}
+                                                className="flex h-7 w-7 items-center justify-center text-muted-foreground"
+                                                aria-hidden="true"
+                                            >
+                                                <MoreHorizontal className="h-3.5 w-3.5" />
+                                            </span>
+                                        );
+                                    }
+
+                                    const isCurrentPage = item.page === currentPage;
+
+                                    return (
+                                        <Button
+                                            key={item.page}
+                                            type="button"
+                                            variant={isCurrentPage ? "default" : "ghost"}
+                                            size="sm"
+                                            aria-current={isCurrentPage ? "page" : undefined}
+                                            onClick={isCurrentPage ? undefined : () => goToCardPage(item.page)}
                                             className={cn(
-                                                "line-clamp-2 min-h-[3rem] text-base leading-6 tracking-tight",
-                                                card.is_read ? "text-foreground/90" : "text-foreground",
+                                                "h-7 min-w-7 px-2 text-xs",
+                                                isCurrentPage && "pointer-events-none",
                                             )}
                                         >
-                                            {card.title}
-                                        </CardTitle>
-                                    </div>
-                                    {!card.is_read && <span className="mt-1 inline-block h-2 w-2 shrink-0 rounded-full bg-blue-500"></span>}
-                                </div>
-                                <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
-                                    <span className="tabular-nums">{formatUtcDateTime(card.created_at)}</span>
-                                    <span>
-                                        {card.generation_mode === "auto" ? t("auto") : t("manual")} · {formatArticleCount(card.used_article_count)}
-                                    </span>
-                                </div>
-                            </CardHeader>
-                            <CardContent className={CREATIVE_TILE_BODY_CLASS}>
-                                <p
-                                    className={cn(
-                                        "line-clamp-5 min-h-[7.5rem] text-sm leading-6",
-                                        card.is_read ? "text-muted-foreground" : "text-foreground/78",
-                                    )}
-                                >
-                                    {getCreativeCardPreviewExcerpt(card, GENERATED_TILE_PREVIEW_MAX_LENGTH)}
-                                </p>
-                            </CardContent>
-                        </Card>
-                    ))}
+                                            {item.page + 1}
+                                        </Button>
+                                    );
+                                })}
+                            </nav>
 
-                    {cards.length === 0 && (
-                        <div className="editor-empty col-span-full">
-                            <Lightbulb className="mb-4 h-10 w-10 text-muted-foreground/30" />
-                            <p>{t("noCreativeCardsYet")}</p>
-                            <p className="text-sm">{t("generateFirstCard")}</p>
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => goToCardPage(currentPage + 1)}
+                                disabled={!canGoToNextPage}
+                            >
+                                {t("next", { ns: "common" })}
+                                <ChevronRight className="h-3.5 w-3.5" />
+                            </Button>
                         </div>
-                    )}
-                </div>
+                    </div>
+                )}
 
                 <Dialog open={manualDialogOpen} onOpenChange={setManualDialogOpen}>
                     <DialogContent className="flex max-h-[90vh] max-w-4xl flex-col gap-0 overflow-hidden p-0">

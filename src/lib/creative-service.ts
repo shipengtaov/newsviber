@@ -62,6 +62,11 @@ export type SaveCreativeProjectInput = {
     source_ids: number[];
 };
 
+export type CreativeCardPage = {
+    cards: CreativeCard[];
+    totalCount: number;
+};
+
 export type GenerateCreativeCardInput = {
     projectId: number;
     articleIds: number[];
@@ -580,27 +585,45 @@ export async function listCreativeProjects(): Promise<CreativeProject[]> {
     return rows.map(normalizeCreativeProject);
 }
 
-export async function listCreativeCards(projectId: number): Promise<CreativeCard[]> {
+export async function listCreativeCards(
+    projectId: number,
+    options: { offset?: number; limit?: number } = {},
+): Promise<CreativeCardPage> {
     const db = await getDb();
-    const rows = await db.select<CreativeCardRow[]>(
-        `
-            SELECT
-                id,
-                project_id,
-                title,
-                full_report,
-                generation_mode,
-                used_article_count,
-                is_read,
-                created_at
-            FROM creative_cards
-            WHERE project_id = $1
-            ORDER BY id DESC
-        `,
+    const offset = Math.max(0, options.offset ?? 0);
+    const limit = options.limit != null ? Math.max(1, Math.min(200, options.limit)) : undefined;
+
+    const countRows = await db.select<{ cnt: number }[]>(
+        "SELECT COUNT(*) AS cnt FROM creative_cards WHERE project_id = $1",
         [projectId],
     );
+    const totalCount = Number(countRows[0]?.cnt) || 0;
 
-    return rows.map(normalizeCreativeCard);
+    const params: unknown[] = [projectId];
+    let sql = `
+        SELECT
+            id,
+            project_id,
+            title,
+            full_report,
+            generation_mode,
+            used_article_count,
+            is_read,
+            created_at
+        FROM creative_cards
+        WHERE project_id = $1
+        ORDER BY id DESC
+    `;
+
+    if (limit != null) {
+        sql += ` LIMIT ${pushParam(params, limit)}`;
+        if (offset > 0) {
+            sql += ` OFFSET ${pushParam(params, offset)}`;
+        }
+    }
+
+    const rows = await db.select<CreativeCardRow[]>(sql, params);
+    return { cards: rows.map(normalizeCreativeCard), totalCount };
 }
 
 export async function listCreativeSources(): Promise<CreativeSourceOption[]> {

@@ -121,5 +121,8 @@
     "connectingToModel": "モデルに接続中...",
     "streaming": "ストリーミング中...",
     "exploreFurther": "さらに詳しく...",
-    "closeDiscussion": "ディスカッションを閉じる"
+    "closeDiscussion": "ディスカッションを閉じる",
+    "viewCard": "カード表示",
+    "viewList": "リスト表示",
+    "pageXOfY": "{{page}} / {{total}} ページ"
 }

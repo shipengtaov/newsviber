@@ -121,5 +121,8 @@
     "connectingToModel": "Verbindung zum Modell wird hergestellt...",
     "streaming": "Streaming...",
     "exploreFurther": "Weiter erkunden...",
-    "closeDiscussion": "Diskussion schließen"
+    "closeDiscussion": "Diskussion schließen",
+    "viewCard": "Kartenansicht",
+    "viewList": "Listenansicht",
+    "pageXOfY": "Seite {{page}} von {{total}}"
 }

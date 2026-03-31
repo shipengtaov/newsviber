@@ -126,5 +126,8 @@
     "connectingToModel": "正在连接模型...",
     "streaming": "流式输出中...",
     "exploreFurther": "深入探索...",
-    "closeDiscussion": "关闭讨论"
+    "closeDiscussion": "关闭讨论",
+    "viewCard": "卡片视图",
+    "viewList": "列表视图",
+    "pageXOfY": "第 {{page}} / {{total}} 页"
 }
