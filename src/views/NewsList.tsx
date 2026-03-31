@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { openUrl } from "@tauri-apps/plugin-opener";
-import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
@@ -51,10 +50,10 @@ const DESKTOP_LAYOUT_MEDIA_QUERY = "(min-width: 1024px)";
 const NEWS_SCROLL_RESTORE_TOLERANCE_PX = 2;
 const NEWS_SCROLL_MAX_RESTORE_ATTEMPTS = 180;
 const PAGE_SIZE = 20;
-const DEFAULT_SOURCES_PANEL_WIDTH = 240;
-const MIN_SOURCES_PANEL_WIDTH = 200;
-const MAX_SOURCES_PANEL_WIDTH = 420;
-const SOURCE_ACTION_BUTTON_CLASS_NAME = "h-10 w-10 shrink-0 rounded-lg border border-transparent text-muted-foreground shadow-none hover:bg-accent/50 hover:text-accent-foreground transition-colors";
+const DEFAULT_SOURCES_PANEL_WIDTH = 220;
+const MIN_SOURCES_PANEL_WIDTH = 180;
+const MAX_SOURCES_PANEL_WIDTH = 380;
+const SOURCE_ACTION_BUTTON_CLASS_NAME = "h-7 w-7 shrink-0 rounded border border-transparent text-muted-foreground shadow-none hover:bg-muted hover:text-foreground transition-colors";
 
 function parsePageParam(rawPage: string | null): number {
     const parsed = Number.parseInt(rawPage ?? "0", 10);
@@ -238,29 +237,27 @@ function SourceFilterRow({
     onFetch,
 }: SourceFilterRowProps) {
     return (
-        <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-1">
+        <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-0.5">
             <Button
                 type="button"
                 variant="ghost"
                 className={cn(
-                    "h-10 min-w-0 flex w-full items-center gap-2 rounded-lg border border-transparent bg-transparent px-3 text-left shadow-none transition-all duration-200 hover:bg-accent/50 hover:text-foreground",
-                    isSelected && "bg-accent/70 text-accent-foreground font-medium",
+                    "h-7 min-w-0 flex w-full items-center gap-1.5 rounded-md border border-transparent bg-transparent px-2 text-left shadow-none transition-colors duration-100 hover:bg-muted hover:text-foreground",
+                    isSelected && "bg-muted text-foreground font-medium",
                 )}
                 onClick={onSelect}
                 title={title}
             >
-                <span className="min-w-0 flex-1 truncate text-sm font-medium">{label}</span>
-                <span className="inline-flex min-w-[4ch] shrink-0 items-center justify-end gap-1.5">
+                <span className="min-w-0 flex-1 truncate text-[13px]">{label}</span>
+                <span className="inline-flex min-w-[3ch] shrink-0 items-center justify-end gap-1">
                     <span className={cn(
-                        "text-right text-xs tabular-nums",
-                        isSelected ? "text-accent-foreground" : "text-muted-foreground",
+                        "text-right text-[11px] tabular-nums",
+                        isSelected ? "text-foreground" : "text-muted-foreground",
                     )}>
                         {count}
                     </span>
                     {unreadCount > 0 && (
-                        <span
-                            className="inline-flex h-[1.2rem] min-w-[1.2rem] items-center justify-center rounded-full bg-amber-500 px-1 text-[9px] font-semibold leading-none tabular-nums text-white shadow-[0_12px_22px_-16px_rgba(245,158,11,0.92)] ring-1 ring-background"
-                        >
+                        <span className="inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-medium leading-none tabular-nums text-primary-foreground">
                             {formatUnreadArticleCount(unreadCount)}
                         </span>
                     )}
@@ -276,7 +273,7 @@ function SourceFilterRow({
                 aria-label={fetchAriaLabel}
                 title={fetchAriaLabel}
             >
-                <RefreshCcw className={cn("h-4 w-4", isFetching && "animate-spin")} />
+                <RefreshCcw className={cn("h-3.5 w-3.5", isFetching && "animate-spin")} />
             </Button>
         </div>
     );
@@ -771,7 +768,7 @@ export default function NewsList() {
     }
 
     return (
-        <div className={cn("flex min-h-full w-full min-w-0 flex-col gap-4 py-4 md:py-6", CONTENT_GUTTER_X_CLASS)}>
+        <div className={cn("flex min-h-full w-full min-w-0 flex-col gap-2 py-2 md:py-3", CONTENT_GUTTER_X_CLASS)}>
             <WorkspaceHeader
                 density="compact"
                 eyebrow={t("eyebrow")}
@@ -785,12 +782,12 @@ export default function NewsList() {
                     { label: t("unread"), value: t("unreadCount", { count: scopedUnreadCount }), tone: scopedUnreadCount > 0 ? "warning" : "default" },
                 ]}
                 actions={(
-                    <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
-                        <form onSubmit={handleSearch} className="relative flex min-w-0 flex-1 items-center sm:w-[20rem]">
-                            <Search className="absolute left-3 h-4 w-4 text-muted-foreground" />
+                    <div className="flex w-full flex-col gap-1.5 sm:w-auto sm:flex-row sm:items-center">
+                        <form onSubmit={handleSearch} className="relative flex min-w-0 flex-1 items-center sm:w-[18rem]">
+                            <Search className="absolute left-2.5 h-3.5 w-3.5 text-muted-foreground" />
                             <Input
                                 placeholder={t("searchArticles")}
-                                className="pl-10 sm:w-full"
+                                className="h-8 pl-8 text-sm sm:w-full"
                                 value={searchInput}
                                 onChange={(e) => setSearchInput(e.target.value)}
                             />
@@ -798,6 +795,7 @@ export default function NewsList() {
                         <Button
                             type="button"
                             variant="outline"
+                            size="sm"
                             onClick={() => void handleMarkScopedRead()}
                             disabled={isMarkingScopedRead || scopedUnreadCount === 0}
                             aria-label={markScopedReadLabel}
@@ -805,12 +803,12 @@ export default function NewsList() {
                         >
                             {isMarkingScopedRead ? (
                                 <>
-                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
                                     {t("marking")}
                                 </>
                             ) : (
                                 <>
-                                    <CheckCheck className="h-4 w-4" />
+                                    <CheckCheck className="h-3.5 w-3.5" />
                                     {t("markAllAsRead")}
                                 </>
                             )}
@@ -819,16 +817,14 @@ export default function NewsList() {
                 )}
             />
 
-            <div className="flex min-h-0 flex-1 flex-col gap-4 lg:flex-row">
+            <div className="flex min-h-0 flex-1 flex-col gap-2 lg:flex-row">
                 <div
-                    className="relative min-w-0 lg:sticky lg:top-6 lg:self-start lg:shrink-0"
+                    className="relative min-w-0 lg:sticky lg:top-2 lg:self-start lg:shrink-0"
                     style={isDesktopLayout ? { width: sourcesPanelWidth } : undefined}
                 >
-                    <div className="surface-panel flex min-h-0 flex-col px-4 py-4 lg:max-h-[calc(100vh-8rem)]">
-                        <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
-                            <div>
-                                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{t("sources")}</p>
-                            </div>
+                    <div className="surface-panel flex min-h-0 flex-col px-2 py-2 lg:max-h-[calc(100vh-7rem)]">
+                        <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-1 px-1">
+                            <p className="text-[11px] font-medium text-muted-foreground">{t("sources")}</p>
                             <Button
                                 type="button"
                                 variant="ghost"
@@ -838,11 +834,11 @@ export default function NewsList() {
                                 aria-label={t("addSource")}
                                 title={t("addSource")}
                             >
-                                <Plus className="h-4 w-4" />
+                                <Plus className="h-3.5 w-3.5" />
                             </Button>
                         </div>
 
-                        <div className="mt-4 space-y-1.5 pr-1 lg:flex-1 lg:min-h-0 lg:overflow-y-auto">
+                        <div className="mt-1 space-y-0.5 lg:flex-1 lg:min-h-0 lg:overflow-y-auto">
                             <SourceFilterRow
                                 label={t("allArticles")}
                                 title={`${t("allArticles")} (${allArticleCount}${allUnreadCount > 0 ? `, ${t("unreadCount", { count: allUnreadCount })}` : ""})`}
@@ -877,10 +873,10 @@ export default function NewsList() {
 
                             {sourcesLoaded && sources.length === 0 && (
                                 <EmptyState
-                                    icon={<Newspaper className="h-8 w-8" />}
+                                    icon={<Newspaper className="h-6 w-6" />}
                                     title={t("noActiveSources")}
                                     description={t("addSourceToStart")}
-                                    className="px-4 py-10"
+                                    className="px-2 py-6"
                                 />
                             )}
                         </div>
@@ -894,11 +890,11 @@ export default function NewsList() {
                         aria-valuenow={sourcesPanelWidth}
                         data-no-window-drag
                         onPointerDown={handleSourcesResizeStart}
-                        className="absolute inset-y-0 -right-2 z-10 hidden w-4 touch-none cursor-col-resize lg:block"
+                        className="absolute inset-y-0 -right-1.5 z-10 hidden w-3 touch-none cursor-col-resize lg:block"
                     >
                         <div
                             className={cn(
-                                "absolute inset-y-4 left-1/2 w-px -translate-x-1/2 rounded-full transition-colors",
+                                "absolute inset-y-2 left-1/2 w-px -translate-x-1/2 transition-colors",
                                 isResizingSourcesPanel ? "bg-muted-foreground/60" : "bg-border",
                             )}
                         />
@@ -907,41 +903,41 @@ export default function NewsList() {
 
                 <div className="min-w-0 flex-1 lg:min-h-0">
                     <div className="surface-panel flex h-full min-h-0 w-full min-w-0 flex-col">
-                        <div className="border-b border-border/60 px-5 py-3.5 md:px-6">
-                            <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
+                        <div className="border-b border-border px-3 py-2">
+                            <div className="flex flex-col gap-1 lg:flex-row lg:items-center lg:justify-between">
                                 <div className="min-w-0">
-                                    <h2 className="truncate font-display text-xl font-semibold tracking-[-0.04em] text-foreground">
+                                    <h2 className="truncate text-sm font-medium text-foreground">
                                         {selectedSource?.name ?? t("allArticles")}
                                     </h2>
                                     {selectedSource ? (
-                                        <div className="mt-1.5 flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                                        <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-muted-foreground">
                                             <span>{resultSummaryLabel}</span>
                                             <span>{formatLastFetchSummary(selectedSource.last_fetch)}</span>
                                             <span>{formatFetchInterval(selectedSource.fetch_interval)}</span>
                                             <a
                                                 href={selectedSource.url}
                                                 title={selectedSource.url}
-                                                className="min-w-0 truncate text-primary transition-colors hover:text-accent-foreground"
+                                                className="min-w-0 truncate text-primary hover:underline"
                                                 onClick={(event) => handleExternalLink(event, selectedSource.url)}
                                             >
                                                 {selectedSource.url}
                                             </a>
                                         </div>
                                     ) : (
-                                        <div className="mt-1.5 flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                                        <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-muted-foreground">
                                             <span>{activeSourceSummaryLabel}</span>
                                             <span>{resultSummaryLabel}</span>
                                         </div>
                                     )}
                                 </div>
-                                <div className="shrink-0 rounded-full border border-border/60 bg-background/72 px-4 py-2 text-xs font-medium text-muted-foreground shadow-soft">
+                                <span className="shrink-0 text-[11px] text-muted-foreground">
                                     {compactPaginationLabel}
-                                </div>
+                                </span>
                             </div>
                         </div>
 
-                        <div ref={articlesScrollRef} className="min-h-0 flex-1 overflow-y-auto px-3 py-4 md:px-4 md:py-5">
-                            <div className="space-y-3">
+                        <div ref={articlesScrollRef} className="min-h-0 flex-1 overflow-y-auto">
+                            <div className="divide-y divide-border">
                                 {articles.map((article) => {
                                     const preview = resolveArticlePreview(article.summary, article.content);
 
@@ -950,116 +946,111 @@ export default function NewsList() {
                                             to={buildArticleHref(article.id)}
                                             state={{ returnTo: `${location.pathname}${location.search}` }}
                                             key={article.id}
-                                            className="group block"
+                                            className={cn(
+                                                "group block px-3 py-2 transition-colors hover:bg-muted/50",
+                                                !article.is_read && "bg-primary/[0.03]",
+                                            )}
                                             onClick={handleArticleClick}
                                         >
-                                            <Card
-                                                className={cn(
-                                                    "editor-list-card border border-border/55",
-                                                    article.is_read
-                                                        ? "bg-card/40 hover:border-primary/30"
-                                                        : "border-amber-200/70 bg-amber-50/52 shadow-sm",
+                                            <div className="flex items-baseline gap-2">
+                                                {!article.is_read && <span className="mt-0.5 inline-block h-1.5 w-1.5 shrink-0 rounded-full bg-primary"></span>}
+                                                <h3 className={cn(
+                                                    "min-w-0 flex-1 truncate text-[13px] leading-5",
+                                                    article.is_read ? "text-muted-foreground" : "font-medium text-foreground",
+                                                )}>
+                                                    {article.title}
+                                                </h3>
+                                                <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">
+                                                    {formatUtcDateTime(article.published_at)}
+                                                </span>
+                                            </div>
+                                            {preview.source === "summary" && article.summary ? (
+                                                <p
+                                                    className="mt-0.5 line-clamp-1 text-xs leading-4 text-muted-foreground"
+                                                    dangerouslySetInnerHTML={{ __html: sanitizeArticleHtml(article.summary) }}
+                                                    onClick={handleHtmlLinkClick}
+                                                />
+                                            ) : preview.source === "content" ? (
+                                                <p className="mt-0.5 line-clamp-1 text-xs leading-4 text-muted-foreground">
+                                                    {preview.text}
+                                                </p>
+                                            ) : null}
+                                            <div className="mt-0.5 flex items-center gap-2 text-[11px] text-muted-foreground">
+                                                <span className="font-medium text-foreground/70">{article.source_name}</span>
+                                                {article.guid && (
+                                                    <a
+                                                        href={article.guid}
+                                                        className="inline-flex items-center text-primary hover:underline"
+                                                        onClick={(e) => handleExternalLink(e, article.guid)}
+                                                    >
+                                                        <ExternalLink className="mr-0.5 h-2.5 w-2.5" />
+                                                        {t("original")}
+                                                    </a>
                                                 )}
-                                            >
-                                                <CardHeader className="space-y-3 px-4 py-4">
-                                                    <div className="flex items-start gap-3">
-                                                        {!article.is_read && <span className="mt-2 inline-block h-2.5 w-2.5 shrink-0 rounded-full bg-amber-500"></span>}
-                                                        <div className="min-w-0 flex-1">
-                                                            <CardTitle className="text-[1.08rem] leading-7 text-foreground">{article.title}</CardTitle>
-                                                        </div>
-                                                    </div>
-                                                    {preview.source === "summary" && article.summary && (
-                                                        <CardDescription
-                                                            className="min-w-0 line-clamp-2 text-sm leading-6 text-muted-foreground"
-                                                            dangerouslySetInnerHTML={{ __html: sanitizeArticleHtml(article.summary) }}
-                                                            onClick={handleHtmlLinkClick}
-                                                        />
-                                                    )}
-                                                    {preview.source === "content" && (
-                                                        <CardDescription className="min-w-0 line-clamp-2 text-sm leading-6 text-muted-foreground">
-                                                            {preview.text}
-                                                        </CardDescription>
-                                                    )}
-                                                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
-                                                        <span className="rounded-full bg-accent/80 px-2.5 py-1 text-accent-foreground">{article.source_name}</span>
-                                                        <span>{t("published", { date: formatUtcDateTime(article.published_at) })}</span>
-                                                        <span>{t("saved", { date: formatUtcDateTime(article.inserted_at) })}</span>
-                                                        {article.guid && (
-                                                            <a
-                                                                href={article.guid}
-                                                                className="inline-flex shrink-0 items-center text-primary transition-colors hover:text-accent-foreground"
-                                                                onClick={(e) => handleExternalLink(e, article.guid)}
-                                                            >
-                                                                <ExternalLink className="mr-1 h-3 w-3" />
-                                                                {t("original")}
-                                                            </a>
-                                                        )}
-                                                    </div>
-                                                </CardHeader>
-                                            </Card>
+                                            </div>
                                         </Link>
                                     );
                                 })}
-
-                                {articles.length === 0 && (
-                                    <EmptyState
-                                        icon={<Newspaper className="h-10 w-10" />}
-                                        title={emptyStateMessage}
-                                        description={hasActiveSources
-                                            ? t("emptyHasSourcesDesc")
-                                            : t("emptyNoSourcesDesc")}
-                                    />
-                                )}
                             </div>
+
+                            {articles.length === 0 && (
+                                <EmptyState
+                                    icon={<Newspaper className="h-6 w-6" />}
+                                    title={emptyStateMessage}
+                                    description={hasActiveSources
+                                        ? t("emptyHasSourcesDesc")
+                                        : t("emptyNoSourcesDesc")}
+                                />
+                            )}
                         </div>
 
-                        <div className="border-t border-border/60 px-4 py-3 md:px-6">
+                        <div className="border-t border-border px-3 py-1.5">
                             <div className="flex items-center justify-between gap-2 sm:hidden">
                                 <Button
-                                    variant="outline"
+                                    variant="ghost"
                                     size="sm"
                                     onClick={() => goToPage(Math.max(0, page - 1))}
                                     disabled={!canGoToPreviousPage}
                                 >
-                                    <ChevronLeft className="h-4 w-4" />
+                                    <ChevronLeft className="h-3.5 w-3.5" />
                                     <span className="sr-only">{t("previousPage", { ns: "common" })}</span>
                                 </Button>
-                                <span className="min-w-0 flex-1 text-center text-sm font-medium text-muted-foreground">
+                                <span className="min-w-0 flex-1 text-center text-xs text-muted-foreground">
                                     {compactPaginationLabel}
                                 </span>
                                 <Button
-                                    variant="outline"
+                                    variant="ghost"
                                     size="sm"
                                     onClick={() => goToPage(page + 1)}
                                     disabled={!canGoToNextPage}
                                 >
                                     <span className="sr-only">{t("nextPage", { ns: "common" })}</span>
-                                    <ChevronRight className="h-4 w-4" />
+                                    <ChevronRight className="h-3.5 w-3.5" />
                                 </Button>
                             </div>
 
-                            <div className="hidden items-center justify-center gap-3 sm:flex">
+                            <div className="hidden items-center justify-center gap-2 sm:flex">
                                 <Button
-                                    variant="outline"
+                                    variant="ghost"
                                     size="sm"
                                     onClick={() => goToPage(Math.max(0, page - 1))}
                                     disabled={!canGoToPreviousPage}
                                 >
-                                    <ChevronLeft className="h-4 w-4" />
+                                    <ChevronLeft className="h-3.5 w-3.5" />
                                     {t("previous", { ns: "common" })}
                                 </Button>
 
                                 {totalPages !== null && totalPages > 1 ? (
-                                    <nav aria-label={t("pagination", { ns: "common" })} className="flex items-center gap-1.5">
+                                    <nav aria-label={t("pagination", { ns: "common" })} className="flex items-center gap-1">
                                         {paginationItems.map((item) => {
                                             if (item.type === "ellipsis") {
                                                 return (
                                                     <span
                                                         key={item.key}
-                                                        className="flex h-9 w-9 items-center justify-center rounded-full text-muted-foreground"
+                                                        className="flex h-7 w-7 items-center justify-center text-muted-foreground"
                                                         aria-hidden="true"
                                                     >
-                                                        <MoreHorizontal className="h-4 w-4" />
+                                                        <MoreHorizontal className="h-3.5 w-3.5" />
                                                     </span>
                                                 );
                                             }
@@ -1070,12 +1061,12 @@ export default function NewsList() {
                                                 <Button
                                                     key={item.page}
                                                     type="button"
-                                                    variant={isCurrentPage ? "default" : "outline"}
+                                                    variant={isCurrentPage ? "default" : "ghost"}
                                                     size="sm"
                                                     aria-current={isCurrentPage ? "page" : undefined}
                                                     onClick={isCurrentPage ? undefined : () => goToPage(item.page)}
                                                     className={cn(
-                                                        "min-w-9 px-3",
+                                                        "h-7 min-w-7 px-2 text-xs",
                                                         isCurrentPage && "pointer-events-none",
                                                     )}
                                                 >
@@ -1085,19 +1076,19 @@ export default function NewsList() {
                                         })}
                                     </nav>
                                 ) : (
-                                    <span className="text-sm font-medium text-muted-foreground">
+                                    <span className="text-xs text-muted-foreground">
                                         {compactPaginationLabel}
                                     </span>
                                 )}
 
                                 <Button
-                                    variant="outline"
+                                    variant="ghost"
                                     size="sm"
                                     onClick={() => goToPage(page + 1)}
                                     disabled={!canGoToNextPage}
                                 >
                                     {t("next", { ns: "common" })}
-                                    <ChevronRight className="h-4 w-4" />
+                                    <ChevronRight className="h-3.5 w-3.5" />
                                 </Button>
                             </div>
                         </div>

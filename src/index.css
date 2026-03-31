@@ -35,10 +35,9 @@
     --chart-3: 160 44% 35%;
     --chart-4: 12 70% 58%;
     --chart-5: 218 44% 39%;
-    --radius: 1rem;
-    --shadow-soft: 0 22px 50px -34px rgba(27, 46, 66, 0.28);
-    --shadow-elevated: 0 28px 80px -42px rgba(17, 34, 53, 0.34);
-    --shadow-glow: 0 0 0 1px rgba(255, 255, 255, 0.72), 0 24px 70px -40px rgba(11, 84, 118, 0.38);
+    --radius: 0.5rem;
+    --shadow-soft: 0 1px 3px 0 rgba(0, 0, 0, 0.06), 0 1px 2px -1px rgba(0, 0, 0, 0.06);
+    --shadow-elevated: 0 4px 12px -2px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.06);
   }
 
   .dark {
@@ -67,9 +66,8 @@
     --chart-3: 159 43% 49%;
     --chart-4: 8 78% 63%;
     --chart-5: 224 60% 70%;
-    --shadow-soft: 0 28px 60px -34px rgba(0, 0, 0, 0.58);
-    --shadow-elevated: 0 36px 90px -44px rgba(0, 0, 0, 0.72);
-    --shadow-glow: 0 0 0 1px rgba(255, 255, 255, 0.08), 0 26px 76px -42px rgba(56, 189, 248, 0.22);
+    --shadow-soft: 0 1px 3px 0 rgba(0, 0, 0, 0.3), 0 1px 2px -1px rgba(0, 0, 0, 0.3);
+    --shadow-elevated: 0 4px 12px -2px rgba(0, 0, 0, 0.4), 0 2px 4px -2px rgba(0, 0, 0, 0.3);
   }
 
   * {
@@ -89,10 +87,6 @@
   body {
     font-family: var(--font-body);
     @apply bg-background text-foreground antialiased;
-    background-image:
-      radial-gradient(circle at top left, hsl(192 80% 65% / 0.14), transparent 28%),
-      radial-gradient(circle at 85% 16%, hsl(36 92% 54% / 0.12), transparent 24%),
-      linear-gradient(180deg, hsl(46 30% 98%), hsl(var(--background)));
     text-rendering: optimizeLegibility;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
@@ -110,7 +104,7 @@
   h5,
   h6 {
     font-family: var(--font-display);
-    letter-spacing: -0.03em;
+    letter-spacing: -0.01em;
   }
 
   code,
@@ -128,8 +122,8 @@
   }
 
   ::-webkit-scrollbar {
-    width: 12px;
-    height: 12px;
+    width: 8px;
+    height: 8px;
   }
 
   ::-webkit-scrollbar-track {
@@ -137,9 +131,9 @@
   }
 
   ::-webkit-scrollbar-thumb {
-    border: 3px solid transparent;
+    border: 2px solid transparent;
     border-radius: 999px;
-    background: hsl(var(--border) / 0.95);
+    background: hsl(var(--border));
     background-clip: padding-box;
   }
 
@@ -151,51 +145,55 @@
 
 @layer components {
   .surface-panel {
-    @apply relative overflow-hidden rounded-xl border bg-card text-card-foreground shadow-sm;
+    @apply relative overflow-hidden rounded-lg border bg-card text-card-foreground;
   }
 
   .surface-panel-quiet {
-    @apply relative overflow-hidden rounded-xl border bg-card/60 text-foreground shadow-sm backdrop-blur-md;
-    border-color: hsl(var(--border) / 0.6);
+    @apply relative overflow-hidden rounded-lg border bg-card text-foreground;
+    border-color: hsl(var(--border) / 0.7);
   }
 
   .surface-panel-elevated {
-    @apply surface-panel shadow-md;
+    @apply surface-panel shadow-soft;
   }
 
   .section-kicker {
-    @apply inline-flex items-center rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.22em] text-accent-foreground;
-    background-color: hsl(var(--accent) / 0.8);
+    @apply inline-flex items-center rounded px-2 py-0.5 text-[11px] font-medium text-muted-foreground;
+    background-color: hsl(var(--muted) / 0.7);
   }
 
   .stat-pill {
-    @apply inline-flex min-w-[7rem] flex-col gap-1 rounded-[1.2rem] border px-4 py-3 shadow-soft backdrop-blur-sm;
-    border-color: hsl(var(--border) / 0.6);
-    background-color: hsl(var(--background) / 0.72);
+    @apply inline-flex min-w-0 items-center gap-1.5 rounded border px-2.5 py-1.5 text-xs;
+    border-color: hsl(var(--border) / 0.7);
+    background-color: hsl(var(--background));
   }
 
   .stat-pill-label {
-    @apply text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground;
+    @apply text-[11px] font-medium text-muted-foreground;
   }
 
   .stat-pill-value {
-    @apply text-sm font-semibold text-foreground;
+    @apply text-xs font-medium text-foreground;
   }
 
   .editor-list-card {
-    @apply surface-panel-quiet rounded-xl transition-all duration-200 motion-safe:hover:-translate-y-[2px] motion-safe:hover:shadow-md;
+    @apply surface-panel-quiet rounded-lg transition-colors duration-150;
+  }
+
+  .editor-list-card:hover {
+    border-color: hsl(var(--border));
   }
 
   .editor-empty {
-    @apply surface-panel-quiet flex flex-col items-center justify-center gap-3 px-6 py-12 text-center text-sm text-muted-foreground;
+    @apply flex flex-col items-center justify-center gap-2 px-4 py-8 text-center text-sm text-muted-foreground;
   }
 
   .page-grid {
-    @apply grid gap-6;
+    @apply grid gap-4;
   }
 
   .workspace-enter {
-    animation: workspace-fade-up 0.45s cubic-bezier(0.2, 1, 0.3, 1);
+    animation: workspace-fade-in 0.15s ease-out;
   }
 
   @media (prefers-reduced-motion: reduce) {
@@ -204,15 +202,13 @@
     }
   }
 
-  @keyframes workspace-fade-up {
+  @keyframes workspace-fade-in {
     from {
       opacity: 0;
-      transform: translateY(12px);
     }
 
     to {
       opacity: 1;
-      transform: translateY(0);
     }
   }
 
@@ -220,18 +216,16 @@
 
     0%,
     100% {
-      transform: scale(1);
       opacity: 1;
     }
 
     50% {
-      transform: scale(1.08);
-      opacity: 0.94;
+      opacity: 0.6;
     }
   }
 
   .animate-pulse-subtle {
-    animation: pulse-subtle 4s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+    animation: pulse-subtle 3s ease-in-out infinite;
   }
 
   .chat-markdown {
@@ -319,7 +313,7 @@
   }
 
   .chat-markdown-pre {
-    @apply overflow-x-auto rounded-xl border px-4 py-3 text-sm leading-6 shadow-sm;
+    @apply overflow-x-auto rounded-lg border px-3 py-2.5 text-sm leading-6;
     border-color: var(--chat-markdown-surface-border);
     background-color: var(--chat-markdown-surface);
     color: var(--chat-markdown-foreground);
@@ -342,7 +336,7 @@
   }
 
   .chat-markdown-table-wrapper {
-    @apply my-4 overflow-x-auto rounded-xl border shadow-sm;
+    @apply my-4 overflow-x-auto rounded-lg border;
     border-color: var(--chat-markdown-surface-border);
   }
 
@@ -353,14 +347,14 @@
   }
 
   .chat-markdown-th {
-    @apply border-b px-3 py-2 text-left font-semibold;
+    @apply border-b px-3 py-1.5 text-left font-semibold;
     border-color: var(--chat-markdown-surface-border);
     background-color: var(--chat-markdown-table-header-bg);
     color: var(--chat-markdown-foreground);
   }
 
   .chat-markdown-td {
-    @apply border-b px-3 py-2 align-top;
+    @apply border-b px-3 py-1.5 align-top;
     border-color: var(--chat-markdown-surface-border-soft);
     color: var(--chat-markdown-body);
   }
@@ -374,27 +368,25 @@
     box-shadow: none;
   }
 
-  /* Unread Badge */
   .unread-badge-container {
     @apply absolute -right-0.5 -top-0.5 pointer-events-none;
-    filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.16));
   }
 
   .unread-badge {
-    @apply h-1.5 w-1.5 rounded-full ring-[1.5px] transition-all duration-300 opacity-80;
-    background: linear-gradient(135deg, hsl(36 92% 58%), hsl(24 94% 54%));
-    background-clip: padding-box;
+    @apply h-1.5 w-1.5 rounded-full ring-[1.5px] transition-opacity duration-200;
+    background: hsl(var(--primary));
+  }
+
+  .unread-badge-active {
+    background: hsl(36 92% 58%);
+    @apply ring-primary;
   }
 
   .unread-badge:hover {
-    @apply opacity-100 scale-110;
+    @apply opacity-100;
   }
 
-  /* No explicit animation to minimize distraction, or use a very slow pulse */
   .unread-badge::before {
-    content: "";
-    @apply absolute inset-0 rounded-full animate-pulse-subtle opacity-40;
-    background: currentColor;
-    background: inherit;
+    content: none;
   }
 }

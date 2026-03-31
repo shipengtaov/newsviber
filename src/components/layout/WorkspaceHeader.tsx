@@ -28,9 +28,9 @@ export type WorkspaceHeaderProps = {
 };
 
 const TONE_CLASS_MAP: Record<Tone, string> = {
-    default: "border-border/60 bg-background/72",
-    accent: "border-primary/20 bg-accent/70",
-    warning: "border-amber-300/50 bg-amber-100/75 text-amber-950",
+    default: "",
+    accent: "text-primary",
+    warning: "text-amber-600 dark:text-amber-400",
 };
 
 export function SectionLabel({ children, className }: { children: ReactNode; className?: string }) {
@@ -43,10 +43,10 @@ export function SectionLabel({ children, className }: { children: ReactNode; cla
 
 export function StatPill({ label, value, tone = "default", className }: WorkspaceStat & { className?: string }) {
     return (
-        <div className={cn("stat-pill", TONE_CLASS_MAP[tone], className)}>
-            <div className="stat-pill-label">{label}</div>
-            <div className="stat-pill-value">{value}</div>
-        </div>
+        <span className={cn("stat-pill", className)}>
+            <span className="stat-pill-label">{label}:</span>
+            <span className={cn("stat-pill-value", TONE_CLASS_MAP[tone])}>{value}</span>
+        </span>
     );
 }
 
@@ -65,10 +65,10 @@ export function EmptyState({
 }) {
     return (
         <div className={cn("editor-empty workspace-enter", className)}>
-            {icon ? <div className="text-primary/70">{icon}</div> : null}
+            {icon ? <div className="text-muted-foreground">{icon}</div> : null}
             <div className="space-y-1">
-                <div className="font-display text-lg font-semibold text-foreground">{title}</div>
-                {description ? <p className="max-w-xl text-sm leading-6 text-muted-foreground">{description}</p> : null}
+                <div className="text-sm font-medium text-foreground">{title}</div>
+                {description ? <p className="max-w-xl text-xs leading-5 text-muted-foreground">{description}</p> : null}
             </div>
             {action}
         </div>
@@ -99,7 +99,7 @@ export function WorkspaceHeader({
     const shouldUseCompactTitlelessLayout = !shouldRenderVisibleTitle && titlelessLayout === "compact";
 
     const statsContent = shouldRenderStats && stats && stats.length > 0 ? (
-        <div className={cn("flex flex-wrap", density === "compact" ? "gap-2.5" : "gap-3")}>
+        <div className="flex flex-wrap gap-2">
             {stats.map((stat, index) => (
                 <StatPill key={`${String(stat.label)}-${index}`} {...stat} />
             ))}
@@ -107,20 +107,12 @@ export function WorkspaceHeader({
     ) : null;
 
     const textBlockContent = shouldRenderTextBlock ? (
-        <div
-            className={cn(
-                shouldRenderVisibleTitle && description && shouldRenderDescription
-                    ? density === "compact"
-                        ? "space-y-1.5"
-                        : "space-y-2"
-                    : undefined,
-            )}
-        >
+        <div className={cn(shouldRenderVisibleTitle && description && shouldRenderDescription ? "space-y-1" : undefined)}>
             {shouldRenderVisibleTitle ? (
                 <h1
                     className={cn(
-                        "font-display font-semibold tracking-[-0.04em] text-foreground",
-                        density === "compact" ? "text-2xl md:text-[1.9rem]" : "text-3xl md:text-[2.3rem]",
+                        "font-semibold tracking-tight text-foreground",
+                        density === "compact" ? "text-lg" : "text-xl",
                         titleClassName,
                     )}
                 >
@@ -128,13 +120,7 @@ export function WorkspaceHeader({
                 </h1>
             ) : null}
             {description && shouldRenderDescription ? (
-                <p
-                    className={cn(
-                        "max-w-3xl text-muted-foreground",
-                        density === "compact" ? "text-sm leading-6" : "text-sm leading-7 md:text-base",
-                        descriptionClassName,
-                    )}
-                >
+                <p className={cn("text-xs leading-5 text-muted-foreground", descriptionClassName)}>
                     {description}
                 </p>
             ) : null}
@@ -144,26 +130,16 @@ export function WorkspaceHeader({
     return (
         <section
             className={cn(
-                "surface-panel workspace-enter",
-                density === "compact" ? "px-4 py-4 md:px-5 md:py-5" : "px-5 py-5 md:px-7 md:py-7",
+                "surface-panel workspace-enter px-3 py-2",
                 className,
             )}
         >
-            <div className={cn("flex flex-col", shouldUseCompactTitlelessLayout ? "gap-2.5" : density === "compact" ? "gap-3.5" : "gap-5")}>
+            <div className={cn("flex flex-col", shouldUseCompactTitlelessLayout ? "gap-2" : "gap-2.5")}>
                 {shouldUseCompactTitlelessLayout ? (
-                    <div className={cn("flex flex-col gap-2.5", actions ? "lg:flex-row lg:items-start lg:justify-between" : undefined)}>
-                        <div
-                            className={cn(
-                                "min-w-0",
-                                statsContent || textBlockContent || leading || eyebrow
-                                    ? density === "compact"
-                                        ? "space-y-3.5"
-                                        : "space-y-5"
-                                    : undefined,
-                            )}
-                        >
+                    <div className={cn("flex flex-col gap-2", actions ? "lg:flex-row lg:items-center lg:justify-between" : undefined)}>
+                        <div className={cn("min-w-0", statsContent || textBlockContent || leading || eyebrow ? "space-y-2" : undefined)}>
                             {leading ? <div className="flex items-center gap-2">{leading}</div> : null}
-                            {eyebrow ? <SectionLabel className={density === "compact" ? "px-2.5 py-0.5 text-[10px]" : undefined}>{eyebrow}</SectionLabel> : null}
+                            {eyebrow ? <SectionLabel>{eyebrow}</SectionLabel> : null}
                             <h1 className="sr-only">{title}</h1>
                             {textBlockContent}
                             {statsContent}
@@ -172,10 +148,10 @@ export function WorkspaceHeader({
                     </div>
                 ) : (
                     <>
-                        <div className={cn("flex flex-col", density === "compact" ? "gap-3.5 lg:flex-row lg:items-start lg:justify-between" : "gap-5 lg:flex-row lg:items-start lg:justify-between")}>
-                            <div className={cn("min-w-0", density === "compact" ? "space-y-2" : "space-y-3")}>
+                        <div className="flex flex-col gap-2.5 lg:flex-row lg:items-center lg:justify-between">
+                            <div className="min-w-0 space-y-1.5">
                                 {leading ? <div className="flex items-center gap-2">{leading}</div> : null}
-                                {eyebrow ? <SectionLabel className={density === "compact" ? "px-2.5 py-0.5 text-[10px]" : undefined}>{eyebrow}</SectionLabel> : null}
+                                {eyebrow ? <SectionLabel>{eyebrow}</SectionLabel> : null}
                                 {!shouldRenderVisibleTitle ? <h1 className="sr-only">{title}</h1> : null}
                                 {textBlockContent}
                             </div>

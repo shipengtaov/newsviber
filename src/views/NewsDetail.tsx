@@ -123,20 +123,20 @@ export function ArticleDetailView({
 
     if (isLoading && !article) {
         return (
-            <div className={cn("flex h-full w-full items-center justify-center py-6", CONTENT_GUTTER_X_CLASS, className)}>
-                <div className="surface-panel-quiet px-6 py-10 text-sm text-muted-foreground">{t("loadingArticle")}</div>
+            <div className={cn("flex h-full w-full items-center justify-center py-4", CONTENT_GUTTER_X_CLASS, className)}>
+                <div className="surface-panel-quiet px-4 py-6 text-sm text-muted-foreground">{t("loadingArticle")}</div>
             </div>
         );
     }
 
     if (!article) {
         return (
-            <div className={cn("flex h-full w-full flex-col items-center justify-center gap-4 py-6", CONTENT_GUTTER_X_CLASS, className)}>
-                <div className="surface-panel-quiet px-6 py-10 text-center text-sm text-muted-foreground">
+            <div className={cn("flex h-full w-full flex-col items-center justify-center gap-3 py-4", CONTENT_GUTTER_X_CLASS, className)}>
+                <div className="surface-panel-quiet px-4 py-6 text-center text-sm text-muted-foreground">
                     {loadError ?? t("articleNotFound")}
                 </div>
-                <Button variant="outline" onClick={handleBack}>
-                    <ArrowLeft className="mr-2 h-4 w-4" />
+                <Button variant="outline" size="sm" onClick={handleBack}>
+                    <ArrowLeft className="h-3.5 w-3.5" />
                     {t("backToNews")}
                 </Button>
             </div>
@@ -144,31 +144,31 @@ export function ArticleDetailView({
     }
 
     return (
-        <div className={cn("flex h-full w-full min-h-0 py-4 md:py-6", CONTENT_GUTTER_X_CLASS, className)}>
+        <div className={cn("flex h-full w-full min-h-0 py-2 md:py-3", CONTENT_GUTTER_X_CLASS, className)}>
             <div className="surface-panel min-w-0 flex-1 overflow-y-auto">
-                <div className="mx-auto w-full max-w-5xl p-6 md:p-8">
-                    <Button variant="ghost" className="mb-5 -ml-1 text-muted-foreground hover:bg-background/80" onClick={handleBack}>
-                        <ArrowLeft className="w-4 h-4 mr-2" /> {t("backToNews")}
+                <div className="mx-auto w-full max-w-5xl p-4 md:p-6">
+                    <Button variant="ghost" size="sm" className="mb-3 -ml-1 text-muted-foreground" onClick={handleBack}>
+                        <ArrowLeft className="h-3.5 w-3.5" /> {t("backToNews")}
                     </Button>
 
-                    <div className="mb-7">
-                        <h1 className="mb-3 font-display text-[2rem] font-semibold leading-tight tracking-[-0.05em] text-foreground md:text-[2.35rem]">{article.title}</h1>
-                        <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
-                            <span className="rounded-full bg-accent/80 px-3 py-1 font-medium text-accent-foreground">{article.source_name}</span>
+                    <div className="mb-5">
+                        <h1 className="mb-2 text-xl font-semibold leading-tight tracking-tight text-foreground md:text-2xl">{article.title}</h1>
+                        <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+                            <span className="rounded-md bg-accent/80 px-2 py-0.5 text-xs font-medium text-accent-foreground">{article.source_name}</span>
                             <span>{formatUtcDateTime(article.published_at)}</span>
                             <a
                                 href={article.guid}
                                 className="flex items-center text-primary transition-colors hover:text-accent-foreground hover:underline cursor-pointer"
                                 onClick={(e) => { e.preventDefault(); openUrl(article.guid); }}
                             >
-                                <ExternalLink className="w-3.5 h-3.5 mr-1" /> {t("originalSource")}
+                                <ExternalLink className="mr-0.5 h-3 w-3" /> {t("originalSource")}
                             </a>
                         </div>
                     </div>
 
                     {article.summary && (
                         <div
-                            className="surface-panel-quiet mb-6 px-5 py-4 text-sm leading-7 text-muted-foreground"
+                            className="surface-panel-quiet mb-4 px-4 py-3 text-sm leading-6 text-muted-foreground"
                             dangerouslySetInnerHTML={{ __html: sanitizeArticleHtml(article.summary) }}
                             onClick={(e) => {
                                 const target = e.target as HTMLElement;

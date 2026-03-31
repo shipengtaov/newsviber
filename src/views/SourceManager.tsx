@@ -344,7 +344,7 @@ export default function SourceManager() {
         <>
             <PageShell
                 variant="workspace"
-                contentClassName="space-y-8"
+                contentClassName="space-y-4"
                 header={{
                     density: "compact",
                     eyebrow: t("eyebrow"),
@@ -361,18 +361,19 @@ export default function SourceManager() {
                         <div className="flex flex-wrap gap-2">
                             <Button
                                 variant="outline"
+                                size="sm"
                                 onClick={() => void fetchAll()}
                                 disabled={isManagerLocked || activeSourceCount === 0}
                             >
-                                <RefreshCcw className={`mr-2 h-4 w-4 ${isFetchingAll ? "animate-spin" : ""}`} />
+                                <RefreshCcw className={`h-3.5 w-3.5 ${isFetchingAll ? "animate-spin" : ""}`} />
                                 {isFetchingAll ? t("fetchingAll") : t("fetchAll")}
                             </Button>
                             <DropdownMenu>
                                 <DropdownMenuTrigger asChild>
-                                    <Button disabled={isManagerLocked}>
-                                        <Plus className="mr-2 h-4 w-4" />
+                                    <Button size="sm" disabled={isManagerLocked}>
+                                        <Plus className="h-3.5 w-3.5" />
                                         {t("addSource")}
-                                        <ChevronDown className="ml-2 h-4 w-4" />
+                                        <ChevronDown className="h-3.5 w-3.5" />
                                     </Button>
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent align="end" className="w-56">
@@ -391,21 +392,21 @@ export default function SourceManager() {
                 }}
             >
                 <div className="space-y-4">
-                    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                    <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                         {sources.map((source) => (
                             <Card
                                 key={source.id}
                                 className={`flex flex-col ${!source.active ? "bg-muted/40 opacity-80" : ""}`}
                             >
-                                <CardHeader className="px-4 py-4 pb-2">
+                                <CardHeader className="pb-1.5">
                                     <div className="min-w-0 flex-1">
-                                        <CardTitle className="truncate text-lg">{source.name}</CardTitle>
-                                        <CardDescription className="mt-1.5 line-clamp-2 text-sm" title={source.url}>
+                                        <CardTitle className="truncate text-base">{source.name}</CardTitle>
+                                        <CardDescription className="mt-1 line-clamp-2 text-sm" title={source.url}>
                                             {source.url}
                                         </CardDescription>
                                     </div>
                                 </CardHeader>
-                                <CardContent className="flex flex-1 flex-col px-4 pb-4 pt-0 text-sm text-muted-foreground">
+                                <CardContent className="flex flex-1 flex-col text-sm text-muted-foreground">
                                     <div className="space-y-1.5">
                                         <p>{t("type")} {formatSourceTypeLabel(source.source_type, t)}</p>
                                         <p>{t("status")} {source.active ? t("active", { ns: "common" }) : t("inactive", { ns: "common" })}</p>
@@ -419,7 +420,7 @@ export default function SourceManager() {
                                             onClick={() => void fetchNow(source)}
                                             disabled={!source.active || isManagerLocked}
                                         >
-                                            <RefreshCcw className={`mr-2 h-4 w-4 ${fetchingSourceId === source.id ? "animate-spin" : ""}`} />
+                                            <RefreshCcw className={`h-3.5 w-3.5 ${fetchingSourceId === source.id ? "animate-spin" : ""}`} />
                                             {t("fetch")}
                                         </Button>
                                         <Button
@@ -428,7 +429,7 @@ export default function SourceManager() {
                                             onClick={() => navigate(`/sources/edit/${source.id}`)}
                                             disabled={isManagerLocked}
                                         >
-                                            <Edit className="mr-2 h-4 w-4" /> {t("edit", { ns: "common" })}
+                                            <Edit className="h-3.5 w-3.5" /> {t("edit", { ns: "common" })}
                                         </Button>
                                         <Button
                                             variant="outline"
@@ -437,7 +438,7 @@ export default function SourceManager() {
                                             title={source.active ? t("deactivateSource") : t("activateSource")}
                                             disabled={isManagerLocked}
                                         >
-                                            {source.active ? <PowerOff className="h-4 w-4" /> : <Power className="h-4 w-4" />}
+                                            {source.active ? <PowerOff className="h-3.5 w-3.5" /> : <Power className="h-3.5 w-3.5" />}
                                         </Button>
                                         <Button
                                             variant="ghost"
@@ -447,7 +448,7 @@ export default function SourceManager() {
                                             title={t("deleteSourceTitle")}
                                             disabled={isManagerLocked}
                                         >
-                                            <Trash2 className="h-4 w-4" />
+                                            <Trash2 className="h-3.5 w-3.5" />
                                         </Button>
                                     </div>
                                 </CardContent>
@@ -465,7 +466,7 @@ export default function SourceManager() {
             <Dialog open={pendingImport !== null} onOpenChange={handleImportReviewDialogOpenChange}>
                 <DialogContent
                     className="border-amber-200/90 bg-amber-50/95 text-stone-950 shadow-2xl dark:border-amber-300/30 dark:bg-stone-900/96 dark:text-amber-50"
-                    overlayClassName="bg-stone-950/35 backdrop-blur-sm"
+                    overlayClassName="bg-black/40"
                     closeButtonClassName="border-amber-200/90 bg-amber-50 text-amber-950 hover:bg-amber-100 dark:border-amber-300/25 dark:bg-stone-800 dark:text-amber-100 dark:hover:bg-stone-700"
                 >
                     <DialogHeader>
@@ -479,7 +480,7 @@ export default function SourceManager() {
 
                     {pendingImport && (
                         <div className="space-y-4">
-                            <div className="rounded-[1.5rem] border border-amber-200/90 bg-gradient-to-br from-amber-100 via-amber-50 to-orange-50 p-4 text-amber-950 shadow-sm dark:border-amber-300/30 dark:bg-amber-400/10 dark:text-amber-50">
+                            <div className="rounded-md border border-amber-200/90 bg-amber-50 p-3 text-amber-950 dark:border-amber-300/30 dark:bg-amber-400/10 dark:text-amber-50">
                                 <div className="flex items-start gap-3">
                                     <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" />
                                     <div className="space-y-2">
@@ -511,7 +512,7 @@ export default function SourceManager() {
                             </div>
 
                             {pendingImport.missingFetchIntervalCount > 0 && (
-                                <div className="space-y-3 rounded-[1.5rem] border border-amber-200/80 bg-stone-50/90 p-4 dark:border-amber-300/20 dark:bg-stone-800/80">
+                                <div className="space-y-3 rounded-md border border-amber-200/80 bg-stone-50/90 p-3 dark:border-amber-300/20 dark:bg-stone-800/80">
                                     <Label
                                         htmlFor="import-opml-fetch-interval"
                                         className="text-stone-900 dark:text-amber-50"
@@ -570,7 +571,7 @@ export default function SourceManager() {
                                         type="button"
                                         disabled={isImportingOpml || !isPendingImportReady}
                                         onClick={() => void confirmImport("skip")}
-                                        className="bg-amber-400 text-amber-950 shadow-soft hover:bg-amber-300 dark:bg-amber-300 dark:text-stone-950 dark:hover:bg-amber-200"
+                                        className="bg-amber-400 text-amber-950 hover:bg-amber-300 dark:bg-amber-300 dark:text-stone-950 dark:hover:bg-amber-200"
                                     >
                                         {t("importModeSkip")}
                                     </Button>
@@ -580,7 +581,7 @@ export default function SourceManager() {
                                     type="button"
                                     disabled={isImportingOpml || !isPendingImportReady}
                                     onClick={() => void confirmImport("skip")}
-                                    className="bg-amber-400 text-amber-950 shadow-soft hover:bg-amber-300 dark:bg-amber-300 dark:text-stone-950 dark:hover:bg-amber-200"
+                                    className="bg-amber-400 text-amber-950 hover:bg-amber-300 dark:bg-amber-300 dark:text-stone-950 dark:hover:bg-amber-200"
                                 >
                                     {t("confirmImportOpml")}
                                 </Button>

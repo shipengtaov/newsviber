@@ -296,7 +296,7 @@ export function AppUpdateProvider({ children }: { children: ReactNode }) {
                     {isInstalling || lastCheckError ? (
                         <div className="space-y-4">
                             {isInstalling ? (
-                                <div className="space-y-3 rounded-[1.25rem] border border-border/70 bg-muted/25 p-4">
+                                <div className="space-y-3 rounded-md border border-border bg-muted/25 p-3">
                                     <div className="text-sm font-medium text-foreground">{t("installingUpdate")}</div>
                                     <div className="text-sm text-muted-foreground">{progressLabel}</div>
                                     <div className="h-2 overflow-hidden rounded-full bg-border/70">

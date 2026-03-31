@@ -67,12 +67,12 @@ const DEFAULT_MAX_ARTICLES_PER_CARD = "12";
 const DEFAULT_MIN_ARTICLES_PER_CARD = "1";
 const GENERATED_TILE_PREVIEW_MAX_LENGTH = 360;
 const DESKTOP_CARD_DISCUSSION_MEDIA_QUERY = "(min-width: 1024px)";
-const CREATIVE_TILE_GRID_CLASS = "grid gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4";
+const CREATIVE_TILE_GRID_CLASS = "grid gap-3 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4";
 const CREATIVE_TILE_CARD_BASE_CLASS = "editor-list-card flex cursor-pointer flex-col overflow-hidden focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2";
-const PROJECT_TILE_CARD_CLASS = `${CREATIVE_TILE_CARD_BASE_CLASS} h-[296px]`;
-const GENERATED_TILE_CARD_CLASS = `${CREATIVE_TILE_CARD_BASE_CLASS} min-h-[276px]`;
-const CREATIVE_TILE_HEADER_CLASS = "px-6 py-6 pb-3";
-const CREATIVE_TILE_BODY_CLASS = "flex flex-1 flex-col px-6 pb-6 pt-0";
+const PROJECT_TILE_CARD_CLASS = `${CREATIVE_TILE_CARD_BASE_CLASS} h-[240px]`;
+const GENERATED_TILE_CARD_CLASS = `${CREATIVE_TILE_CARD_BASE_CLASS} min-h-[220px]`;
+const CREATIVE_TILE_HEADER_CLASS = "px-3 py-2.5 pb-1.5";
+const CREATIVE_TILE_BODY_CLASS = "flex flex-1 flex-col px-3 pb-3 pt-0";
 const CREATIVE_SPACE_SCROLL_STORAGE_KEY = "creativeSpaceScrollPositions_v1";
 const CREATIVE_BOARD_SCROLL_SCOPE_KEY = "creative:board";
 
@@ -255,7 +255,7 @@ function ProjectDialog({
                         </DialogDescription>
                     </DialogHeader>
 
-                    <form onSubmit={onSubmit} className="space-y-6">
+                    <form onSubmit={onSubmit} className="space-y-4">
                         <div className="space-y-2">
                             <Label>{t("projectName")}</Label>
                             <Input
@@ -1190,18 +1190,18 @@ export default function CreativeSpace() {
 
     if (activeCard) {
         return (
-            <div className={cn("flex h-full min-h-0 flex-col gap-4 bg-background py-4 md:py-6 lg:flex-row lg:gap-0", CONTENT_GUTTER_X_CLASS)}>
+            <div className={cn("flex h-full min-h-0 flex-col gap-2 bg-background py-2 md:py-3 lg:flex-row lg:gap-0", CONTENT_GUTTER_X_CLASS)}>
                 <div className="surface-panel min-h-0 min-w-0 flex-1 overflow-hidden">
                     <div className="flex h-full min-h-0 flex-col">
-                        <div className="shrink-0 border-b border-border/60 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/85">
-                            <div className="mx-auto flex w-full max-w-4xl flex-col gap-3 px-4 py-3 md:px-6">
-                                <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                        <div className="shrink-0 border-b border-border bg-background">
+                            <div className="mx-auto flex w-full max-w-4xl flex-col gap-2 px-3 py-2 md:px-4">
+                                <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
                                     <div className="min-w-0">
                                         <Button variant="ghost" size="sm" onClick={() => setActiveCardId(null)} className="-ml-2 w-fit">
-                                            <ArrowLeft className="mr-2 h-4 w-4" /> {t("back", { ns: "common" })}
+                                            <ArrowLeft className="h-3.5 w-3.5" /> {t("back", { ns: "common" })}
                                         </Button>
-                                        <div className="mt-2 space-y-2.5">
-                                            <div className="text-balance text-lg font-semibold leading-tight md:text-xl">{activeCard.title}</div>
+                                        <div className="mt-1.5 space-y-2">
+                                            <div className="text-balance text-base font-semibold leading-tight md:text-lg">{activeCard.title}</div>
                                             <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
                                                 <span>{activeCard.generation_mode === "auto" ? t("auto") : t("manual")} {t("run")}</span>
                                                 <span>{formatArticleCount(activeCard.used_article_count)}</span>
@@ -1216,7 +1216,7 @@ export default function CreativeSpace() {
                                         onClick={() => setIsCardDiscussionOpen((open) => !open)}
                                         className="shrink-0 self-start"
                                     >
-                                        <MessageSquare className="mr-2 h-4 w-4" />
+                                        <MessageSquare className="h-3.5 w-3.5" />
                                         {isCardDiscussionOpen ? t("hideDiscussion") : t("discussCard")}
                                     </Button>
                                 </div>
@@ -1224,7 +1224,7 @@ export default function CreativeSpace() {
                         </div>
 
                         <div className="min-h-0 flex-1 overflow-y-auto">
-                            <div className="mx-auto w-full max-w-4xl px-4 py-5 md:px-6 md:py-6">
+                            <div className="mx-auto w-full max-w-4xl px-3 py-3 md:px-4 md:py-4">
                                 <div className="prose prose-sm max-w-none break-words dark:prose-invert">
                                     <ReactMarkdown>{activeCardBodyMarkdown}</ReactMarkdown>
                                 </div>
@@ -1283,8 +1283,8 @@ export default function CreativeSpace() {
                 header={{
                     density: "compact",
                     leading: (
-                        <Button variant="ghost" onClick={leaveProjectDetail}>
-                            <ArrowLeft className="mr-2 h-4 w-4" /> {t("back", { ns: "common" })}
+                        <Button variant="ghost" size="sm" onClick={leaveProjectDetail}>
+                            <ArrowLeft className="h-3.5 w-3.5" /> {t("back", { ns: "common" })}
                         </Button>
                     ),
                     eyebrow: t("eyebrow"),
@@ -1297,17 +1297,18 @@ export default function CreativeSpace() {
                     ],
                     actions: (
                         <div className="flex flex-wrap items-center gap-2">
-                            <Button onClick={openManualGenerateDialog} disabled={isGenerating}>
-                                <WandSparkles className="mr-2 h-4 w-4" /> {isGenerating ? t("generating") : t("generateCard")}
+                            <Button size="sm" onClick={openManualGenerateDialog} disabled={isGenerating}>
+                                <WandSparkles className="h-3.5 w-3.5" /> {isGenerating ? t("generating") : t("generateCard")}
                             </Button>
                             <Button
                                 variant="outline"
+                                size="sm"
                                 onClick={handleMarkAllCardsRead}
                                 disabled={isMarkingAllCardsRead || activeProjectUnreadCount === 0}
                             >
                                 {isMarkingAllCardsRead ? (
                                     <>
-                                        <Loader2 className="mr-2 h-4 w-4 animate-spin" /> {t("marking", { ns: "news" })}
+                                        <Loader2 className="h-3.5 w-3.5 animate-spin" /> {t("marking", { ns: "news" })}
                                     </>
                                 ) : (
                                     t("markAllAsRead")
@@ -1317,11 +1318,12 @@ export default function CreativeSpace() {
                                 <Button
                                     variant="outline"
                                     size="icon"
+                                    className="h-7 w-7"
                                     onClick={() => setIsProjectActionsOpen((current) => !current)}
                                     aria-label={t("openProjectActions")}
                                     aria-expanded={isProjectActionsOpen}
                                 >
-                                    <Ellipsis className="h-4 w-4" />
+                                    <Ellipsis className="h-3.5 w-3.5" />
                                 </Button>
 
                                 {isProjectActionsOpen && (
@@ -1332,7 +1334,7 @@ export default function CreativeSpace() {
                                             className="w-full justify-start"
                                             onClick={() => openEditProjectDialog(activeProject)}
                                         >
-                                            <Pencil className="mr-2 h-4 w-4" /> {t("editProject")}
+                                            <Pencil className="h-3.5 w-3.5" /> {t("editProject")}
                                         </Button>
                                         <Button
                                             variant="ghost"
@@ -1341,7 +1343,7 @@ export default function CreativeSpace() {
                                             onClick={() => openDeleteProjectDialog(activeProject)}
                                             disabled={deletingProjectId === activeProject.id}
                                         >
-                                            <Trash2 className="mr-2 h-4 w-4" /> {t("deleteProject")}
+                                            <Trash2 className="h-3.5 w-3.5" /> {t("deleteProject")}
                                         </Button>
                                     </div>
                                 )}
@@ -1350,7 +1352,7 @@ export default function CreativeSpace() {
                     ),
                 }}
             >
-                <div className="surface-panel-quiet px-4 py-4">
+                <div className="surface-panel-quiet px-3 py-3">
                         <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
                             <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-4 gap-y-1.5 text-sm">
                                 <span className="inline-flex items-center gap-1.5">
@@ -1386,7 +1388,7 @@ export default function CreativeSpace() {
                                 variant="ghost"
                                 size="icon"
                                 onClick={() => setIsProjectInfoOpen((current) => !current)}
-                                className="h-8 w-8 shrink-0 self-start lg:self-center"
+                                className="h-7 w-7 shrink-0 self-start lg:self-center"
                                 aria-label={isProjectInfoOpen ? t("collapseProjectInfo") : t("expandProjectInfo")}
                                 aria-expanded={isProjectInfoOpen}
                                 title={isProjectInfoOpen ? t("collapseProjectInfo") : t("expandProjectInfo")}
@@ -1450,7 +1452,7 @@ export default function CreativeSpace() {
                             key={card.id}
                             className={cn(
                                 GENERATED_TILE_CARD_CLASS,
-                                "rounded-[1.35rem] border-border/70 bg-card/95",
+                                "rounded-lg border-border bg-card",
                                 card.is_read
                                     ? "shadow-[0_18px_44px_-36px_rgba(15,15,15,0.28)]"
                                     : "border-sky-200/80 bg-sky-50/40 shadow-[0_22px_48px_-40px_rgba(14,165,233,0.35)] dark:border-sky-400/20 dark:bg-sky-500/[0.06]",
@@ -1505,14 +1507,14 @@ export default function CreativeSpace() {
 
                 <Dialog open={manualDialogOpen} onOpenChange={setManualDialogOpen}>
                     <DialogContent className="flex max-h-[90vh] max-w-4xl flex-col gap-0 overflow-hidden p-0">
-                        <DialogHeader className="shrink-0 border-b px-6 pb-4 pt-6">
+                        <DialogHeader className="shrink-0 border-b px-4 pb-3 pt-4">
                             <DialogTitle>{t("generateCardDialog")}</DialogTitle>
                             <DialogDescription>
                                 {t("selectUpTo", { count: activeProject.max_articles_per_card })}
                             </DialogDescription>
                         </DialogHeader>
 
-                        <div className="flex min-h-0 flex-1 flex-col px-6 py-4">
+                        <div className="flex min-h-0 flex-1 flex-col px-4 py-3">
                             <div className="shrink-0 space-y-4">
                                 <div className="grid gap-4 border-b pb-4 md:grid-cols-[minmax(0,1fr)_220px]">
                                     <div className="space-y-2">
@@ -1583,7 +1585,7 @@ export default function CreativeSpace() {
                                                 type="button"
                                                 onClick={() => toggleArticleSelection(article.id)}
                                                 disabled={isSelectionLocked}
-                                                className={`w-full rounded-[1.3rem] border p-4 text-left shadow-soft transition-colors ${isSelected ? "border-primary/20 bg-accent/72" : "border-border/60 bg-background/72 hover:border-primary/20 hover:bg-background/90"} ${isSelectionLocked ? "cursor-not-allowed opacity-60" : ""}`}
+                                                className={`w-full rounded-md border p-3 text-left transition-colors ${isSelected ? "border-primary/30 bg-accent" : "border-border hover:border-primary/20 hover:bg-muted/50"} ${isSelectionLocked ? "cursor-not-allowed opacity-60" : ""}`}
                                             >
                                                 <div className="flex items-start gap-3">
                                                     <Checkbox
@@ -1614,7 +1616,7 @@ export default function CreativeSpace() {
                             </div>
                         </div>
 
-                        <DialogFooter className="shrink-0 border-t bg-background px-6 py-4 sm:justify-end">
+                        <DialogFooter className="shrink-0 border-t bg-background px-4 py-3 sm:justify-end">
                             <Button type="button" variant="outline" onClick={() => setManualDialogOpen(false)}>
                                 {t("cancel", { ns: "common" })}
                             </Button>
@@ -1650,8 +1652,8 @@ export default function CreativeSpace() {
                     { label: t("autoEnabled"), value: t("nActive", { count: autoEnabledProjectCount }), tone: "accent" },
                 ],
                 actions: renderProjectDialog(
-                    <Button onClick={openCreateProjectDialog}>
-                        <Plus className="mr-2 h-4 w-4" /> {t("newProject")}
+                    <Button size="sm" onClick={openCreateProjectDialog}>
+                        <Plus className="h-3.5 w-3.5" /> {t("newProject")}
                     </Button>,
                 ),
             }}
@@ -1663,7 +1665,7 @@ export default function CreativeSpace() {
                         key={project.id}
                         className={cn(
                             PROJECT_TILE_CARD_CLASS,
-                            "rounded-[1.5rem] border-border/70 bg-card/95",
+                            "rounded-lg border-border bg-card",
                             project.unread_card_count > 0
                                 ? "border-sky-200/80 shadow-[0_24px_52px_-40px_rgba(14,165,233,0.32)] dark:border-sky-400/20"
                                 : "shadow-[0_18px_42px_-38px_rgba(15,15,15,0.28)]",
@@ -1691,7 +1693,7 @@ export default function CreativeSpace() {
                             </CardDescription>
                         </CardHeader>
                         <CardContent className={`${CREATIVE_TILE_BODY_CLASS} text-sm text-muted-foreground`}>
-                            <div className="mt-auto border-t border-border/60 pt-4">
+                            <div className="mt-auto border-t border-border pt-3">
                                 <div className="grid grid-cols-3 gap-3 text-left">
                                     <div>
                                         <div className="text-[10px] font-medium uppercase tracking-[0.16em] text-muted-foreground">{t("auto")}</div>
@@ -1719,7 +1721,7 @@ export default function CreativeSpace() {
                                         openEditProjectDialog(project);
                                     }}
                                 >
-                                    <Pencil className="mr-2 h-4 w-4" />
+                                    <Pencil className="h-3.5 w-3.5" />
                                     {t("edit", { ns: "common" })}
                                 </Button>
                                 <Button
@@ -1734,7 +1736,7 @@ export default function CreativeSpace() {
                                     aria-label={deletingProjectId === project.id ? t("deletingName", { name: project.name }) : t("deleteName", { name: project.name })}
                                     title={deletingProjectId === project.id ? t("deleting") : t("delete", { ns: "common" })}
                                 >
-                                    <Trash2 className="h-4 w-4" />
+                                    <Trash2 className="h-3.5 w-3.5" />
                                 </Button>
                             </div>
                         </CardContent>

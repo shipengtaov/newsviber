@@ -27,8 +27,8 @@ const SIZE_CLASS_MAP: Record<
 };
 
 const PADDING_CLASS_MAP: Record<NonNullable<PageShellProps["variant"]>, string> = {
-    default: `${CONTENT_GUTTER_X_CLASS} py-5 md:py-7`,
-    workspace: `${CONTENT_GUTTER_X_CLASS} py-3 md:py-4 lg:py-5`,
+    default: `${CONTENT_GUTTER_X_CLASS} py-3 md:py-4`,
+    workspace: `${CONTENT_GUTTER_X_CLASS} py-2 md:py-3`,
 };
 
 export function PageShell({
@@ -41,7 +41,7 @@ export function PageShell({
 }: PageShellProps) {
     return (
         <div className={cn("mx-auto w-full", PADDING_CLASS_MAP[variant], SIZE_CLASS_MAP[variant][size], className)}>
-            <div className="space-y-4 md:space-y-6">
+            <div className="space-y-3">
                 {header ? <WorkspaceHeader {...header} /> : null}
                 <div className={contentClassName}>{children}</div>
             </div>

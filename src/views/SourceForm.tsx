@@ -95,12 +95,12 @@ export default function SourceForm() {
     return (
         <PageShell
             variant="workspace"
-            contentClassName="space-y-8"
+            contentClassName="space-y-4"
             header={{
                 density: "compact",
                 leading: (
-                    <Button variant="ghost" onClick={navigateBack}>
-                        <ChevronLeft className="h-4 w-4 mr-2" />
+                    <Button variant="ghost" size="sm" onClick={navigateBack}>
+                        <ChevronLeft className="h-3.5 w-3.5" />
                         {returnButtonLabel}
                     </Button>
                 ),

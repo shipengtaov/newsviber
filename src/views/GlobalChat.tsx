@@ -661,7 +661,7 @@ export default function GlobalChat() {
     }
 
     return (
-        <div className={cn("flex min-h-full w-full min-w-0 flex-col gap-4 py-4 md:py-6", CONTENT_GUTTER_X_CLASS)}>
+        <div className={cn("flex min-h-full w-full min-w-0 flex-col gap-2 py-2 md:py-3", CONTENT_GUTTER_X_CLASS)}>
             <WorkspaceHeader
                 density="compact"
                 eyebrow={t("eyebrow")}
@@ -675,8 +675,8 @@ export default function GlobalChat() {
                     { label: t("sourceScopeLabel"), value: scopeSourceSummary },
                 ]}
                 actions={(
-                    <Button onClick={() => navigate("/chat")}>
-                        <Plus className="h-4 w-4" />
+                    <Button size="sm" onClick={() => navigate("/chat")}>
+                        <Plus className="h-3.5 w-3.5" />
                         {t("newChat")}
                     </Button>
                 )}
@@ -719,26 +719,26 @@ export default function GlobalChat() {
                 </DialogContent>
             </Dialog>
 
-            <div className="flex min-h-0 flex-1 flex-col gap-4 lg:flex-row">
+            <div className="flex min-h-0 flex-1 flex-col gap-2 lg:flex-row">
                 <div
                     className="relative shrink-0"
                     style={isDesktopLayout ? { width: chatThreadsPanelWidth } : undefined}
                 >
                     <aside className="surface-panel flex h-full min-h-0 flex-col">
-                        <div className="border-b border-border/60 px-4 py-4 lg:px-5">
-                            <div className="space-y-3">
+                        <div className="border-b border-border px-3 py-2">
+                            <div className="space-y-2">
                                 <div>
-                                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{t("conversations")}</p>
-                                    <h2 className="mt-1 font-display text-xl font-semibold tracking-[-0.04em] text-foreground">{t("savedThreads")}</h2>
+                                    <p className="text-[11px] font-medium text-muted-foreground">{t("conversations")}</p>
+                                    <h2 className="text-sm font-medium text-foreground">{t("savedThreads")}</h2>
                                 </div>
-                                <Button className="w-full justify-start" onClick={() => navigate("/chat")}>
-                                    <Plus className="h-4 w-4" />
+                                <Button size="sm" className="w-full justify-start" onClick={() => navigate("/chat")}>
+                                    <Plus className="h-3.5 w-3.5" />
                                     {t("startNewThread")}
                                 </Button>
                             </div>
                         </div>
                         <ScrollArea className="max-h-72 min-h-0 flex-1 lg:max-h-none">
-                            <div className="space-y-2.5 p-3 lg:pr-[17px]">
+                            <div className="space-y-1 p-2 lg:pr-[17px]">
                                 {isLoadingThreads && threads.length === 0 && (
                                     <EmptyState
                                         title={t("loadingConversations")}
@@ -761,10 +761,10 @@ export default function GlobalChat() {
                                         <div
                                             key={thread.id}
                                             className={cn(
-                                                "flex items-start gap-2 rounded-[1.2rem] border p-2 transition-all duration-200",
+                                                "flex items-start gap-2 rounded-md border p-1.5 transition-colors duration-100",
                                                 isActive
-                                                    ? "border-primary/20 bg-accent/78 shadow-soft"
-                                                    : "border-transparent bg-background/42 hover:border-primary/12 hover:bg-background/78",
+                                                    ? "border-border bg-muted"
+                                                    : "border-transparent hover:bg-muted/50",
                                             )}
                                         >
                                             <button
@@ -779,7 +779,7 @@ export default function GlobalChat() {
                                                 type="button"
                                                 variant="ghost"
                                                 size="icon"
-                                                className="h-9 w-9 shrink-0 text-muted-foreground hover:text-destructive"
+                                                className="h-7 w-7 shrink-0 text-muted-foreground hover:text-destructive"
                                                 disabled={isDeletingThreadId === thread.id}
                                                 onClick={(event) => {
                                                     event.preventDefault();
@@ -789,7 +789,7 @@ export default function GlobalChat() {
                                                 aria-label={t("deleteChat")}
                                                 title={t("deleteChat")}
                                             >
-                                                <Trash2 className="h-4 w-4" />
+                                                <Trash2 className="h-3.5 w-3.5" />
                                             </Button>
                                         </div>
                                     );
@@ -819,16 +819,15 @@ export default function GlobalChat() {
                     )}
                 </div>
 
-                <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-4 lg:flex-row">
+                <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-2 lg:flex-row">
                     <section className="surface-panel flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-                        <div className="border-b border-border/60 px-6 py-4">
-                            <div className="flex items-center justify-between gap-3">
+                        <div className="border-b border-border px-3 py-2">
+                            <div className="flex items-center justify-between gap-2">
                                 <div className="min-w-0">
-                                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{t("liveThread")}</p>
-                                    <h1 className="mt-1 truncate font-display text-2xl font-semibold tracking-[-0.04em] text-foreground">
+                                    <h1 className="truncate text-sm font-medium text-foreground">
                                         {activeThread?.title ?? t("newChat")}
                                     </h1>
-                                    <p className="mt-2 text-sm text-muted-foreground">
+                                    <p className="text-[11px] text-muted-foreground">
                                         {t("scopeChangesNote")}
                                     </p>
                                 </div>
@@ -836,7 +835,7 @@ export default function GlobalChat() {
                         </div>
 
                         <ScrollArea className="min-h-0 flex-1">
-                            <div className="mx-auto flex min-h-full w-full max-w-4xl flex-col px-4 py-5 md:px-6 md:py-6">
+                            <div className="mx-auto flex min-h-full w-full max-w-4xl flex-col px-3 py-3 md:px-4 md:py-4">
                                 {messages.length === 0 && !isLoadingThread && (
                                     <EmptyState
                                         icon={<MessageSquare className="h-10 w-10" />}
@@ -852,22 +851,22 @@ export default function GlobalChat() {
                                     </div>
                                 )}
 
-                                <div className="space-y-6 pb-20">
+                                <div className="space-y-4 pb-16">
                                     {messages.map((message, index) => (
-                                        <div key={`${message.role}-${index}`} className={`flex gap-4 ${message.role === "user" ? "flex-row-reverse" : ""}`}>
+                                        <div key={`${message.role}-${index}`} className={`flex gap-3 ${message.role === "user" ? "flex-row-reverse" : ""}`}>
                                             <div className={cn(
-                                                "flex h-10 w-10 shrink-0 items-center justify-center rounded-full shadow-soft",
+                                                "flex h-7 w-7 shrink-0 items-center justify-center rounded-full",
                                                 message.role === "user"
                                                     ? "bg-primary text-primary-foreground"
-                                                    : "border border-border/60 bg-background/82 text-primary",
+                                                    : "border border-border bg-card text-muted-foreground",
                                             )}>
-                                                {message.role === "user" ? <User className="h-4 w-4" /> : <Bot className="h-4 w-4" />}
+                                                {message.role === "user" ? <User className="h-3.5 w-3.5" /> : <Bot className="h-3.5 w-3.5" />}
                                             </div>
                                             <div className={cn(
-                                                "max-w-[88%] rounded-[1.5rem] px-4 py-3 text-sm shadow-soft",
+                                                "max-w-[88%] rounded-lg px-3 py-2 text-sm",
                                                 message.role === "user"
                                                     ? "bg-primary text-primary-foreground"
-                                                    : "border border-border/60 bg-card/72",
+                                                    : "border border-border bg-card",
                                             )}>
                                                 {(() => {
                                                     const isLiveAssistantMessage = message.role === "assistant"
@@ -910,20 +909,18 @@ export default function GlobalChat() {
                             </div>
                         </ScrollArea>
 
-                        <div className="border-t border-border/60 bg-background/70 px-4 py-4 backdrop-blur md:px-6">
-                            <form onSubmit={handleSend} className="mx-auto flex max-w-4xl">
-                                <div className="surface-panel-quiet flex w-full items-center gap-2 rounded-[1.45rem] px-2 py-2">
-                                    <Input
-                                        value={input}
-                                        onChange={(event) => setInput(event.target.value)}
-                                        placeholder={t("askAboutRecentNews")}
-                                        className="h-11 flex-1 border-0 bg-transparent shadow-none backdrop-blur-none focus-visible:border-transparent focus-visible:ring-0"
-                                        autoFocus
-                                    />
-                                    <Button type="submit" size="icon" disabled={isStreaming || isLoadingThread || !input.trim()}>
-                                        <Send className="h-4 w-4" />
-                                    </Button>
-                                </div>
+                        <div className="border-t border-border px-3 py-2 md:px-4">
+                            <form onSubmit={handleSend} className="mx-auto flex max-w-4xl items-center gap-2">
+                                <Input
+                                    value={input}
+                                    onChange={(event) => setInput(event.target.value)}
+                                    placeholder={t("askAboutRecentNews")}
+                                    className="flex-1"
+                                    autoFocus
+                                />
+                                <Button type="submit" size="sm" disabled={isStreaming || isLoadingThread || !input.trim()}>
+                                    <Send className="h-3.5 w-3.5" />
+                                </Button>
                             </form>
                         </div>
                     </section>
@@ -941,7 +938,7 @@ export default function GlobalChat() {
                                     type="button"
                                     variant="ghost"
                                     size="icon"
-                                    className="h-10 w-10"
+                                    className="h-8 w-8"
                                     onClick={() => setIsScopePanelCollapsed(false)}
                                     aria-label={t("expandThreadScope")}
                                     title={t("expandThreadScope")}
@@ -951,12 +948,11 @@ export default function GlobalChat() {
                             </div>
                         ) : (
                             <>
-                                <div className="border-b border-border/60 px-5 py-4">
-                                    <div className="flex items-start justify-between gap-3">
+                                <div className="border-b border-border px-3 py-2">
+                                    <div className="flex items-start justify-between gap-2">
                                         <div className="min-w-0">
-                                            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{t("threadScope")}</p>
-                                            <h2 className="mt-1 font-display text-xl font-semibold tracking-[-0.04em] text-foreground">{t("contextFilters")}</h2>
-                                            <p className="mt-2 text-xs leading-6 text-muted-foreground">
+                                            <h2 className="text-sm font-medium text-foreground">{t("contextFilters")}</h2>
+                                            <p className="text-[11px] text-muted-foreground">
                                                 {t("tuneDescription")}
                                             </p>
                                         </div>
@@ -965,7 +961,7 @@ export default function GlobalChat() {
                                                 type="button"
                                                 variant="ghost"
                                                 size="icon"
-                                                className="h-9 w-9 shrink-0"
+                                                className="h-7 w-7 shrink-0"
                                                 onClick={() => setIsScopePanelCollapsed(true)}
                                                 aria-label={t("collapseThreadScope")}
                                                 title={t("collapseThreadScope")}
@@ -977,10 +973,10 @@ export default function GlobalChat() {
                                 </div>
 
                                 <ScrollArea className="min-h-0 flex-1">
-                                    <div className="space-y-6 p-5">
-                                        <div className="surface-panel-quiet px-4 py-4">
-                                            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{t("currentScope")}</p>
-                                            <p className="mt-2 text-sm leading-6 text-foreground">
+                                    <div className="space-y-4 p-3">
+                                        <div className="rounded-md border border-border bg-muted/30 px-3 py-2">
+                                            <p className="text-[11px] font-medium text-muted-foreground">{t("currentScope")}</p>
+                                            <p className="mt-1 text-xs leading-5 text-foreground">
                                                 {buildScopeSummary(scope, sources, t)}
                                             </p>
                                         </div>
@@ -1035,7 +1031,7 @@ export default function GlobalChat() {
                                                 </p>
                                             </div>
 
-                                            <label className="flex items-center gap-3 rounded-[1.15rem] border border-border/60 bg-background/70 px-3.5 py-3 text-sm shadow-soft">
+                                            <label className="flex items-center gap-2 rounded-md border border-border px-2.5 py-2 text-sm">
                                                 <Checkbox
                                                     checked={useAllSources}
                                                     onChange={(event) => handleUseAllSourcesChange(event.target.checked)}
@@ -1056,10 +1052,10 @@ export default function GlobalChat() {
                                                     <label
                                                         key={source.id}
                                                         className={cn(
-                                                            "flex items-center justify-between gap-3 rounded-[1.15rem] border px-3.5 py-3 text-sm shadow-soft transition-colors",
+                                                            "flex items-center justify-between gap-2 rounded-md border px-2.5 py-2 text-sm transition-colors",
                                                             useAllSources
-                                                                ? "border-border/50 bg-muted/35"
-                                                                : "border-border/60 bg-background/72 hover:bg-background/86",
+                                                                ? "border-border bg-muted/30"
+                                                                : "border-border hover:bg-muted/30",
                                                         )}
                                                     >
                                                         <div className="min-w-0">

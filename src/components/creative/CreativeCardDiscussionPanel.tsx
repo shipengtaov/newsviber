@@ -45,7 +45,7 @@ function CreativeCardDiscussionHeader({
 
     if (variant === "sheet") {
         return (
-            <SheetHeader className="shrink-0 border-b border-border/60 px-5 pb-4 pt-5 text-left">
+            <SheetHeader className="shrink-0 border-b border-border px-4 pb-3 pt-3 text-left">
                 <SheetTitle>{t("discussCard")}</SheetTitle>
                 <SheetDescription>{t("discussCardDesc")}</SheetDescription>
                 {webSearchNotice ? (
@@ -63,7 +63,7 @@ function CreativeCardDiscussionHeader({
     }
 
     return (
-        <div className="shrink-0 border-b border-border/60 px-5 pb-4 pt-5">
+        <div className="shrink-0 border-b border-border px-4 pb-3 pt-3">
             <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0 space-y-2">
                     <h2 className="text-lg font-semibold text-foreground">{t("discussCard")}</h2>
@@ -178,7 +178,7 @@ export function CreativeCardDiscussionPanel({
                 ))}
             </div>
 
-            <div className="shrink-0 border-t border-border/60 bg-background px-5 py-4">
+            <div className="shrink-0 border-t border-border bg-background px-4 py-3">
                 <form onSubmit={onChatSubmit} className="flex items-center gap-2">
                     <Input
                         value={chatInput}

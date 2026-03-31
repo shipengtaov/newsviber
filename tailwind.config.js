@@ -20,7 +20,6 @@ export default {
 			boxShadow: {
 				soft: 'var(--shadow-soft)',
 				elevated: 'var(--shadow-elevated)',
-				glow: 'var(--shadow-glow)',
 			},
 			colors: {
 				background: 'hsl(var(--background))',

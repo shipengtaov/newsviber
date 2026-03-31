@@ -292,7 +292,7 @@ export default function Settings() {
     return (
         <PageShell
             variant="workspace"
-            contentClassName="space-y-8"
+            contentClassName="space-y-4"
             header={{
                 density: "compact",
                 eyebrow: t("eyebrow"),
@@ -342,7 +342,7 @@ export default function Settings() {
                     <CardTitle>{t("softwareUpdate")}</CardTitle>
                 </CardHeader>
                 <CardContent>
-                    <div className="space-y-4 rounded-lg border bg-muted/35 p-4">
+                    <div className="space-y-3 rounded-md border bg-muted/35 p-3">
                         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                             <div>
                                 <div className="text-sm font-medium">{t("currentVersion")}</div>
@@ -370,7 +370,7 @@ export default function Settings() {
                         </div>
 
                         {isInstalling || lastCheckError ? (
-                            <div className="space-y-3 border-t border-border/60 pt-4">
+                            <div className="space-y-3 border-t border-border pt-3">
                                 {isInstalling ? (
                                     <>
                                         <div className="text-sm text-muted-foreground">
@@ -388,7 +388,7 @@ export default function Settings() {
                                 ) : null}
 
                                 {lastCheckError ? (
-                                    <div className="rounded-[1rem] border border-destructive/40 bg-destructive/5 p-3 text-sm text-destructive">
+                                    <div className="rounded-md border border-destructive/40 bg-destructive/5 p-2.5 text-sm text-destructive">
                                         <div className="font-medium">{t("updateCheckFailedStatus")}</div>
                                         <div>{lastCheckError}</div>
                                     </div>
@@ -405,7 +405,7 @@ export default function Settings() {
                     <CardDescription>{t("aiProviderDesc")}</CardDescription>
                 </CardHeader>
                 <CardContent>
-                    <form onSubmit={handleSaveAiSettings} className="space-y-6">
+                    <form onSubmit={handleSaveAiSettings} className="space-y-4">
                         <div className="space-y-4">
                             <div className="space-y-2">
                                 <Label>{t("selectProvider")}</Label>
@@ -517,7 +517,7 @@ export default function Settings() {
                     <CardDescription>{t("webSearchConfigDesc")}</CardDescription>
                 </CardHeader>
                 <CardContent>
-                    <form onSubmit={handleSaveWebSearchSettings} className="space-y-6">
+                    <form onSubmit={handleSaveWebSearchSettings} className="space-y-4">
                         <div className="grid gap-4 md:grid-cols-2">
                             <div className="space-y-2">
                                 <Label>{t("webSearchProvider")}</Label>

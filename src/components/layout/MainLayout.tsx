@@ -17,8 +17,8 @@ const TRAFFIC_LIGHT_Y = 14;
 const MAC_TRAFFIC_LIGHT_DIAMETER = 12;
 const MAC_TRAFFIC_LIGHT_GAP = 8;
 const TRAFFIC_LIGHT_GROUP_WIDTH = MAC_TRAFFIC_LIGHT_DIAMETER * 3 + MAC_TRAFFIC_LIGHT_GAP * 2;
-const TOGGLE_BUTTON_SIZE = 34;
-const TOGGLE_BUTTON_GAP = 20;
+const TOGGLE_BUTTON_SIZE = 28;
+const TOGGLE_BUTTON_GAP = 14;
 const TOGGLE_BUTTON_LEFT = TRAFFIC_LIGHT_X + TRAFFIC_LIGHT_GROUP_WIDTH + TOGGLE_BUTTON_GAP;
 const TOGGLE_BUTTON_TOP = TRAFFIC_LIGHT_Y + MAC_TRAFFIC_LIGHT_DIAMETER / 2 - TOGGLE_BUTTON_SIZE / 2;
 const NON_DRAGGABLE_TITLEBAR_TARGETS = [
@@ -78,23 +78,18 @@ export function MainLayout() {
     };
 
     const layoutShellStyle = {
-        "--layout-titlebar-height": `${TITLEBAR_HEIGHT + 12}px`,
-        "--layout-titlebar-safe-height": `${TITLEBAR_HEIGHT + 10}px`,
+        "--layout-titlebar-height": `${TITLEBAR_HEIGHT + 8}px`,
+        "--layout-titlebar-safe-height": `${TITLEBAR_HEIGHT + 6}px`,
     } as CSSProperties;
 
     return (
         <div className="relative h-screen w-full overflow-hidden bg-background text-foreground">
-            <div className="pointer-events-none absolute inset-0">
-                <div className="absolute inset-x-0 top-0 h-48 bg-[radial-gradient(circle_at_top_left,_rgba(56,189,248,0.08),_transparent_48%)]" />
-                <div className="absolute right-[-8%] top-[12%] h-64 w-64 rounded-full bg-[radial-gradient(circle,_rgba(251,191,36,0.08),_transparent_68%)] blur-3xl" />
-                <div className="absolute bottom-[-10%] left-[18%] h-72 w-72 rounded-full bg-[radial-gradient(circle,_rgba(14,165,233,0.05),_transparent_72%)] blur-3xl" />
-            </div>
-            <div data-layout-shell="true" className="relative z-10 flex h-full w-full overflow-hidden" style={layoutShellStyle}>
+            <div data-layout-shell="true" className="relative flex h-full w-full overflow-hidden" style={layoutShellStyle}>
                 <div
                     data-layout-titlebar="true"
                     data-tauri-drag-region
                     onMouseDown={handleTitlebarMouseDown}
-                    className="absolute inset-x-0 top-0 z-20 h-[var(--layout-titlebar-height)] rounded-none border-b border-border/50 bg-background/80 backdrop-blur-md"
+                    className="absolute inset-x-0 top-0 z-20 h-[var(--layout-titlebar-height)] border-b border-border bg-background"
                 />
                 <Button
                     type="button"
@@ -103,14 +98,14 @@ export function MainLayout() {
                     onClick={() => setIsSidebarCollapsed((value) => !value)}
                     data-no-window-drag
                     aria-label={isSidebarCollapsed ? t("expandSidebar") : t("collapseSidebar")}
-                    className="absolute z-30 border border-border/50 bg-background/60 text-muted-foreground shadow-soft backdrop-blur-sm hover:bg-card/90 hover:text-foreground"
+                    className="absolute z-30 text-muted-foreground hover:bg-muted hover:text-foreground"
                     style={{ left: TOGGLE_BUTTON_LEFT, top: TOGGLE_BUTTON_TOP, width: TOGGLE_BUTTON_SIZE, height: TOGGLE_BUTTON_SIZE }}
                 >
-                    {isSidebarCollapsed ? <PanelLeftOpen className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
+                    {isSidebarCollapsed ? <PanelLeftOpen className="h-3.5 w-3.5" /> : <PanelLeftClose className="h-3.5 w-3.5" />}
                 </Button>
                 <Sidebar collapsed={isSidebarCollapsed} />
                 <div data-layout-main-column="true" className="relative flex min-w-0 flex-1 flex-col overflow-hidden">
-                    <main ref={mainRef} className={`min-w-0 flex-1 overflow-y-auto ${CONTENT_GUTTER_LEFT_CLASS} pr-3 pb-3 pt-[var(--layout-titlebar-safe-height)] md:pr-4 md:pb-4`}>
+                    <main ref={mainRef} className={`min-w-0 flex-1 overflow-y-auto ${CONTENT_GUTTER_LEFT_CLASS} pr-2 pb-2 pt-[var(--layout-titlebar-safe-height)] md:pr-3 md:pb-3`}>
                         <Outlet context={{ mainScrollRef: mainRef }} />
                     </main>
                 </div>
