@@ -28,5 +28,6 @@
     "languageDesc": "アプリの表示言語を選択します。",
     "never": "なし",
     "pagination": "ページネーション",
+    "backToTop": "ページ上部へ",
     "autoDetect": "自動検出"
 }

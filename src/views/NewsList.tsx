@@ -18,6 +18,7 @@ import { listNewsSources, markScopedNewsArticlesAsRead, type NewsSource } from "
 import { useMainLayoutScrollContainer } from "@/components/layout/MainLayout";
 import { EmptyState, WorkspaceHeader } from "@/components/layout/WorkspaceHeader";
 import { CONTENT_GUTTER_X_CLASS } from "@/components/layout/layout-spacing";
+import { BackToTopButton } from "@/components/ui/BackToTopButton";
 
 type Article = {
     id: number;
@@ -306,6 +307,7 @@ export default function NewsList() {
     const resizeStartXRef = useRef(0);
     const resizeStartWidthRef = useRef(DEFAULT_SOURCES_PANEL_WIDTH);
     const articlesScrollRef = useRef<HTMLDivElement>(null);
+    const sourcesPanelScrollRef = useRef<HTMLDivElement>(null);
     const pendingPaginationScrollResetRef = useRef(false);
 
     useEffect(() => {
@@ -410,9 +412,14 @@ export default function NewsList() {
     const markScopedReadLabel = selectedSource
         ? t("markScopedReadSource", { name: selectedSource.name })
         : t("markScopedReadAll");
+    const backToTopLabel = t("backToTop", { ns: "common" });
     const newsListScrollKey = useMemo(
         () => buildNewsListScrollKey(page, search, selectedSourceId),
         [page, search, selectedSourceId],
+    );
+    const backToTopTargetRefs = useMemo(
+        () => [mainScrollRef, articlesScrollRef, sourcesPanelScrollRef],
+        [mainScrollRef],
     );
 
     useEffect(() => {
@@ -768,7 +775,8 @@ export default function NewsList() {
     }
 
     return (
-        <div className={cn("flex min-h-full w-full min-w-0 flex-col gap-2 py-2 md:py-3", CONTENT_GUTTER_X_CLASS)}>
+        <>
+            <div className={cn("flex min-h-full w-full min-w-0 flex-col gap-2 py-2 md:py-3", CONTENT_GUTTER_X_CLASS)}>
             <WorkspaceHeader
                 density="compact"
                 eyebrow={t("eyebrow")}
@@ -838,7 +846,7 @@ export default function NewsList() {
                             </Button>
                         </div>
 
-                        <div className="mt-1 space-y-0.5 lg:flex-1 lg:min-h-0 lg:overflow-y-auto">
+                        <div ref={sourcesPanelScrollRef} className="mt-1 space-y-0.5 lg:flex-1 lg:min-h-0 lg:overflow-y-auto">
                             <SourceFilterRow
                                 label={t("allArticles")}
                                 title={`${t("allArticles")} (${allArticleCount}${allUnreadCount > 0 ? `, ${t("unreadCount", { count: allUnreadCount })}` : ""})`}
@@ -1095,6 +1103,8 @@ export default function NewsList() {
                     </div>
                 </div>
             </div>
-        </div>
+            </div>
+            <BackToTopButton targetRefs={backToTopTargetRefs} label={backToTopLabel} />
+        </>
     );
 }

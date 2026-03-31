@@ -50,6 +50,10 @@ vi.mock("react-i18next", () => ({
                 return `Saved ${options?.date}`;
             }
 
+            if (key === "backToTop") {
+                return "Back to top";
+            }
+
             return namespace ? `${namespace}:${key}` : key;
         },
     }),
@@ -333,7 +337,7 @@ describe("NewsList pagination scroll reset", () => {
             throw new Error("Sources panel label not found.");
         }
 
-        const headerRow = sourcesLabel.parentElement?.parentElement;
+        const headerRow = sourcesLabel.parentElement;
         if (!(headerRow instanceof HTMLDivElement)) {
             throw new Error("Sources panel header row not found.");
         }
@@ -354,6 +358,20 @@ describe("NewsList pagination scroll reset", () => {
         }
 
         return { stickyWrapper, panelCard, listContainer };
+    }
+
+    function queryBackToTopButton(): HTMLButtonElement | null {
+        const button = container.querySelector('button[aria-label="Back to top"]');
+        return button instanceof HTMLButtonElement ? button : null;
+    }
+
+    function getBackToTopButton(): HTMLButtonElement {
+        const button = queryBackToTopButton();
+        if (!button) {
+            throw new Error("Back-to-top button not found.");
+        }
+
+        return button;
     }
 
     function setInputValue(input: HTMLInputElement, value: string) {
@@ -409,11 +427,11 @@ describe("NewsList pagination scroll reset", () => {
         const { stickyWrapper, panelCard, listContainer } = getSourcesPanelElements();
 
         expect(stickyWrapper.className).toContain("lg:sticky");
-        expect(stickyWrapper.className).toContain("lg:top-6");
+        expect(stickyWrapper.className).toContain("lg:top-2");
         expect(stickyWrapper.className).toContain("lg:self-start");
         expect(stickyWrapper.className).not.toContain("lg:h-full");
 
-        expect(panelCard.className).toContain("lg:max-h-[calc(100vh-8rem)]");
+        expect(panelCard.className).toContain("lg:max-h-[calc(100vh-7rem)]");
         expect(panelCard.className).not.toContain("h-full");
 
         expect(listContainer.className).toContain("lg:flex-1");
@@ -452,7 +470,7 @@ describe("NewsList pagination scroll reset", () => {
 
         const hackerNewsButton = getSourceFilterButton("Hacker News");
         expect(hackerNewsButton.className).toContain("flex");
-        expect(hackerNewsButton.className).toContain("gap-2");
+        expect(hackerNewsButton.className).toContain("gap-1.5");
         expect(hackerNewsButton.className).not.toContain("grid-cols-[minmax(0,1fr)_auto]");
 
         const labelSpan = hackerNewsButton.children[0];
@@ -470,7 +488,7 @@ describe("NewsList pagination scroll reset", () => {
             throw new Error("Source meta span not found.");
         }
 
-        expect(metaSpan.className).toContain("min-w-[4ch]");
+        expect(metaSpan.className).toContain("min-w-[3ch]");
         expect(metaSpan.className).toContain("shrink-0");
         expect(metaSpan.className).not.toContain("min-w-[4.75rem]");
 
@@ -543,5 +561,53 @@ describe("NewsList pagination scroll reset", () => {
         expect(mainScrollContainer.scrollTop).toBe(210);
         expect(getArticlesScrollContainer().scrollTop).toBe(95);
         expect(readStoredScrollMap()["/?q=ai"]).toBe(95);
+    });
+
+    it("shows the back-to-top button when the articles list scroll crosses the threshold", async () => {
+        renderNewsList("/");
+        await settleNewsList();
+
+        expect(queryBackToTopButton()).toBeNull();
+
+        const articlesContainer = getArticlesScrollContainer();
+        articlesContainer.scrollTop = 320;
+        act(() => {
+            articlesContainer.dispatchEvent(new Event("scroll"));
+        });
+
+        expect(getBackToTopButton()).toBeInstanceOf(HTMLButtonElement);
+    });
+
+    it("shows the back-to-top button for main and sources scrolling and resets all tracked containers", async () => {
+        renderNewsList("/");
+        await settleNewsList();
+
+        const articlesContainer = getArticlesScrollContainer();
+        const { listContainer } = getSourcesPanelElements();
+
+        mainScrollContainer.scrollTop = 340;
+        act(() => {
+            mainScrollContainer.dispatchEvent(new Event("scroll"));
+        });
+        expect(getBackToTopButton()).toBeInstanceOf(HTMLButtonElement);
+
+        articlesContainer.scrollTop = 360;
+        act(() => {
+            articlesContainer.dispatchEvent(new Event("scroll"));
+        });
+
+        listContainer.scrollTop = 390;
+        act(() => {
+            listContainer.dispatchEvent(new Event("scroll"));
+        });
+
+        act(() => {
+            getBackToTopButton().click();
+        });
+
+        expect(mainScrollContainer.scrollTop).toBe(0);
+        expect(articlesContainer.scrollTop).toBe(0);
+        expect(listContainer.scrollTop).toBe(0);
+        expect(queryBackToTopButton()).toBeNull();
     });
 });

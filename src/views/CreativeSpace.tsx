@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
 import i18n from "@/lib/i18n";
 import { Button } from "@/components/ui/button";
@@ -41,6 +41,7 @@ import { buildCreativeCardDiscussionSystemPrompt } from "@/lib/chat-prompts";
 import { useMainLayoutScrollContainer } from "@/components/layout/MainLayout";
 import { PageShell } from "@/components/layout/PageShell";
 import { CONTENT_GUTTER_X_CLASS } from "@/components/layout/layout-spacing";
+import { BackToTopButton } from "@/components/ui/BackToTopButton";
 import { useScopedScrollMemory } from "@/hooks/use-scoped-scroll-memory";
 import { useStreamingConversation } from "@/hooks/use-streaming-conversation";
 import { getCreativeCardBodyMarkdown, getCreativeCardPreviewExcerpt } from "@/lib/creative-card";
@@ -562,6 +563,7 @@ export default function CreativeSpace() {
     const promptOptimizationRequestIdRef = useRef(0);
     const projectDialogOpenRef = useRef(projectDialogOpen);
     const projectActionsPanelRef = useRef<HTMLDivElement | null>(null);
+    const cardBodyScrollRef = useRef<HTMLDivElement | null>(null);
     const cardDiscussionScrollRef = useRef<HTMLDivElement | null>(null);
     const cardDiscussionToggleButtonRef = useRef<HTMLButtonElement | null>(null);
 
@@ -588,11 +590,20 @@ export default function CreativeSpace() {
     const compactPaginationLabel = totalPages > 0
         ? t("pageXOfY", { page: currentPage + 1, total: totalPages })
         : "";
+    const backToTopLabel = t("backToTop", { ns: "common" });
     const creativeScrollScopeKey = activeCardId !== null
         ? null
         : activeProject !== null
             ? buildCreativeProjectScrollScopeKey(activeProject.id)
             : CREATIVE_BOARD_SCROLL_SCOPE_KEY;
+    const projectDetailBackToTopTargetRefs = useMemo(
+        () => [mainScrollRef],
+        [mainScrollRef],
+    );
+    const cardDetailBackToTopTargetRefs = useMemo(
+        () => [mainScrollRef, cardBodyScrollRef],
+        [mainScrollRef],
+    );
     const { saveCurrentScopeScroll: saveCreativeScrollPosition } = useScopedScrollMemory({
         containerRef: mainScrollRef,
         storageKey: CREATIVE_SPACE_SCROLL_STORAGE_KEY,
@@ -1256,168 +1267,172 @@ export default function CreativeSpace() {
 
     if (activeCard) {
         return (
-            <div className={cn("flex h-full min-h-0 flex-col gap-2 bg-background py-2 md:py-3 lg:flex-row lg:gap-0", CONTENT_GUTTER_X_CLASS)}>
-                <div className="surface-panel min-h-0 min-w-0 flex-1 overflow-hidden">
-                    <div className="flex h-full min-h-0 flex-col">
-                        <div className="shrink-0 border-b border-border bg-background">
-                            <div className="mx-auto flex w-full max-w-4xl flex-col gap-2 px-3 py-2 md:px-4">
-                                <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
-                                    <div className="min-w-0">
-                                        <Button variant="ghost" size="sm" onClick={() => setActiveCardId(null)} className="-ml-2 w-fit">
-                                            <ArrowLeft className="h-3.5 w-3.5" /> {t("back", { ns: "common" })}
-                                        </Button>
-                                        <div className="mt-1.5 space-y-2">
-                                            <div className="text-balance text-base font-semibold leading-tight md:text-lg">{activeCard.title}</div>
-                                            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
-                                                <span>{activeCard.generation_mode === "auto" ? t("auto") : t("manual")} {t("run")}</span>
-                                                <span>{formatArticleCount(activeCard.used_article_count)}</span>
-                                                <span className="tabular-nums">{formatTimestamp(activeCard.created_at)}</span>
+            <>
+                <div className={cn("flex h-full min-h-0 flex-col gap-2 bg-background py-2 md:py-3 lg:flex-row lg:gap-0", CONTENT_GUTTER_X_CLASS)}>
+                    <div className="surface-panel min-h-0 min-w-0 flex-1 overflow-hidden">
+                        <div className="flex h-full min-h-0 flex-col">
+                            <div className="shrink-0 border-b border-border bg-background">
+                                <div className="mx-auto flex w-full max-w-4xl flex-col gap-2 px-3 py-2 md:px-4">
+                                    <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+                                        <div className="min-w-0">
+                                            <Button variant="ghost" size="sm" onClick={() => setActiveCardId(null)} className="-ml-2 w-fit">
+                                                <ArrowLeft className="h-3.5 w-3.5" /> {t("back", { ns: "common" })}
+                                            </Button>
+                                            <div className="mt-1.5 space-y-2">
+                                                <div className="text-balance text-base font-semibold leading-tight md:text-lg">{activeCard.title}</div>
+                                                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                                                    <span>{activeCard.generation_mode === "auto" ? t("auto") : t("manual")} {t("run")}</span>
+                                                    <span>{formatArticleCount(activeCard.used_article_count)}</span>
+                                                    <span className="tabular-nums">{formatTimestamp(activeCard.created_at)}</span>
+                                                </div>
                                             </div>
                                         </div>
+                                        <Button
+                                            ref={cardDiscussionToggleButtonRef}
+                                            variant={isCardDiscussionOpen ? "default" : "outline"}
+                                            size="sm"
+                                            onClick={() => setIsCardDiscussionOpen((open) => !open)}
+                                            className="shrink-0 self-start"
+                                        >
+                                            <MessageSquare className="h-3.5 w-3.5" />
+                                            {isCardDiscussionOpen ? t("hideDiscussion") : t("discussCard")}
+                                        </Button>
                                     </div>
-                                    <Button
-                                        ref={cardDiscussionToggleButtonRef}
-                                        variant={isCardDiscussionOpen ? "default" : "outline"}
-                                        size="sm"
-                                        onClick={() => setIsCardDiscussionOpen((open) => !open)}
-                                        className="shrink-0 self-start"
-                                    >
-                                        <MessageSquare className="h-3.5 w-3.5" />
-                                        {isCardDiscussionOpen ? t("hideDiscussion") : t("discussCard")}
-                                    </Button>
                                 </div>
                             </div>
-                        </div>
 
-                        <div className="min-h-0 flex-1 overflow-y-auto">
-                            <div className="mx-auto w-full max-w-4xl px-3 py-3 md:px-4 md:py-4">
-                                <div className="prose prose-sm max-w-none break-words dark:prose-invert">
-                                    <ReactMarkdown>{activeCardBodyMarkdown}</ReactMarkdown>
+                            <div ref={cardBodyScrollRef} className="min-h-0 flex-1 overflow-y-auto">
+                                <div className="mx-auto w-full max-w-4xl px-3 py-3 md:px-4 md:py-4">
+                                    <div className="prose prose-sm max-w-none break-words dark:prose-invert">
+                                        <ReactMarkdown>{activeCardBodyMarkdown}</ReactMarkdown>
+                                    </div>
                                 </div>
                             </div>
                         </div>
                     </div>
+
+                    <CreativeCardDiscussionRail open={isDesktopCardDiscussionLayout && isCardDiscussionOpen}>
+                        <CreativeCardDiscussionPanel
+                            variant="inline"
+                            chatMessages={chatMessages}
+                            isChatStreaming={isChatStreaming}
+                            chatStreamPhase={chatStreamPhase}
+                            webSearchStatus={activeProjectWebSearchStatus}
+                            chatInput={chatInput}
+                            onChatInputChange={setChatInput}
+                            onChatSubmit={handleChat}
+                            onClose={closeCardDiscussion}
+                            showCloseButton
+                            scrollRef={cardDiscussionScrollRef}
+                        />
+                    </CreativeCardDiscussionRail>
+
+                    {!isDesktopCardDiscussionLayout ? (
+                        <Sheet modal={false} open={isCardDiscussionOpen} onOpenChange={setIsCardDiscussionOpen}>
+                            <SheetContent
+                                side="right"
+                                className="w-full max-w-xl p-0 sm:max-w-xl"
+                                showOverlay={false}
+                            >
+                                <CreativeCardDiscussionPanel
+                                    variant="sheet"
+                                    chatMessages={chatMessages}
+                                    isChatStreaming={isChatStreaming}
+                                    chatStreamPhase={chatStreamPhase}
+                                    webSearchStatus={activeProjectWebSearchStatus}
+                                    chatInput={chatInput}
+                                    onChatInputChange={setChatInput}
+                                    onChatSubmit={handleChat}
+                                    scrollRef={cardDiscussionScrollRef}
+                                />
+                            </SheetContent>
+                        </Sheet>
+                    ) : null}
                 </div>
-
-                <CreativeCardDiscussionRail open={isDesktopCardDiscussionLayout && isCardDiscussionOpen}>
-                    <CreativeCardDiscussionPanel
-                        variant="inline"
-                        chatMessages={chatMessages}
-                        isChatStreaming={isChatStreaming}
-                        chatStreamPhase={chatStreamPhase}
-                        webSearchStatus={activeProjectWebSearchStatus}
-                        chatInput={chatInput}
-                        onChatInputChange={setChatInput}
-                        onChatSubmit={handleChat}
-                        onClose={closeCardDiscussion}
-                        showCloseButton
-                        scrollRef={cardDiscussionScrollRef}
-                    />
-                </CreativeCardDiscussionRail>
-
-                {!isDesktopCardDiscussionLayout ? (
-                    <Sheet modal={false} open={isCardDiscussionOpen} onOpenChange={setIsCardDiscussionOpen}>
-                        <SheetContent
-                            side="right"
-                            className="w-full max-w-xl p-0 sm:max-w-xl"
-                            showOverlay={false}
-                        >
-                            <CreativeCardDiscussionPanel
-                                variant="sheet"
-                                chatMessages={chatMessages}
-                                isChatStreaming={isChatStreaming}
-                                chatStreamPhase={chatStreamPhase}
-                                webSearchStatus={activeProjectWebSearchStatus}
-                                chatInput={chatInput}
-                                onChatInputChange={setChatInput}
-                                onChatSubmit={handleChat}
-                                scrollRef={cardDiscussionScrollRef}
-                            />
-                        </SheetContent>
-                    </Sheet>
-                ) : null}
-            </div>
+                <BackToTopButton targetRefs={cardDetailBackToTopTargetRefs} label={backToTopLabel} />
+            </>
         );
     }
 
     if (activeProject) {
         return (
-            <PageShell
-                variant="workspace"
-                size="wide"
-                contentClassName="space-y-4"
-                header={{
-                    density: "compact",
-                    leading: (
-                        <Button variant="ghost" size="sm" onClick={leaveProjectDetail}>
-                            <ArrowLeft className="h-3.5 w-3.5" /> {t("back", { ns: "common" })}
-                        </Button>
-                    ),
-                    eyebrow: t("eyebrow"),
-                    title: activeProject.name,
-                    description: t("projectDescription"),
-                    showDescription: false,
-                    stats: [
-                        { label: t("scopeLabel"), value: formatProjectScopeSummary(activeProject, sources), tone: "accent" },
-                        { label: t("unreadLabel"), value: formatUnreadCardCount(activeProjectUnreadCount), tone: activeProjectUnreadCount > 0 ? "warning" : "default" },
-                    ],
-                    actions: (
-                        <div className="flex flex-wrap items-center gap-2">
-                            <Button size="sm" onClick={openManualGenerateDialog} disabled={isGenerating}>
-                                <WandSparkles className="h-3.5 w-3.5" /> {isGenerating ? t("generating") : t("generateCard")}
+            <>
+                <PageShell
+                    variant="workspace"
+                    size="wide"
+                    contentClassName="space-y-4"
+                    header={{
+                        density: "compact",
+                        leading: (
+                            <Button variant="ghost" size="sm" onClick={leaveProjectDetail}>
+                                <ArrowLeft className="h-3.5 w-3.5" /> {t("back", { ns: "common" })}
                             </Button>
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={handleMarkAllCardsRead}
-                                disabled={isMarkingAllCardsRead || activeProjectUnreadCount === 0}
-                            >
-                                {isMarkingAllCardsRead ? (
-                                    <>
-                                        <Loader2 className="h-3.5 w-3.5 animate-spin" /> {t("marking", { ns: "news" })}
-                                    </>
-                                ) : (
-                                    t("markAllAsRead")
-                                )}
-                            </Button>
-                            <div className="relative" ref={projectActionsPanelRef}>
+                        ),
+                        eyebrow: t("eyebrow"),
+                        title: activeProject.name,
+                        description: t("projectDescription"),
+                        showDescription: false,
+                        stats: [
+                            { label: t("scopeLabel"), value: formatProjectScopeSummary(activeProject, sources), tone: "accent" },
+                            { label: t("unreadLabel"), value: formatUnreadCardCount(activeProjectUnreadCount), tone: activeProjectUnreadCount > 0 ? "warning" : "default" },
+                        ],
+                        actions: (
+                            <div className="flex flex-wrap items-center gap-2">
+                                <Button size="sm" onClick={openManualGenerateDialog} disabled={isGenerating}>
+                                    <WandSparkles className="h-3.5 w-3.5" /> {isGenerating ? t("generating") : t("generateCard")}
+                                </Button>
                                 <Button
                                     variant="outline"
-                                    size="icon"
-                                    className="h-7 w-7"
-                                    onClick={() => setIsProjectActionsOpen((current) => !current)}
-                                    aria-label={t("openProjectActions")}
-                                    aria-expanded={isProjectActionsOpen}
+                                    size="sm"
+                                    onClick={handleMarkAllCardsRead}
+                                    disabled={isMarkingAllCardsRead || activeProjectUnreadCount === 0}
                                 >
-                                    <Ellipsis className="h-3.5 w-3.5" />
+                                    {isMarkingAllCardsRead ? (
+                                        <>
+                                            <Loader2 className="h-3.5 w-3.5 animate-spin" /> {t("marking", { ns: "news" })}
+                                        </>
+                                    ) : (
+                                        t("markAllAsRead")
+                                    )}
                                 </Button>
+                                <div className="relative" ref={projectActionsPanelRef}>
+                                    <Button
+                                        variant="outline"
+                                        size="icon"
+                                        className="h-7 w-7"
+                                        onClick={() => setIsProjectActionsOpen((current) => !current)}
+                                        aria-label={t("openProjectActions")}
+                                        aria-expanded={isProjectActionsOpen}
+                                    >
+                                        <Ellipsis className="h-3.5 w-3.5" />
+                                    </Button>
 
-                                {isProjectActionsOpen && (
-                                    <div className="surface-panel-quiet absolute right-0 top-[calc(100%+0.5rem)] z-20 w-48 p-1.5">
-                                        <Button
-                                            variant="ghost"
-                                            size="sm"
-                                            className="w-full justify-start"
-                                            onClick={() => openEditProjectDialog(activeProject)}
-                                        >
-                                            <Pencil className="h-3.5 w-3.5" /> {t("editProject")}
-                                        </Button>
-                                        <Button
-                                            variant="ghost"
-                                            size="sm"
-                                            className="w-full justify-start text-destructive hover:text-destructive"
-                                            onClick={() => openDeleteProjectDialog(activeProject)}
-                                            disabled={deletingProjectId === activeProject.id}
-                                        >
-                                            <Trash2 className="h-3.5 w-3.5" /> {t("deleteProject")}
-                                        </Button>
-                                    </div>
-                                )}
+                                    {isProjectActionsOpen && (
+                                        <div className="surface-panel-quiet absolute right-0 top-[calc(100%+0.5rem)] z-20 w-48 p-1.5">
+                                            <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                className="w-full justify-start"
+                                                onClick={() => openEditProjectDialog(activeProject)}
+                                            >
+                                                <Pencil className="h-3.5 w-3.5" /> {t("editProject")}
+                                            </Button>
+                                            <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                className="w-full justify-start text-destructive hover:text-destructive"
+                                                onClick={() => openDeleteProjectDialog(activeProject)}
+                                                disabled={deletingProjectId === activeProject.id}
+                                            >
+                                                <Trash2 className="h-3.5 w-3.5" /> {t("deleteProject")}
+                                            </Button>
+                                        </div>
+                                    )}
+                                </div>
                             </div>
-                        </div>
-                    ),
-                }}
-            >
+                        ),
+                    }}
+                >
                 <div className="surface-panel-quiet px-3 py-3">
                         <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
                             <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-4 gap-y-1.5 text-sm">
@@ -1854,9 +1869,11 @@ export default function CreativeSpace() {
                     </DialogContent>
                 </Dialog>
 
-                {renderProjectDialog()}
-                {renderDeleteProjectDialog()}
-            </PageShell>
+                    {renderProjectDialog()}
+                    {renderDeleteProjectDialog()}
+                </PageShell>
+                <BackToTopButton targetRefs={projectDetailBackToTopTargetRefs} label={backToTopLabel} />
+            </>
         );
     }
 

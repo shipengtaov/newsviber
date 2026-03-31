@@ -28,5 +28,6 @@
     "languageDesc": "Select the display language for the application.",
     "never": "Never",
     "pagination": "Pagination",
+    "backToTop": "Back to top",
     "autoDetect": "Auto detect"
 }

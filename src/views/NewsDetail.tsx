@@ -1,15 +1,17 @@
-import { useState, useEffect, useEffectEvent } from "react";
+import { useState, useEffect, useEffectEvent, useMemo, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { ArticleContent } from "@/components/article/ArticleContent";
 import { Button } from "@/components/ui/button";
+import { BackToTopButton } from "@/components/ui/BackToTopButton";
 import { ArrowLeft, ExternalLink } from "lucide-react";
 import { sanitizeArticleHtml } from "@/lib/article-html";
 import { markNewsArticleAsRead } from "@/lib/news-service";
 import { cn } from "@/lib/utils";
 import { getDb } from "@/lib/db";
 import { formatUtcDateTime } from "@/lib/time";
+import { useMainLayoutScrollContainer } from "@/components/layout/MainLayout";
 import { CONTENT_GUTTER_X_CLASS } from "@/components/layout/layout-spacing";
 
 type FullArticle = {
@@ -44,9 +46,16 @@ export function ArticleDetailView({
     const { t } = useTranslation("news");
     const navigate = useNavigate();
     const location = useLocation();
+    const mainScrollRef = useMainLayoutScrollContainer();
+    const detailScrollRef = useRef<HTMLDivElement>(null);
     const [article, setArticle] = useState<FullArticle | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [loadError, setLoadError] = useState<string | null>(null);
+    const backToTopLabel = t("backToTop", { ns: "common" });
+    const backToTopTargetRefs = useMemo(
+        () => [mainScrollRef, detailScrollRef],
+        [mainScrollRef],
+    );
     const notifyMarkedRead = useEffectEvent((id: number) => {
         onMarkAsRead?.(id);
     });
@@ -144,32 +153,47 @@ export function ArticleDetailView({
     }
 
     return (
-        <div className={cn("flex h-full w-full min-h-0 py-2 md:py-3", CONTENT_GUTTER_X_CLASS, className)}>
-            <div className="surface-panel min-w-0 flex-1 overflow-y-auto">
-                <div className="mx-auto w-full max-w-5xl p-4 md:p-6">
-                    <Button variant="ghost" size="sm" className="mb-3 -ml-1 text-muted-foreground" onClick={handleBack}>
-                        <ArrowLeft className="h-3.5 w-3.5" /> {t("backToNews")}
-                    </Button>
+        <>
+            <div className={cn("flex h-full w-full min-h-0 py-2 md:py-3", CONTENT_GUTTER_X_CLASS, className)}>
+                <div ref={detailScrollRef} className="surface-panel min-w-0 flex-1 overflow-y-auto">
+                    <div className="mx-auto w-full max-w-5xl p-4 md:p-6">
+                        <Button variant="ghost" size="sm" className="mb-3 -ml-1 text-muted-foreground" onClick={handleBack}>
+                            <ArrowLeft className="h-3.5 w-3.5" /> {t("backToNews")}
+                        </Button>
 
-                    <div className="mb-5">
-                        <h1 className="mb-2 text-xl font-semibold leading-tight tracking-tight text-foreground md:text-2xl">{article.title}</h1>
-                        <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-                            <span className="rounded-md bg-accent/80 px-2 py-0.5 text-xs font-medium text-accent-foreground">{article.source_name}</span>
-                            <span>{formatUtcDateTime(article.published_at)}</span>
-                            <a
-                                href={article.guid}
-                                className="flex items-center text-primary transition-colors hover:text-accent-foreground hover:underline cursor-pointer"
-                                onClick={(e) => { e.preventDefault(); openUrl(article.guid); }}
-                            >
-                                <ExternalLink className="mr-0.5 h-3 w-3" /> {t("originalSource")}
-                            </a>
+                        <div className="mb-5">
+                            <h1 className="mb-2 text-xl font-semibold leading-tight tracking-tight text-foreground md:text-2xl">{article.title}</h1>
+                            <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+                                <span className="rounded-md bg-accent/80 px-2 py-0.5 text-xs font-medium text-accent-foreground">{article.source_name}</span>
+                                <span>{formatUtcDateTime(article.published_at)}</span>
+                                <a
+                                    href={article.guid}
+                                    className="flex items-center text-primary transition-colors hover:text-accent-foreground hover:underline cursor-pointer"
+                                    onClick={(e) => { e.preventDefault(); openUrl(article.guid); }}
+                                >
+                                    <ExternalLink className="mr-0.5 h-3 w-3" /> {t("originalSource")}
+                                </a>
+                            </div>
                         </div>
-                    </div>
 
-                    {article.summary && (
-                        <div
-                            className="surface-panel-quiet mb-4 px-4 py-3 text-sm leading-6 text-muted-foreground"
-                            dangerouslySetInnerHTML={{ __html: sanitizeArticleHtml(article.summary) }}
+                        {article.summary && (
+                            <div
+                                className="surface-panel-quiet mb-4 px-4 py-3 text-sm leading-6 text-muted-foreground"
+                                dangerouslySetInnerHTML={{ __html: sanitizeArticleHtml(article.summary) }}
+                                onClick={(e) => {
+                                    const target = e.target as HTMLElement;
+                                    const anchor = target.closest('a');
+                                    if (anchor && anchor.href) {
+                                        e.preventDefault();
+                                        openUrl(anchor.href);
+                                    }
+                                }}
+                            />
+                        )}
+
+                        <ArticleContent
+                            content={article.content}
+                            className="prose prose-neutral dark:prose-invert max-w-none w-full leading-8 text-foreground/90"
                             onClick={(e) => {
                                 const target = e.target as HTMLElement;
                                 const anchor = target.closest('a');
@@ -179,23 +203,11 @@ export function ArticleDetailView({
                                 }
                             }}
                         />
-                    )}
-
-                    <ArticleContent
-                        content={article.content}
-                        className="prose prose-neutral dark:prose-invert max-w-none w-full leading-8 text-foreground/90"
-                        onClick={(e) => {
-                            const target = e.target as HTMLElement;
-                            const anchor = target.closest('a');
-                            if (anchor && anchor.href) {
-                                e.preventDefault();
-                                openUrl(anchor.href);
-                            }
-                        }}
-                    />
+                    </div>
                 </div>
             </div>
-        </div>
+            <BackToTopButton targetRefs={backToTopTargetRefs} label={backToTopLabel} />
+        </>
     );
 }
 
