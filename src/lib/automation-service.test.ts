@@ -40,6 +40,7 @@ import {
     listAutomationProjects,
     markAllAutomationReportsAsRead,
     markAutomationReportAsRead,
+    saveAutomationProject,
     setAutomationReportFavorite,
     summarizeArticleContextText,
 } from "@/lib/automation-service";
@@ -369,6 +370,61 @@ describe("automation service unread state", () => {
             "UPDATE automation_reports SET is_favorite = $1 WHERE id = $2",
             [1, 18],
         );
+        expect(dispatchAutomationSyncEventMock).toHaveBeenCalledTimes(1);
+    });
+
+    it("falls back to the new project article defaults when saving invalid values", async () => {
+        const selectMock = vi.fn(async (query: string) => {
+            if (query.includes("FROM automation_projects p")) {
+                return [{
+                    id: 9,
+                    name: "Signals",
+                    prompt: "Summarize",
+                    cycle_mode: "manual",
+                    auto_enabled: 0,
+                    auto_interval_minutes: 60,
+                    max_articles_per_report: 200,
+                    min_articles_per_report: 10,
+                    web_search_enabled: 0,
+                    last_auto_checked_at: null,
+                    last_auto_generated_at: null,
+                    source_ids_csv: null,
+                    unread_report_count: 0,
+                }];
+            }
+
+            throw new Error(`Unexpected select query: ${query}`);
+        });
+
+        getDbMock.mockResolvedValue({
+            select: selectMock,
+            execute: vi.fn(),
+        });
+        invokeMock.mockResolvedValue({ projectId: 9 });
+
+        await expect(saveAutomationProject({
+            name: " Signals ",
+            prompt: " Summarize ",
+            auto_enabled: false,
+            auto_interval_minutes: 0,
+            max_articles_per_report: 0,
+            min_articles_per_report: 0,
+            web_search_enabled: false,
+            use_all_sources: true,
+            source_ids: [],
+        })).resolves.toEqual(expect.objectContaining({
+            id: 9,
+            max_articles_per_report: 200,
+            min_articles_per_report: 10,
+        }));
+
+        expect(invokeMock).toHaveBeenCalledWith("save_automation_project_cmd", {
+            input: expect.objectContaining({
+                autoIntervalMinutes: 60,
+                maxArticlesPerReport: 200,
+                minArticlesPerReport: 10,
+            }),
+        });
         expect(dispatchAutomationSyncEventMock).toHaveBeenCalledTimes(1);
     });
 });

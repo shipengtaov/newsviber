@@ -77,8 +77,8 @@ pub async fn save_automation_project_cmd(
     }
 
     let auto_interval_minutes = normalize_positive_i64(input.auto_interval_minutes, 60);
-    let max_articles_per_report = normalize_positive_i64(input.max_articles_per_report, 12);
-    let min_articles_per_report = normalize_positive_i64(input.min_articles_per_report, 1);
+    let max_articles_per_report = normalize_positive_i64(input.max_articles_per_report, 200);
+    let min_articles_per_report = normalize_positive_i64(input.min_articles_per_report, 10);
     let source_ids = normalize_unique_ids(input.source_ids);
 
     let mut connection = connect_automation_db(&app).await?;

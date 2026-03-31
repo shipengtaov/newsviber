@@ -471,6 +471,28 @@ describe("Automation", () => {
         expect(queryBackToTopButton()).toBeNull();
     });
 
+    it("prefills new project article counts with 10 and 200", async () => {
+        renderAutomation();
+        await settleAutomation();
+
+        act(() => {
+            const newProjectButton = Array.from(document.body.querySelectorAll("button")).find((candidate) => (
+                candidate.textContent?.includes("New project")
+            ));
+            if (!(newProjectButton instanceof HTMLButtonElement)) {
+                throw new Error("New project button not found.");
+            }
+
+            newProjectButton.click();
+        });
+        await settleAutomation();
+
+        const numericValues = Array.from(document.body.querySelectorAll('input[type="number"]'))
+            .map((input) => input instanceof HTMLInputElement ? input.value : null);
+
+        expect(numericValues).toEqual(["60", "10", "200"]);
+    });
+
     it("switches to favorites with a first-page reload and favorites-only empty state", async () => {
         listAutomationReportsMock.mockImplementation((_projectId: number, options?: { offset?: number; favoritesOnly?: boolean }) => {
             if (options?.favoritesOnly) {
