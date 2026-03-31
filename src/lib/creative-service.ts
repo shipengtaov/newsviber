@@ -29,6 +29,7 @@ export type CreativeCard = {
     generation_mode: "manual" | "auto";
     used_article_count: number;
     is_read: boolean;
+    is_favorite: boolean;
     created_at: string;
 };
 
@@ -128,6 +129,7 @@ type CreativeCardRow = {
     generation_mode: string | null;
     used_article_count: number | null;
     is_read: number | boolean | string | null;
+    is_favorite: number | boolean | string | null;
     created_at: string;
 };
 
@@ -259,6 +261,7 @@ function normalizeCreativeCard(row: CreativeCardRow): CreativeCard {
         generation_mode: generationMode,
         used_article_count: normalizePositiveInteger(row.used_article_count, 0),
         is_read: normalizeBoolean(row.is_read),
+        is_favorite: normalizeBoolean(row.is_favorite),
         created_at: row.created_at,
     };
 }
@@ -439,6 +442,7 @@ async function getCreativeCard(cardId: number): Promise<CreativeCard | null> {
                 generation_mode,
                 used_article_count,
                 is_read,
+                is_favorite,
                 created_at
             FROM creative_cards
             WHERE id = $1
@@ -587,14 +591,18 @@ export async function listCreativeProjects(): Promise<CreativeProject[]> {
 
 export async function listCreativeCards(
     projectId: number,
-    options: { offset?: number; limit?: number } = {},
+    options: { offset?: number; limit?: number; favoritesOnly?: boolean } = {},
 ): Promise<CreativeCardPage> {
     const db = await getDb();
     const offset = Math.max(0, options.offset ?? 0);
     const limit = options.limit != null ? Math.max(1, Math.min(200, options.limit)) : undefined;
+    const favoritesOnly = Boolean(options.favoritesOnly);
+    const whereClause = favoritesOnly
+        ? "project_id = $1 AND is_favorite = 1"
+        : "project_id = $1";
 
     const countRows = await db.select<{ cnt: number }[]>(
-        "SELECT COUNT(*) AS cnt FROM creative_cards WHERE project_id = $1",
+        `SELECT COUNT(*) AS cnt FROM creative_cards WHERE ${whereClause}`,
         [projectId],
     );
     const totalCount = Number(countRows[0]?.cnt) || 0;
@@ -609,9 +617,10 @@ export async function listCreativeCards(
             generation_mode,
             used_article_count,
             is_read,
+            is_favorite,
             created_at
         FROM creative_cards
-        WHERE project_id = $1
+        WHERE ${whereClause}
         ORDER BY id DESC
     `;
 
@@ -692,6 +701,15 @@ export async function deleteCreativeProject(projectId: number): Promise<void> {
 export async function markCreativeCardAsRead(cardId: number): Promise<void> {
     const db = await getDb();
     await db.execute("UPDATE creative_cards SET is_read = 1 WHERE id = $1", [cardId]);
+    dispatchCreativeSyncEvent();
+}
+
+export async function setCreativeCardFavorite(cardId: number, isFavorite: boolean): Promise<void> {
+    const db = await getDb();
+    await db.execute(
+        "UPDATE creative_cards SET is_favorite = $1 WHERE id = $2",
+        [isFavorite ? 1 : 0, cardId],
+    );
     dispatchCreativeSyncEvent();
 }
 

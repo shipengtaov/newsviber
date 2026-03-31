@@ -10,6 +10,7 @@ const {
     listCreativeCardsMock,
     listCreativeSourcesMock,
     markCreativeCardAsReadMock,
+    setCreativeCardFavoriteMock,
     mockUseMainLayoutScrollContainer,
     useScopedScrollMemoryMock,
     replaceMessagesMock,
@@ -18,6 +19,7 @@ const {
     listCreativeCardsMock: vi.fn(),
     listCreativeSourcesMock: vi.fn(),
     markCreativeCardAsReadMock: vi.fn(),
+    setCreativeCardFavoriteMock: vi.fn(),
     mockUseMainLayoutScrollContainer: vi.fn(),
     useScopedScrollMemoryMock: vi.fn(),
     replaceMessagesMock: vi.fn(),
@@ -54,6 +56,10 @@ const creativeTranslations: Record<string, string> = {
     projectDescription: "Project description",
     generateCard: "Generate card",
     generating: "Generating",
+    allCards: "All",
+    favoriteCards: "Favorites",
+    addToFavorites: "Add to favorites",
+    removeFromFavorites: "Remove from favorites",
     markAllAsRead: "Mark all as read",
     openProjectActions: "Open project actions",
     editProject: "Edit project",
@@ -64,6 +70,8 @@ const creativeTranslations: Record<string, string> = {
     viewCard: "Card view",
     viewList: "List view",
     noCreativeCardsYet: "No cards yet",
+    noFavoriteCardsYet: "No favorited cards yet",
+    favoriteFirstCard: "Favorite a card to keep it pinned here",
     generateFirstCard: "Generate the first card",
     focusPrompt: "Focus prompt",
     automation: "Automation",
@@ -90,6 +98,7 @@ const creativeTranslations: Record<string, string> = {
     hideDiscussion: "Hide discussion",
     discussCard: "Discuss card",
     noCreativeProjectsYet: "No creative projects yet",
+    failedToUpdateFavorite: "Failed to update favorite",
     articlesUnit: "articles",
 };
 
@@ -166,6 +175,7 @@ vi.mock("@/lib/creative-service", () => ({
     listCreativeCards: listCreativeCardsMock,
     listCreativeSources: listCreativeSourcesMock,
     markCreativeCardAsRead: markCreativeCardAsReadMock,
+    setCreativeCardFavorite: setCreativeCardFavoriteMock,
     deleteCreativeProject: vi.fn(),
     generateCreativeCardForProject: vi.fn(),
     listProjectCandidateArticles: vi.fn().mockResolvedValue([]),
@@ -238,9 +248,11 @@ describe("CreativeSpace", () => {
         listCreativeCardsMock.mockReset();
         listCreativeSourcesMock.mockReset();
         markCreativeCardAsReadMock.mockReset();
+        setCreativeCardFavoriteMock.mockReset();
         mockUseMainLayoutScrollContainer.mockReset();
         useScopedScrollMemoryMock.mockReset();
         replaceMessagesMock.mockReset();
+        localStorage.clear();
 
         listCreativeProjectsMock.mockResolvedValue([
             {
@@ -272,12 +284,14 @@ describe("CreativeSpace", () => {
                     generation_mode: "manual",
                     used_article_count: 3,
                     is_read: false,
+                    is_favorite: false,
                     created_at: "2026-03-30T00:00:00Z",
                 },
             ],
             totalCount: 1,
         });
         markCreativeCardAsReadMock.mockResolvedValue(undefined);
+        setCreativeCardFavoriteMock.mockResolvedValue(undefined);
         useScopedScrollMemoryMock.mockReturnValue({
             saveCurrentScopeScroll: vi.fn(),
         });
@@ -356,6 +370,15 @@ describe("CreativeSpace", () => {
         }
 
         return element;
+    }
+
+    function getButtonByAriaLabel(label: string): HTMLButtonElement {
+        const button = container.querySelector(`button[aria-label="${label}"]`);
+        if (!(button instanceof HTMLButtonElement)) {
+            throw new Error(`Button "${label}" not found.`);
+        }
+
+        return button;
     }
 
     function getCardBodyScrollContainer(): HTMLDivElement {
@@ -446,5 +469,178 @@ describe("CreativeSpace", () => {
         expect(mainScrollContainer.scrollTop).toBe(0);
         expect(cardBodyScrollContainer.scrollTop).toBe(0);
         expect(queryBackToTopButton()).toBeNull();
+    });
+
+    it("switches to favorites with a first-page reload and favorites-only empty state", async () => {
+        listCreativeCardsMock.mockImplementation((_projectId: number, options?: { offset?: number; favoritesOnly?: boolean }) => {
+            if (options?.favoritesOnly) {
+                return Promise.resolve({ cards: [], totalCount: 0 });
+            }
+
+            return Promise.resolve({
+                cards: [{
+                    id: 10,
+                    project_id: 1,
+                    title: "Card Alpha",
+                    full_report: "Full report body",
+                    generation_mode: "manual",
+                    used_article_count: 3,
+                    is_read: false,
+                    is_favorite: false,
+                    created_at: "2026-03-30T00:00:00Z",
+                }],
+                totalCount: options?.offset === 20 ? 25 : 25,
+            });
+        });
+
+        renderCreativeSpace();
+        await settleCreativeSpace();
+
+        act(() => {
+            getButtonByRoleText("Project Alpha").click();
+        });
+        await settleCreativeSpace();
+
+        act(() => {
+            const pageTwoButton = Array.from(container.querySelectorAll("button")).find((candidate) => candidate.textContent?.trim() === "2");
+            if (!(pageTwoButton instanceof HTMLButtonElement)) {
+                throw new Error("Page 2 button not found.");
+            }
+
+            pageTwoButton.click();
+        });
+        await settleCreativeSpace();
+
+        act(() => {
+            const favoritesButton = Array.from(container.querySelectorAll("button")).find((candidate) => candidate.textContent?.trim() === "Favorites");
+            if (!(favoritesButton instanceof HTMLButtonElement)) {
+                throw new Error("Favorites button not found.");
+            }
+
+            favoritesButton.click();
+        });
+        await settleCreativeSpace();
+
+        expect(listCreativeCardsMock).toHaveBeenLastCalledWith(1, expect.objectContaining({
+            offset: 0,
+            favoritesOnly: true,
+        }));
+        expect(container.textContent).toContain("No favorited cards yet");
+    });
+
+    it("favorites a card from the grid without opening card detail", async () => {
+        renderCreativeSpace();
+        await settleCreativeSpace();
+
+        act(() => {
+            getButtonByRoleText("Project Alpha").click();
+        });
+        await settleCreativeSpace();
+
+        act(() => {
+            getButtonByAriaLabel("Add to favorites").click();
+        });
+        await settleCreativeSpace();
+
+        expect(setCreativeCardFavoriteMock).toHaveBeenCalledWith(10, true);
+        expect(container.querySelector('[data-testid="card-markdown"]')).toBeNull();
+        expect(getButtonByAriaLabel("Remove from favorites")).toBeInstanceOf(HTMLButtonElement);
+    });
+
+    it("favorites a card from the list view without opening card detail", async () => {
+        renderCreativeSpace();
+        await settleCreativeSpace();
+
+        act(() => {
+            getButtonByRoleText("Project Alpha").click();
+        });
+        await settleCreativeSpace();
+
+        act(() => {
+            getButtonByAriaLabel("List view").click();
+        });
+        await settleCreativeSpace();
+
+        act(() => {
+            getButtonByAriaLabel("Add to favorites").click();
+        });
+        await settleCreativeSpace();
+
+        expect(setCreativeCardFavoriteMock).toHaveBeenCalledWith(10, true);
+        expect(container.querySelector('[data-testid="card-markdown"]')).toBeNull();
+    });
+
+    it("keeps card detail open when removing a favorite under the favorites filter", async () => {
+        let favoritesOnlyHasCard = true;
+
+        listCreativeCardsMock.mockImplementation((_projectId: number, options?: { favoritesOnly?: boolean }) => {
+            const favoritedCard = {
+                id: 10,
+                project_id: 1,
+                title: "Card Alpha",
+                full_report: "Full report body",
+                generation_mode: "manual",
+                used_article_count: 3,
+                is_read: false,
+                is_favorite: true,
+                created_at: "2026-03-30T00:00:00Z",
+            };
+
+            if (options?.favoritesOnly) {
+                return Promise.resolve(
+                    favoritesOnlyHasCard
+                        ? { cards: [favoritedCard], totalCount: 1 }
+                        : { cards: [], totalCount: 0 },
+                );
+            }
+
+            return Promise.resolve({ cards: [favoritedCard], totalCount: 1 });
+        });
+
+        setCreativeCardFavoriteMock.mockImplementation(async () => {
+            favoritesOnlyHasCard = false;
+        });
+
+        renderCreativeSpace();
+        await settleCreativeSpace();
+
+        act(() => {
+            getButtonByRoleText("Project Alpha").click();
+        });
+        await settleCreativeSpace();
+
+        act(() => {
+            const favoritesButton = Array.from(container.querySelectorAll("button")).find((candidate) => candidate.textContent?.trim() === "Favorites");
+            if (!(favoritesButton instanceof HTMLButtonElement)) {
+                throw new Error("Favorites button not found.");
+            }
+
+            favoritesButton.click();
+        });
+        await settleCreativeSpace();
+
+        act(() => {
+            getButtonByRoleText("Card Alpha").click();
+        });
+        await settleCreativeSpace();
+
+        act(() => {
+            getButtonByAriaLabel("Remove from favorites").click();
+        });
+        await settleCreativeSpace();
+
+        expect(container.querySelector('[data-testid="card-markdown"]')).not.toBeNull();
+
+        act(() => {
+            const backButton = Array.from(container.querySelectorAll("button")).find((candidate) => candidate.textContent?.includes("Back"));
+            if (!(backButton instanceof HTMLButtonElement)) {
+                throw new Error("Back button not found.");
+            }
+
+            backButton.click();
+        });
+        await settleCreativeSpace();
+
+        expect(container.textContent).toContain("No favorited cards yet");
     });
 });

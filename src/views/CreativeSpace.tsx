@@ -35,6 +35,7 @@ import {
     markAllCreativeCardsAsRead,
     markCreativeCardAsRead,
     saveCreativeProject,
+    setCreativeCardFavorite,
 } from "@/lib/creative-service";
 import { optimizeCreativeProjectPrompt, type Message } from "@/lib/ai";
 import { buildCreativeCardDiscussionSystemPrompt } from "@/lib/chat-prompts";
@@ -49,7 +50,7 @@ import { formatUtcDateTime } from "@/lib/time";
 import { cn } from "@/lib/utils";
 import { hasConfiguredWebSearch } from "@/lib/web-search-service";
 import ReactMarkdown from "react-markdown";
-import { ArrowLeft, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Ellipsis, LayoutGrid, Lightbulb, List, Loader2, MessageSquare, MoreHorizontal, Pencil, Plus, Trash2, WandSparkles } from "lucide-react";
+import { ArrowLeft, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Ellipsis, LayoutGrid, Lightbulb, List, Loader2, MessageSquare, MoreHorizontal, Pencil, Plus, Star, Trash2, WandSparkles } from "lucide-react";
 
 type ProjectFormState = {
     name: string;
@@ -75,6 +76,7 @@ const GENERATED_TILE_CARD_CLASS = `${CREATIVE_TILE_CARD_BASE_CLASS} min-h-[220px
 const CREATIVE_TILE_HEADER_CLASS = "px-3 py-2.5 pb-1.5";
 const CREATIVE_TILE_BODY_CLASS = "flex flex-1 flex-col px-3 pb-3 pt-0";
 type CardViewMode = "card" | "list";
+type CardFilterMode = "all" | "favorites";
 type CreativePaginationItem =
     | { type: "page"; page: number }
     | { type: "ellipsis"; key: string };
@@ -511,6 +513,7 @@ export default function CreativeSpace() {
     const [sources, setSources] = useState<CreativeSourceOption[]>([]);
     const [totalCardCount, setTotalCardCount] = useState(0);
     const [currentPage, setCurrentPage] = useState(0);
+    const [cardFilterMode, setCardFilterMode] = useState<CardFilterMode>("all");
     const [cardViewMode, setCardViewMode] = useState<CardViewMode>(() => {
         if (typeof window === "undefined") return "card";
         const stored = localStorage.getItem(CARD_VIEW_MODE_STORAGE_KEY);
@@ -519,6 +522,7 @@ export default function CreativeSpace() {
 
     const [activeProjectId, setActiveProjectId] = useState<number | null>(null);
     const [activeCardId, setActiveCardId] = useState<number | null>(null);
+    const [activeCardSnapshot, setActiveCardSnapshot] = useState<CreativeCard | null>(null);
 
     const [projectDialogOpen, setProjectDialogOpen] = useState(false);
     const [editingProjectId, setEditingProjectId] = useState<number | null>(null);
@@ -540,6 +544,7 @@ export default function CreativeSpace() {
     const [isLoadingCandidates, setIsLoadingCandidates] = useState(false);
     const [isGenerating, setIsGenerating] = useState(false);
     const [isMarkingAllCardsRead, setIsMarkingAllCardsRead] = useState(false);
+    const [favoriteMutationCardIds, setFavoriteMutationCardIds] = useState<number[]>([]);
     const [isProjectInfoOpen, setIsProjectInfoOpen] = useState(false);
     const [isProjectActionsOpen, setIsProjectActionsOpen] = useState(false);
     const [isCardDiscussionOpen, setIsCardDiscussionOpen] = useState(false);
@@ -568,7 +573,10 @@ export default function CreativeSpace() {
     const cardDiscussionToggleButtonRef = useRef<HTMLButtonElement | null>(null);
 
     const activeProject = projects.find((project) => project.id === activeProjectId) ?? null;
-    const activeCard = cards.find((card) => card.id === activeCardId) ?? null;
+    const activeCardFromList = activeCardId === null
+        ? null
+        : cards.find((card) => card.id === activeCardId) ?? null;
+    const activeCard = activeCardFromList ?? activeCardSnapshot;
     const activeProjectWebSearchStatus = !activeProject?.web_search_enabled
         ? "disabled"
         : hasConfiguredWebSearch()
@@ -587,7 +595,7 @@ export default function CreativeSpace() {
     const paginationItems = totalPages > 1 ? buildCreativePaginationItems(currentPage, totalPages) : [];
     const canGoToPreviousPage = currentPage > 0;
     const canGoToNextPage = currentPage < totalPages - 1;
-    const compactPaginationLabel = totalPages > 0
+    const compactPaginationLabel = totalCardCount > 0
         ? t("pageXOfY", { page: currentPage + 1, total: totalPages })
         : "";
     const backToTopLabel = t("backToTop", { ns: "common" });
@@ -638,13 +646,27 @@ export default function CreativeSpace() {
             setCards([]);
             setTotalCardCount(0);
             setCurrentPage(0);
+            setCardFilterMode("all");
             setActiveCardId(null);
+            setActiveCardSnapshot(null);
             return;
         }
 
         setCurrentPage(0);
-        void loadCards(activeProjectId, 0);
+        setCardFilterMode("all");
+        void loadCards(activeProjectId, 0, "all");
     }, [activeProjectId]);
+
+    useEffect(() => {
+        if (activeCardId === null) {
+            setActiveCardSnapshot(null);
+            return;
+        }
+
+        if (activeCardFromList) {
+            setActiveCardSnapshot(activeCardFromList);
+        }
+    }, [activeCardFromList, activeCardId]);
 
     useEffect(() => {
         if (!isCardDiscussionOpen) {
@@ -702,14 +724,14 @@ export default function CreativeSpace() {
             void loadSources();
 
             if (activeProjectId !== null) {
-                void loadCards(activeProjectId, currentPage);
+                void loadCards(activeProjectId, currentPage, cardFilterMode);
             }
 
             if (manualDialogOpen && activeProjectId !== null) {
                 void refreshCandidateArticles(activeProjectId);
             }
         });
-    }, [activeProjectId, currentPage, manualDialogOpen, includeConsumed, candidateSearch, candidateSourceId]);
+    }, [activeProjectId, currentPage, manualDialogOpen, includeConsumed, candidateSearch, candidateSourceId, cardFilterMode]);
 
     useEffect(() => {
         replaceChatMessages([]);
@@ -769,17 +791,25 @@ export default function CreativeSpace() {
         }
     }
 
-    async function loadCards(projectId: number, page?: number) {
+    async function loadCards(projectId: number, page?: number, filterMode: CardFilterMode = cardFilterMode) {
         try {
-            const targetPage = page ?? currentPage;
+            const targetPage = Math.max(0, page ?? currentPage);
             const offset = targetPage * DEFAULT_PAGE_SIZE;
-            const result = await listCreativeCards(projectId, { offset, limit: DEFAULT_PAGE_SIZE });
+            const result = await listCreativeCards(projectId, {
+                offset,
+                limit: DEFAULT_PAGE_SIZE,
+                favoritesOnly: filterMode === "favorites",
+            });
+            const maxPage = Math.max(0, Math.ceil(Math.max(result.totalCount, 1) / DEFAULT_PAGE_SIZE) - 1);
+
+            if (targetPage > maxPage) {
+                setCurrentPage(maxPage);
+                await loadCards(projectId, maxPage, filterMode);
+                return;
+            }
+
             setCards(result.cards);
             setTotalCardCount(result.totalCount);
-
-            if (activeCardId !== null && !result.cards.some((card) => card.id === activeCardId)) {
-                setActiveCardId(null);
-            }
         } catch (error) {
             console.error(error);
         }
@@ -823,26 +853,73 @@ export default function CreativeSpace() {
         )));
     }
 
+    function updateLoadedCard(cardId: number, updater: (card: CreativeCard) => CreativeCard) {
+        setCards((currentCards) => currentCards.map((card) => (
+            card.id === cardId ? updater(card) : card
+        )));
+        setActiveCardSnapshot((currentCard) => (
+            currentCard?.id === cardId ? updater(currentCard) : currentCard
+        ));
+    }
+
+    function setFavoriteMutationPending(cardId: number, isPending: boolean) {
+        setFavoriteMutationCardIds((currentIds) => {
+            if (isPending) {
+                return currentIds.includes(cardId) ? currentIds : [...currentIds, cardId];
+            }
+
+            return currentIds.filter((currentId) => currentId !== cardId);
+        });
+    }
+
+    function isFavoriteMutationPending(cardId: number): boolean {
+        return favoriteMutationCardIds.includes(cardId);
+    }
+
+    function getFavoriteActionLabel(card: CreativeCard): string {
+        return card.is_favorite ? t("removeFromFavorites") : t("addToFavorites");
+    }
+
+    function applyOptimisticFavoriteState(cardId: number, isFavorite: boolean) {
+        setCards((currentCards) => {
+            const nextCards = currentCards.map((card) => (
+                card.id === cardId ? { ...card, is_favorite: isFavorite } : card
+            ));
+
+            return cardFilterMode === "favorites"
+                ? nextCards.filter((card) => card.is_favorite)
+                : nextCards;
+        });
+        setActiveCardSnapshot((currentCard) => (
+            currentCard?.id === cardId
+                ? { ...currentCard, is_favorite: isFavorite }
+                : currentCard
+        ));
+
+        if (cardFilterMode === "favorites" && !isFavorite) {
+            setTotalCardCount((currentCount) => Math.max(0, currentCount - 1));
+        }
+    }
+
     function openCreativeCard(cardId: number, cardSnapshot?: CreativeCard) {
         const targetCard = cardSnapshot ?? cards.find((card) => card.id === cardId);
         saveCreativeScrollPosition();
         setActiveCardId(cardId);
+        setActiveCardSnapshot(targetCard ?? null);
 
         if (!targetCard || targetCard.is_read || markingCardReadIdsRef.current.has(cardId)) {
             return;
         }
 
         markingCardReadIdsRef.current.add(cardId);
-        setCards((currentCards) => currentCards.map((card) => (
-            card.id === cardId ? { ...card, is_read: true } : card
-        )));
+        updateLoadedCard(cardId, (card) => ({ ...card, is_read: true }));
         updateProjectUnreadCount(targetCard.project_id, (currentCount) => currentCount - 1);
 
         void markCreativeCardAsRead(cardId)
             .catch(async (error) => {
                 toast({ title: t("failedToMarkCardAsRead"), description: String(error), variant: "destructive" });
                 await loadProjects();
-                await loadCards(targetCard.project_id, currentPage);
+                await loadCards(targetCard.project_id, currentPage, cardFilterMode);
             })
             .finally(() => {
                 markingCardReadIdsRef.current.delete(cardId);
@@ -917,8 +994,35 @@ export default function CreativeSpace() {
         openCreativeCard(cardId);
     }
 
-    function stopCardClickPropagation(event: React.MouseEvent<HTMLButtonElement>) {
+    function stopCardEventPropagation(event: React.SyntheticEvent<HTMLElement>) {
         event.stopPropagation();
+    }
+
+    async function handleSetCardFavorite(card: CreativeCard, isFavorite: boolean) {
+        if (isFavoriteMutationPending(card.id)) {
+            return;
+        }
+
+        setFavoriteMutationPending(card.id, true);
+        applyOptimisticFavoriteState(card.id, isFavorite);
+
+        try {
+            await setCreativeCardFavorite(card.id, isFavorite);
+
+            if (activeProjectId !== null && cardFilterMode === "favorites") {
+                await loadCards(activeProjectId, currentPage, cardFilterMode);
+            }
+        } catch (error) {
+            updateLoadedCard(card.id, (currentCard) => ({ ...currentCard, is_favorite: card.is_favorite }));
+
+            if (activeProjectId !== null) {
+                await loadCards(activeProjectId, currentPage, cardFilterMode);
+            }
+
+            toast({ title: t("failedToUpdateFavorite"), description: String(error), variant: "destructive" });
+        } finally {
+            setFavoriteMutationPending(card.id, false);
+        }
     }
 
     async function handleMarkAllCardsRead() {
@@ -937,7 +1041,7 @@ export default function CreativeSpace() {
         } catch (error) {
             toast({ title: t("failedToMarkAllCardsAsRead"), description: String(error), variant: "destructive" });
             await loadProjects();
-            await loadCards(activeProject.id, currentPage);
+            await loadCards(activeProject.id, currentPage, cardFilterMode);
         } finally {
             setIsMarkingAllCardsRead(false);
         }
@@ -972,7 +1076,7 @@ export default function CreativeSpace() {
             toast({ title: editingProjectId ? t("projectUpdated") : t("projectCreated") });
             await loadProjects();
             if (activeProjectId === savedProject.id) {
-                await loadCards(savedProject.id, currentPage);
+                await loadCards(savedProject.id, currentPage, cardFilterMode);
             }
         } catch (error) {
             toast({ title: t("failedToSaveProject"), description: String(error), variant: "destructive" });
@@ -1022,6 +1126,7 @@ export default function CreativeSpace() {
         setIsProjectInfoOpen(false);
         setIsProjectActionsOpen(false);
         setActiveCardId(null);
+        setActiveCardSnapshot(null);
         setActiveProjectId(null);
     }
 
@@ -1030,12 +1135,23 @@ export default function CreativeSpace() {
         localStorage.setItem(CARD_VIEW_MODE_STORAGE_KEY, mode);
     }
 
+    function handleCardFilterModeChange(mode: CardFilterMode) {
+        if (mode === cardFilterMode || activeProjectId === null) {
+            return;
+        }
+
+        setCardFilterMode(mode);
+        setCurrentPage(0);
+        void loadCards(activeProjectId, 0, mode);
+        mainScrollRef.current?.scrollTo?.({ top: 0, behavior: "smooth" });
+    }
+
     function goToCardPage(page: number) {
         const nextPage = Math.max(0, page);
         if (nextPage === currentPage || !activeProjectId) return;
         setCurrentPage(nextPage);
-        void loadCards(activeProjectId, nextPage);
-        mainScrollRef.current?.scrollTo({ top: 0, behavior: "smooth" });
+        void loadCards(activeProjectId, nextPage, cardFilterMode);
+        mainScrollRef.current?.scrollTo?.({ top: 0, behavior: "smooth" });
     }
 
     function handleProjectDialogOpenChange(open: boolean) {
@@ -1191,8 +1307,10 @@ export default function CreativeSpace() {
 
             setCurrentPage(0);
             await loadProjects();
-            await loadCards(activeProject.id, 0);
-            setCards((currentCards) => [generatedCard, ...currentCards.filter((card) => card.id !== generatedCard.id)]);
+            await loadCards(activeProject.id, 0, cardFilterMode);
+            if (cardFilterMode === "all") {
+                setCards((currentCards) => [generatedCard, ...currentCards.filter((card) => card.id !== generatedCard.id)]);
+            }
             openCreativeCard(generatedCard.id, generatedCard);
             setManualDialogOpen(false);
             setSelectedArticleIds([]);
@@ -1287,16 +1405,35 @@ export default function CreativeSpace() {
                                                 </div>
                                             </div>
                                         </div>
-                                        <Button
-                                            ref={cardDiscussionToggleButtonRef}
-                                            variant={isCardDiscussionOpen ? "default" : "outline"}
-                                            size="sm"
-                                            onClick={() => setIsCardDiscussionOpen((open) => !open)}
-                                            className="shrink-0 self-start"
-                                        >
-                                            <MessageSquare className="h-3.5 w-3.5" />
-                                            {isCardDiscussionOpen ? t("hideDiscussion") : t("discussCard")}
-                                        </Button>
+                                        <div className="flex items-center gap-2 self-start">
+                                            <Button
+                                                type="button"
+                                                variant="outline"
+                                                size="icon"
+                                                className={cn(
+                                                    "h-8 w-8 shrink-0 rounded-full",
+                                                    activeCard.is_favorite && "text-amber-500 hover:text-amber-600",
+                                                )}
+                                                onClick={() => {
+                                                    void handleSetCardFavorite(activeCard, !activeCard.is_favorite);
+                                                }}
+                                                aria-label={getFavoriteActionLabel(activeCard)}
+                                                title={getFavoriteActionLabel(activeCard)}
+                                                disabled={isFavoriteMutationPending(activeCard.id)}
+                                            >
+                                                <Star className={cn("h-3.5 w-3.5", activeCard.is_favorite && "fill-current")} />
+                                            </Button>
+                                            <Button
+                                                ref={cardDiscussionToggleButtonRef}
+                                                variant={isCardDiscussionOpen ? "default" : "outline"}
+                                                size="sm"
+                                                onClick={() => setIsCardDiscussionOpen((open) => !open)}
+                                                className="shrink-0 self-start"
+                                            >
+                                                <MessageSquare className="h-3.5 w-3.5" />
+                                                {isCardDiscussionOpen ? t("hideDiscussion") : t("discussCard")}
+                                            </Button>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -1527,11 +1664,35 @@ export default function CreativeSpace() {
                         )}
                 </div>
 
-                {totalCardCount > 0 && (
-                    <div className="flex items-center justify-between">
-                        <span className="shrink-0 text-[11px] text-muted-foreground">
-                            {compactPaginationLabel}
-                        </span>
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="inline-flex items-center overflow-hidden rounded-md border border-border">
+                        <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className={cn("rounded-none px-3", cardFilterMode === "all" && "bg-accent")}
+                            onClick={() => handleCardFilterModeChange("all")}
+                            aria-pressed={cardFilterMode === "all"}
+                        >
+                            {t("allCards")}
+                        </Button>
+                        <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className={cn("rounded-none border-l border-border px-3", cardFilterMode === "favorites" && "bg-accent")}
+                            onClick={() => handleCardFilterModeChange("favorites")}
+                            aria-pressed={cardFilterMode === "favorites"}
+                        >
+                            {t("favoriteCards")}
+                        </Button>
+                    </div>
+                    <div className="flex items-center justify-between gap-2 sm:justify-end">
+                        {compactPaginationLabel ? (
+                            <span className="shrink-0 text-[11px] text-muted-foreground">
+                                {compactPaginationLabel}
+                            </span>
+                        ) : <span />}
                         <div className="inline-flex items-center overflow-hidden rounded-md border border-border">
                             <Button
                                 variant="ghost"
@@ -1541,6 +1702,7 @@ export default function CreativeSpace() {
                                 aria-label={t("viewCard")}
                                 title={t("viewCard")}
                                 aria-pressed={cardViewMode === "card"}
+                                disabled={totalCardCount === 0}
                             >
                                 <LayoutGrid className="h-3.5 w-3.5" />
                             </Button>
@@ -1552,12 +1714,13 @@ export default function CreativeSpace() {
                                 aria-label={t("viewList")}
                                 title={t("viewList")}
                                 aria-pressed={cardViewMode === "list"}
+                                disabled={totalCardCount === 0}
                             >
                                 <List className="h-3.5 w-3.5" />
                             </Button>
                         </div>
                     </div>
-                )}
+                </div>
 
                 {cardViewMode === "card" ? (
                     <div className={CREATIVE_TILE_GRID_CLASS}>
@@ -1588,7 +1751,28 @@ export default function CreativeSpace() {
                                                 {card.title}
                                             </CardTitle>
                                         </div>
-                                        {!card.is_read && <span className="mt-1 inline-block h-2 w-2 shrink-0 rounded-full bg-blue-500"></span>}
+                                        <div className="flex items-start gap-1.5">
+                                            <Button
+                                                type="button"
+                                                variant="ghost"
+                                                size="icon"
+                                                className={cn(
+                                                    "h-8 w-8 shrink-0 rounded-full",
+                                                    card.is_favorite && "text-amber-500 hover:text-amber-600",
+                                                )}
+                                                onClick={(event) => {
+                                                    stopCardEventPropagation(event);
+                                                    void handleSetCardFavorite(card, !card.is_favorite);
+                                                }}
+                                                onKeyDown={stopCardEventPropagation}
+                                                aria-label={getFavoriteActionLabel(card)}
+                                                title={getFavoriteActionLabel(card)}
+                                                disabled={isFavoriteMutationPending(card.id)}
+                                            >
+                                                <Star className={cn("h-3.5 w-3.5", card.is_favorite && "fill-current")} />
+                                            </Button>
+                                            {!card.is_read && <span className="mt-3 inline-block h-2 w-2 shrink-0 rounded-full bg-blue-500"></span>}
+                                        </div>
                                     </div>
                                     <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
                                         <span className="tabular-nums">{formatUtcDateTime(card.created_at)}</span>
@@ -1635,7 +1819,28 @@ export default function CreativeSpace() {
                                         )}>
                                             {card.title}
                                         </span>
-                                        <span className="shrink-0 text-xs tabular-nums text-muted-foreground">{formatUtcDateTime(card.created_at)}</span>
+                                        <div className="flex shrink-0 items-center gap-1">
+                                            <Button
+                                                type="button"
+                                                variant="ghost"
+                                                size="icon"
+                                                className={cn(
+                                                    "h-7 w-7 rounded-full",
+                                                    card.is_favorite && "text-amber-500 hover:text-amber-600",
+                                                )}
+                                                onClick={(event) => {
+                                                    stopCardEventPropagation(event);
+                                                    void handleSetCardFavorite(card, !card.is_favorite);
+                                                }}
+                                                onKeyDown={stopCardEventPropagation}
+                                                aria-label={getFavoriteActionLabel(card)}
+                                                title={getFavoriteActionLabel(card)}
+                                                disabled={isFavoriteMutationPending(card.id)}
+                                            >
+                                                <Star className={cn("h-3.5 w-3.5", card.is_favorite && "fill-current")} />
+                                            </Button>
+                                            <span className="text-xs tabular-nums text-muted-foreground">{formatUtcDateTime(card.created_at)}</span>
+                                        </div>
                                     </div>
                                     <p className={cn(
                                         "mt-0.5 line-clamp-1 text-sm leading-5",
@@ -1657,8 +1862,8 @@ export default function CreativeSpace() {
                 {cards.length === 0 && (
                     <div className="editor-empty">
                         <Lightbulb className="mb-4 h-10 w-10 text-muted-foreground/30" />
-                        <p>{t("noCreativeCardsYet")}</p>
-                        <p className="text-sm">{t("generateFirstCard")}</p>
+                        <p>{cardFilterMode === "favorites" ? t("noFavoriteCardsYet") : t("noCreativeCardsYet")}</p>
+                        <p className="text-sm">{cardFilterMode === "favorites" ? t("favoriteFirstCard") : t("generateFirstCard")}</p>
                     </div>
                 )}
 
@@ -1961,7 +2166,7 @@ export default function CreativeSpace() {
                                     variant="outline"
                                     size="sm"
                                     onClick={(event) => {
-                                        stopCardClickPropagation(event);
+                                        stopCardEventPropagation(event);
                                         openEditProjectDialog(project);
                                     }}
                                 >
@@ -1973,7 +2178,7 @@ export default function CreativeSpace() {
                                     size="sm"
                                     className="ml-auto text-destructive"
                                     onClick={(event) => {
-                                        stopCardClickPropagation(event);
+                                        stopCardEventPropagation(event);
                                         openDeleteProjectDialog(project);
                                     }}
                                     disabled={deletingProjectId === project.id}

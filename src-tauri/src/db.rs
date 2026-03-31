@@ -317,6 +317,14 @@ pub fn get_migrations() -> Vec<Migration> {
                 UPDATE creative_projects SET web_search_enabled = 0;
             ",
             kind: MigrationKind::Up,
+        },
+        Migration {
+            version: 12,
+            description: "add_creative_card_favorite_state",
+            sql: "
+                ALTER TABLE creative_cards ADD COLUMN is_favorite BOOLEAN NOT NULL DEFAULT 0;
+            ",
+            kind: MigrationKind::Up,
         }
     ]
 }

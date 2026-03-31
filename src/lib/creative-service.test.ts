@@ -40,6 +40,7 @@ import {
     listCreativeProjects,
     markAllCreativeCardsAsRead,
     markCreativeCardAsRead,
+    setCreativeCardFavorite,
     summarizeArticleContextText,
 } from "@/lib/creative-service";
 
@@ -172,6 +173,7 @@ describe("creative service context helpers", () => {
                     generation_mode: "manual",
                     used_article_count: 1,
                     is_read: 0,
+                    is_favorite: 0,
                     created_at: "2026-03-13T00:00:00Z",
                 }];
             }
@@ -252,8 +254,9 @@ describe("creative service unread state", () => {
     });
 
     it("maps card read state from card queries", async () => {
-        getDbMock.mockResolvedValue({
-            select: vi.fn().mockResolvedValue([{
+        const selectMock = vi.fn()
+            .mockResolvedValueOnce([{ cnt: 1 }])
+            .mockResolvedValueOnce([{
                 id: 18,
                 project_id: 3,
                 title: "Builder memo",
@@ -261,16 +264,64 @@ describe("creative service unread state", () => {
                 generation_mode: "auto",
                 used_article_count: 2,
                 is_read: 1,
+                is_favorite: 1,
                 created_at: "2026-03-13T02:00:00Z",
-            }]),
+            }]);
+
+        getDbMock.mockResolvedValue({
+            select: selectMock,
             execute: vi.fn(),
         });
 
-        await expect(listCreativeCards(3)).resolves.toEqual([expect.objectContaining({
-            id: 18,
-            generation_mode: "auto",
-            is_read: true,
-        })]);
+        await expect(listCreativeCards(3)).resolves.toEqual({
+            cards: [expect.objectContaining({
+                id: 18,
+                generation_mode: "auto",
+                is_read: true,
+                is_favorite: true,
+            })],
+            totalCount: 1,
+        });
+    });
+
+    it("applies favorites-only filtering to both count and list queries", async () => {
+        const selectMock = vi.fn()
+            .mockResolvedValueOnce([{ cnt: 1 }])
+            .mockResolvedValueOnce([{
+                id: 18,
+                project_id: 3,
+                title: "Builder memo",
+                full_report: "## Memo",
+                generation_mode: "auto",
+                used_article_count: 2,
+                is_read: 1,
+                is_favorite: 1,
+                created_at: "2026-03-13T02:00:00Z",
+            }]);
+
+        getDbMock.mockResolvedValue({
+            select: selectMock,
+            execute: vi.fn(),
+        });
+
+        await expect(listCreativeCards(3, { favoritesOnly: true })).resolves.toEqual({
+            cards: [expect.objectContaining({
+                id: 18,
+                is_favorite: true,
+            })],
+            totalCount: 1,
+        });
+
+        expect(selectMock).toHaveBeenNthCalledWith(
+            1,
+            "SELECT COUNT(*) AS cnt FROM creative_cards WHERE project_id = $1 AND is_favorite = 1",
+            [3],
+        );
+        expect(selectMock).toHaveBeenNthCalledWith(
+            2,
+            expect.stringContaining("WHERE project_id = $1 AND is_favorite = 1"),
+            [3],
+        );
     });
 
     it("marks a single card as read and dispatches sync", async () => {
@@ -301,6 +352,22 @@ describe("creative service unread state", () => {
         expect(executeMock).toHaveBeenCalledWith(
             "UPDATE creative_cards SET is_read = 1 WHERE project_id = $1 AND is_read = 0",
             [7],
+        );
+        expect(dispatchCreativeSyncEventMock).toHaveBeenCalledTimes(1);
+    });
+
+    it("updates a card favorite state and dispatches sync", async () => {
+        const executeMock = vi.fn().mockResolvedValue(undefined);
+        getDbMock.mockResolvedValue({
+            select: vi.fn(),
+            execute: executeMock,
+        });
+
+        await setCreativeCardFavorite(18, true);
+
+        expect(executeMock).toHaveBeenCalledWith(
+            "UPDATE creative_cards SET is_favorite = $1 WHERE id = $2",
+            [1, 18],
         );
         expect(dispatchCreativeSyncEventMock).toHaveBeenCalledTimes(1);
     });
