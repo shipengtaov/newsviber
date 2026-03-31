@@ -16,8 +16,11 @@ import { addSourceFetchSyncListener, dispatchSourceFetchSyncEvent } from "@/lib/
 import { fetchSources, isSourceDueForFetch, type SchedulableSource } from "@/lib/source-fetch";
 import { normalizeFetchInterval } from "@/lib/source-utils";
 import { AppUpdateProvider } from "@/components/update/AppUpdateProvider";
+import { useReleaseContextMenuPolicy } from "@/hooks/use-release-context-menu-policy";
 
 function App() {
+  useReleaseContextMenuPolicy();
+
   useEffect(() => {
     let removeMenuListener: (() => void) | null = null;
     let disposed = false;
