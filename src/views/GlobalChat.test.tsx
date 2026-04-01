@@ -355,6 +355,66 @@ describe("GlobalChat scope panel defaults", () => {
         return button instanceof HTMLButtonElement ? button : null;
     }
 
+    function findButtonByText(text: string): HTMLButtonElement | null {
+        const button = Array.from(container.querySelectorAll("button")).find((candidate) => (
+            candidate.textContent?.includes(text)
+        ));
+
+        return button instanceof HTMLButtonElement ? button : null;
+    }
+
+    function getChatInput(): HTMLInputElement {
+        const chatInput = container.querySelector('input[placeholder="Ask about recent news"]');
+        expect(chatInput).toBeInstanceOf(HTMLInputElement);
+        return chatInput as HTMLInputElement;
+    }
+
+    function getRootLayout(): HTMLDivElement {
+        const rootLayout = container.firstElementChild;
+        expect(rootLayout).toBeInstanceOf(HTMLDivElement);
+        return rootLayout as HTMLDivElement;
+    }
+
+    function getMainSplitLayout(): HTMLDivElement {
+        const mainSplitLayout = getRootLayout().lastElementChild;
+        expect(mainSplitLayout).toBeInstanceOf(HTMLDivElement);
+        return mainSplitLayout as HTMLDivElement;
+    }
+
+    function getThreadsPanel(): HTMLElement {
+        const startNewThreadButton = Array.from(container.querySelectorAll("button")).find((candidate) => (
+            candidate.textContent?.includes("Start new thread")
+        ));
+        expect(startNewThreadButton).toBeInstanceOf(HTMLButtonElement);
+
+        const threadsPanel = startNewThreadButton?.closest("aside");
+        expect(threadsPanel).toBeInstanceOf(HTMLElement);
+        return threadsPanel as HTMLElement;
+    }
+
+    function getThreadsScrollContainer(): HTMLDivElement {
+        const scrollContainer = Array.from(getThreadsPanel().children).find((child) => (
+            child instanceof HTMLDivElement
+            && child.className.includes("max-h-72")
+            && child.className.includes("flex-1")
+        ));
+
+        expect(scrollContainer).toBeInstanceOf(HTMLDivElement);
+        return scrollContainer as HTMLDivElement;
+    }
+
+    function getConversationSection(): HTMLElement {
+        const conversationSection = getChatInput().closest("section");
+        expect(conversationSection).toBeInstanceOf(HTMLElement);
+        return conversationSection as HTMLElement;
+    }
+
+    function getConversationScrollContainer(): HTMLDivElement {
+        const conversationScrollContainer = getConversationSection().children.item(1);
+        expect(conversationScrollContainer).toBeInstanceOf(HTMLDivElement);
+        return conversationScrollContainer as HTMLDivElement;
+    }
+
     it("defaults the desktop scope panel to collapsed when no stored preference exists", async () => {
         renderGlobalChat();
         await settleGlobalChat();
@@ -400,5 +460,85 @@ describe("GlobalChat scope panel defaults", () => {
         expect(findButtonByLabel("Collapse thread scope")).toBeNull();
         expect(container.textContent).toContain("Context filters");
         expect(localStorage.getItem(SCOPE_PANEL_COLLAPSED_STORAGE_KEY)).toBe("true");
+    });
+
+    it("constrains the desktop chat workspace inside the page height", async () => {
+        renderGlobalChat();
+        await settleGlobalChat();
+
+        const rootLayout = getRootLayout();
+        const mainSplitLayout = getMainSplitLayout();
+        const conversationColumns = mainSplitLayout.lastElementChild;
+
+        expect(rootLayout.className).toContain("h-full");
+        expect(rootLayout.className).toContain("min-h-0");
+        expect(rootLayout.className).toContain("overflow-hidden");
+        expect(rootLayout.className).not.toContain("min-h-full");
+
+        expect(mainSplitLayout.className).toContain("min-h-0");
+        expect(mainSplitLayout.className).toContain("flex-1");
+        expect(mainSplitLayout.className).toContain("overflow-hidden");
+
+        expect(conversationColumns).toBeInstanceOf(HTMLDivElement);
+        expect((conversationColumns as HTMLDivElement).className).toContain("min-h-0");
+        expect((conversationColumns as HTMLDivElement).className).toContain("flex-1");
+        expect((conversationColumns as HTMLDivElement).className).toContain("overflow-hidden");
+    });
+
+    it("keeps the threads list and conversation body as independent internal scroll regions on desktop", async () => {
+        renderGlobalChat();
+        await settleGlobalChat();
+
+        const threadsPanel = getThreadsPanel();
+        const threadsScrollContainer = getThreadsScrollContainer();
+        const conversationSection = getConversationSection();
+        const conversationScrollContainer = getConversationScrollContainer();
+
+        expect(threadsPanel.className).toContain("h-full");
+        expect(threadsPanel.className).toContain("min-h-0");
+
+        expect(threadsScrollContainer.className).toContain("max-h-72");
+        expect(threadsScrollContainer.className).toContain("min-h-0");
+        expect(threadsScrollContainer.className).toContain("flex-1");
+
+        expect(conversationSection.className).toContain("min-h-0");
+        expect(conversationSection.className).toContain("flex-1");
+        expect(conversationSection.className).toContain("overflow-hidden");
+
+        expect(conversationScrollContainer.className).toContain("min-h-0");
+        expect(conversationScrollContainer.className).toContain("flex-1");
+    });
+
+    it("focuses the chat input after clicking new chat from an existing thread", async () => {
+        mockGetGlobalChatThread.mockResolvedValue({
+            id: 1,
+            title: "Thread",
+            time_range_mode: "preset",
+            preset_days: 7,
+            custom_start_date: null,
+            custom_end_date: null,
+            source_ids: [],
+            created_at: "2026-03-19T00:00:00Z",
+            updated_at: "2026-03-19T00:00:00Z",
+        });
+        mockListGlobalChatMessages.mockResolvedValue([
+            { role: "user", content: "Existing thread message" },
+        ]);
+
+        renderGlobalChat("/chat/1");
+        await settleGlobalChat();
+
+        const newChatButton = findButtonByText("New chat");
+        const chatInput = getChatInput();
+
+        expect(newChatButton).toBeInstanceOf(HTMLButtonElement);
+
+        act(() => {
+            newChatButton?.focus();
+            newChatButton?.click();
+        });
+        await settleGlobalChat();
+
+        expect(document.activeElement).toBe(chatInput);
     });
 });

@@ -173,12 +173,14 @@ export default function GlobalChat() {
     const { threadId: threadIdParam } = useParams();
     const parsedThread = useMemo(() => parseThreadParam(threadIdParam), [threadIdParam]);
     const bottomRef = useRef<HTMLDivElement>(null);
+    const inputRef = useRef<HTMLInputElement>(null);
     const pendingCreatedThreadIdRef = useRef<number | null>(null);
     const threadLoadRequestIdRef = useRef(0);
     const scopeSaveRequestIdRef = useRef(0);
     const activeThreadIdRef = useRef<number | null>(null);
     const resizeStartXRef = useRef(0);
     const resizeStartWidthRef = useRef(DEFAULT_CHAT_THREADS_PANEL_WIDTH);
+    const pendingInputFocusTimeoutRef = useRef<number | null>(null);
 
     const [threads, setThreads] = useState<GlobalChatThread[]>([]);
     const [sources, setSources] = useState<GlobalChatSourceOption[]>([]);
@@ -237,6 +239,14 @@ export default function GlobalChat() {
             navigate("/chat", { replace: true });
         }
     }, [navigate, parsedThread.isWellFormed]);
+
+    useEffect(() => {
+        return () => {
+            if (pendingInputFocusTimeoutRef.current !== null) {
+                window.clearTimeout(pendingInputFocusTimeoutRef.current);
+            }
+        };
+    }, []);
 
     useEffect(() => {
         try {
@@ -434,6 +444,22 @@ export default function GlobalChat() {
         setScope(createDefaultGlobalChatScopeInput());
         setInput("");
         replaceMessages([]);
+    }
+
+    function scheduleInputFocus() {
+        if (pendingInputFocusTimeoutRef.current !== null) {
+            window.clearTimeout(pendingInputFocusTimeoutRef.current);
+        }
+
+        pendingInputFocusTimeoutRef.current = window.setTimeout(() => {
+            pendingInputFocusTimeoutRef.current = null;
+            inputRef.current?.focus();
+        }, 0);
+    }
+
+    function handleStartNewThread() {
+        navigate("/chat");
+        scheduleInputFocus();
     }
 
     function handleThreadsResizeStart(event: React.PointerEvent<HTMLDivElement>) {
@@ -661,7 +687,7 @@ export default function GlobalChat() {
     }
 
     return (
-        <div className={cn("flex min-h-full w-full min-w-0 flex-col gap-2 py-2 md:py-3", CONTENT_GUTTER_X_CLASS)}>
+        <div className={cn("flex h-full min-h-0 w-full min-w-0 flex-col gap-2 overflow-hidden py-2 md:py-3", CONTENT_GUTTER_X_CLASS)}>
             <WorkspaceHeader
                 density="compact"
                 eyebrow={t("eyebrow")}
@@ -675,7 +701,7 @@ export default function GlobalChat() {
                     { label: t("sourceScopeLabel"), value: scopeSourceSummary },
                 ]}
                 actions={(
-                    <Button size="sm" onClick={() => navigate("/chat")}>
+                    <Button size="sm" onClick={handleStartNewThread}>
                         <Plus className="h-3.5 w-3.5" />
                         {t("newChat")}
                     </Button>
@@ -719,9 +745,9 @@ export default function GlobalChat() {
                 </DialogContent>
             </Dialog>
 
-            <div className="flex min-h-0 flex-1 flex-col gap-2 lg:flex-row">
+            <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-hidden lg:flex-row">
                 <div
-                    className="relative shrink-0"
+                    className="relative min-h-0 shrink-0"
                     style={isDesktopLayout ? { width: chatThreadsPanelWidth } : undefined}
                 >
                     <aside className="surface-panel flex h-full min-h-0 flex-col">
@@ -731,7 +757,7 @@ export default function GlobalChat() {
                                     <p className="text-[11px] font-medium text-muted-foreground">{t("conversations")}</p>
                                     <h2 className="text-sm font-medium text-foreground">{t("savedThreads")}</h2>
                                 </div>
-                                <Button size="sm" className="w-full justify-start" onClick={() => navigate("/chat")}>
+                                <Button size="sm" className="w-full justify-start" onClick={handleStartNewThread}>
                                     <Plus className="h-3.5 w-3.5" />
                                     {t("startNewThread")}
                                 </Button>
@@ -819,7 +845,7 @@ export default function GlobalChat() {
                     )}
                 </div>
 
-                <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-2 lg:flex-row">
+                <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-2 overflow-hidden lg:flex-row">
                     <section className="surface-panel flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
                         <div className="border-b border-border px-3 py-2">
                             <div className="flex items-center justify-between gap-2">
@@ -912,6 +938,7 @@ export default function GlobalChat() {
                         <div className="border-t border-border px-3 py-2 md:px-4">
                             <form onSubmit={handleSend} className="mx-auto flex max-w-4xl items-center gap-2">
                                 <Input
+                                    ref={inputRef}
                                     value={input}
                                     onChange={(event) => setInput(event.target.value)}
                                     placeholder={t("askAboutRecentNews")}
@@ -927,7 +954,7 @@ export default function GlobalChat() {
 
                     <aside
                         className={cn(
-                            "surface-panel flex shrink-0 flex-col overflow-hidden lg:transition-[width]",
+                            "surface-panel flex min-h-0 shrink-0 flex-col overflow-hidden lg:transition-[width]",
                             shouldRenderCollapsedScopePanel && "items-center",
                         )}
                         style={isDesktopLayout ? { width: shouldRenderCollapsedScopePanel ? COLLAPSED_SCOPE_PANEL_WIDTH : EXPANDED_SCOPE_PANEL_WIDTH } : undefined}
