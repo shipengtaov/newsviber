@@ -10,9 +10,11 @@ const {
     listAutomationReportsMock,
     listAutomationReportSourceArticlesMock,
     listAutomationSourcesMock,
+    listProjectCandidateArticlesMock,
     markAutomationReportAsReadMock,
     setAutomationReportFavoriteMock,
     mockUseMainLayoutScrollContainer,
+    toastMock,
     useScopedScrollMemoryMock,
     replaceMessagesMock,
 } = vi.hoisted(() => ({
@@ -20,9 +22,11 @@ const {
     listAutomationReportsMock: vi.fn(),
     listAutomationReportSourceArticlesMock: vi.fn(),
     listAutomationSourcesMock: vi.fn(),
+    listProjectCandidateArticlesMock: vi.fn(),
     markAutomationReportAsReadMock: vi.fn(),
     setAutomationReportFavoriteMock: vi.fn(),
     mockUseMainLayoutScrollContainer: vi.fn(),
+    toastMock: vi.fn(),
     useScopedScrollMemoryMock: vi.fn(),
     replaceMessagesMock: vi.fn(),
 }));
@@ -102,7 +106,46 @@ const automationTranslations: Record<string, string> = {
     noAutomationProjectsYet: "No projects yet",
     failedToUpdateFavorite: "Failed to update favorite",
     articlesUnit: "articles",
+    generateReportDialog: "Generate Report",
+    selectUpTo: "Select up to {{count}} for this manual run.",
+    searchArticles: "Search articles",
+    searchByTitle: "Search by title or summary...",
+    filterBySource: "Filter by source",
+    allScopedSources: "All scoped sources",
+    includePreviouslyUsed: "Include previously used articles for this project",
+    nSelected: "{{count}} selected",
+    nMax: "{{count}} max",
+    loadingCandidates: "Loading candidate articles...",
+    noArticlesMatch: "No articles match the current filters.",
+    inserted: "Inserted {{date}}",
+    previouslyUsed: "Previously used",
+    noSummaryAvailable: "No summary available.",
+    failedToLoadCandidates: "Failed to load candidate articles",
+    selectUpToN: "Select up to {{count}}",
 };
+
+const manualCandidateArticles = [
+    {
+        id: 101,
+        source_id: 1,
+        source_name: "Example Source",
+        title: "Candidate Article 1",
+        summary: "Summary for candidate article 1.",
+        published_at: null,
+        inserted_at: "2026-03-30T00:00:00Z",
+        is_consumed: false,
+    },
+    {
+        id: 102,
+        source_id: 1,
+        source_name: "Example Source",
+        title: "Candidate Article 2",
+        summary: "Summary for candidate article 2.",
+        published_at: null,
+        inserted_at: "2026-03-29T00:00:00Z",
+        is_consumed: true,
+    },
+];
 
 function translate(template: string, options?: Record<string, unknown>) {
     return template.replace(/\{\{(\w+)\}\}/g, (_, key: string) => String(options?.[key] ?? ""));
@@ -117,6 +160,103 @@ vi.mock("react-i18next", () => ({
         },
     }),
 }));
+
+vi.mock("@/components/ui/select", async () => {
+    const React = await vi.importActual<typeof import("react")>("react");
+
+    function extractText(node: React.ReactNode): string {
+        return React.Children.toArray(node).map((child) => {
+            if (typeof child === "string" || typeof child === "number") {
+                return String(child);
+            }
+
+            if (React.isValidElement<{ children?: React.ReactNode }>(child)) {
+                return extractText(child.props.children);
+            }
+
+            return "";
+        }).join("");
+    }
+
+    const SelectItem = ({ children }: { children: React.ReactNode; value: string }) => <>{children}</>;
+    const SelectContent = ({ children }: { children: React.ReactNode }) => <>{children}</>;
+    const SelectTrigger = ({ children }: { children: React.ReactNode }) => <>{children}</>;
+    const SelectValue = ({ placeholder }: { placeholder?: string }) => <>{placeholder ?? null}</>;
+
+    function collectOptions(children: React.ReactNode): Array<{ label: string; value: string }> {
+        return React.Children.toArray(children).flatMap((child) => {
+            if (!React.isValidElement<{ children?: React.ReactNode; value?: string }>(child)) {
+                return [];
+            }
+
+            if (child.type === SelectItem) {
+                return [{
+                    label: extractText(child.props.children),
+                    value: String(child.props.value ?? ""),
+                }];
+            }
+
+            return collectOptions(child.props.children);
+        });
+    }
+
+    const Select = ({ value, onValueChange, children }: { value?: string; onValueChange?: (value: string) => void; children: React.ReactNode }) => {
+        const options = collectOptions(children);
+
+        return (
+            <select
+                data-testid="manual-report-source-select"
+                value={value}
+                onChange={(event) => onValueChange?.(event.target.value)}
+            >
+                {options.map((option) => (
+                    <option key={option.value} value={option.value}>
+                        {option.label}
+                    </option>
+                ))}
+            </select>
+        );
+    };
+
+    return {
+        Select,
+        SelectTrigger,
+        SelectValue,
+        SelectContent,
+        SelectItem,
+    };
+});
+
+vi.mock("@/components/ui/dialog", async () => {
+    const React = await vi.importActual<typeof import("react")>("react");
+    const DialogContext = React.createContext<{ open?: boolean }>({ open: true });
+
+    const Dialog = ({ open = true, children }: { open?: boolean; children: React.ReactNode }) => (
+        <DialogContext.Provider value={{ open }}>
+            {children}
+        </DialogContext.Provider>
+    );
+
+    const DialogTrigger = ({ children }: { children: React.ReactNode; asChild?: boolean }) => <>{children}</>;
+    const DialogContent = ({ children, className }: { children: React.ReactNode; className?: string }) => {
+        const { open } = React.useContext(DialogContext);
+        return open === false ? null : <div className={className}>{children}</div>;
+    };
+    const DialogDescription = ({ children }: { children: React.ReactNode }) => <div>{children}</div>;
+    const DialogFooter = ({ children, className }: { children: React.ReactNode; className?: string }) => <div className={className}>{children}</div>;
+    const DialogHeader = ({ children, className }: { children: React.ReactNode; className?: string }) => <div className={className}>{children}</div>;
+    const DialogTitle = ({ children }: { children: React.ReactNode }) => <div>{children}</div>;
+
+    return {
+        Dialog,
+        DialogTrigger,
+        DialogContent,
+        DialogDescription,
+        DialogFooter,
+        DialogHeader,
+        DialogTitle,
+    };
+});
 
 vi.mock("@/lib/i18n", () => ({
     default: {
@@ -164,7 +304,7 @@ vi.mock("@/lib/i18n", () => ({
 
 vi.mock("@/hooks/use-toast", () => ({
     useToast: () => ({
-        toast: vi.fn(),
+        toast: toastMock,
     }),
 }));
 
@@ -177,11 +317,11 @@ vi.mock("@/lib/automation-service", () => ({
     listAutomationReports: listAutomationReportsMock,
     listAutomationReportSourceArticles: listAutomationReportSourceArticlesMock,
     listAutomationSources: listAutomationSourcesMock,
+    listProjectCandidateArticles: listProjectCandidateArticlesMock,
     markAutomationReportAsRead: markAutomationReportAsReadMock,
     setAutomationReportFavorite: setAutomationReportFavoriteMock,
     deleteAutomationProject: vi.fn(),
     generateAutomationReportForProject: vi.fn(),
-    listProjectCandidateArticles: vi.fn().mockResolvedValue([]),
     markAllAutomationReportsAsRead: vi.fn(),
     saveAutomationProject: vi.fn(),
 }));
@@ -251,9 +391,11 @@ describe("Automation", () => {
         listAutomationReportsMock.mockReset();
         listAutomationReportSourceArticlesMock.mockReset();
         listAutomationSourcesMock.mockReset();
+        listProjectCandidateArticlesMock.mockReset();
         markAutomationReportAsReadMock.mockReset();
         setAutomationReportFavoriteMock.mockReset();
         mockUseMainLayoutScrollContainer.mockReset();
+        toastMock.mockReset();
         useScopedScrollMemoryMock.mockReset();
         replaceMessagesMock.mockReset();
         localStorage.clear();
@@ -278,6 +420,7 @@ describe("Automation", () => {
         listAutomationSourcesMock.mockResolvedValue([
             { id: 1, name: "Example Source", active: true, article_count: 12 },
         ]);
+        listProjectCandidateArticlesMock.mockResolvedValue(manualCandidateArticles);
         listAutomationReportSourceArticlesMock.mockResolvedValue([]);
         listAutomationReportsMock.mockResolvedValue({
             reports: [
@@ -398,6 +541,96 @@ describe("Automation", () => {
         }
 
         return contentWrapper.parentElement;
+    }
+
+    function getBodyButtonByText(text: string): HTMLButtonElement {
+        const button = Array.from(document.body.querySelectorAll("button")).find((candidate) => (
+            candidate.textContent?.includes(text)
+        ));
+
+        if (!(button instanceof HTMLButtonElement)) {
+            throw new Error(`Button "${text}" not found in document body.`);
+        }
+
+        return button;
+    }
+
+    function getManualCandidateList(): HTMLDivElement {
+        const list = document.body.querySelector('[data-testid="manual-report-candidate-list"]');
+        if (!(list instanceof HTMLDivElement)) {
+            throw new Error("Manual candidate list not found.");
+        }
+
+        return list;
+    }
+
+    function getManualSearchInput(): HTMLInputElement {
+        const input = Array.from(document.body.querySelectorAll("input")).find((candidate) => (
+            candidate instanceof HTMLInputElement && candidate.placeholder === "Search by title or summary..."
+        ));
+
+        if (!(input instanceof HTMLInputElement)) {
+            throw new Error("Manual search input not found.");
+        }
+
+        return input;
+    }
+
+    function getManualSourceSelect(): HTMLSelectElement {
+        const select = document.body.querySelector('[data-testid="manual-report-source-select"]');
+        if (!(select instanceof HTMLSelectElement)) {
+            throw new Error("Manual source select not found.");
+        }
+
+        return select;
+    }
+
+    function getLabeledCheckbox(labelText: string): HTMLInputElement {
+        const label = Array.from(document.body.querySelectorAll("label")).find((candidate) => (
+            candidate.textContent?.includes(labelText)
+        ));
+
+        if (!(label instanceof HTMLLabelElement)) {
+            throw new Error(`Checkbox label "${labelText}" not found.`);
+        }
+
+        const checkbox = label.querySelector('input[type="checkbox"]');
+        if (!(checkbox instanceof HTMLInputElement)) {
+            throw new Error(`Checkbox "${labelText}" not found.`);
+        }
+
+        return checkbox;
+    }
+
+    async function openManualGenerateDialog() {
+        renderAutomation();
+        await settleAutomation();
+
+        act(() => {
+            getButtonByRoleText("Project Alpha").click();
+        });
+        await settleAutomation();
+
+        act(() => {
+            getBodyButtonByText("Generate report").click();
+        });
+        await settleAutomation();
+    }
+
+    function updateInputValue(input: HTMLInputElement, value: string) {
+        act(() => {
+            const valueSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
+            valueSetter?.call(input, value);
+            input.dispatchEvent(new Event("input", { bubbles: true }));
+        });
+    }
+
+    function updateSelectValue(select: HTMLSelectElement, value: string) {
+        act(() => {
+            const valueSetter = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, "value")?.set;
+            valueSetter?.call(select, value);
+            select.dispatchEvent(new Event("change", { bubbles: true }));
+        });
     }
 
     it("does not render the back-to-top button on the project board", async () => {
@@ -595,6 +828,79 @@ describe("Automation", () => {
 
         expect(setAutomationReportFavoriteMock).toHaveBeenCalledWith(10, true);
         expect(container.querySelector('[data-testid="card-markdown"]')).toBeNull();
+    });
+
+    it("keeps the manual candidate list at the top when the dialog opens", async () => {
+        await openManualGenerateDialog();
+
+        expect(getManualCandidateList().scrollTop).toBe(0);
+    });
+
+    it("resets the manual candidate list scroll when the search filter changes", async () => {
+        await openManualGenerateDialog();
+
+        const candidateList = getManualCandidateList();
+        candidateList.scrollTop = 240;
+
+        updateInputValue(getManualSearchInput(), "Candidate");
+        await settleAutomation();
+
+        expect(getManualCandidateList().scrollTop).toBe(0);
+    });
+
+    it("resets the manual candidate list scroll when the source filter changes", async () => {
+        await openManualGenerateDialog();
+
+        const candidateList = getManualCandidateList();
+        candidateList.scrollTop = 240;
+
+        updateSelectValue(getManualSourceSelect(), "1");
+        await settleAutomation();
+
+        expect(getManualCandidateList().scrollTop).toBe(0);
+    });
+
+    it("resets the manual candidate list scroll when including previously used articles", async () => {
+        await openManualGenerateDialog();
+
+        const candidateList = getManualCandidateList();
+        candidateList.scrollTop = 240;
+
+        act(() => {
+            getLabeledCheckbox("Include previously used articles for this project").click();
+        });
+        await settleAutomation();
+
+        expect(getManualCandidateList().scrollTop).toBe(0);
+    });
+
+    it("does not reset the manual candidate list scroll when selecting an article", async () => {
+        await openManualGenerateDialog();
+
+        const candidateList = getManualCandidateList();
+        candidateList.scrollTop = 240;
+
+        act(() => {
+            getBodyButtonByText("Candidate Article 1").click();
+        });
+        await settleAutomation();
+
+        expect(getManualCandidateList().scrollTop).toBe(240);
+    });
+
+    it("renders sanitized plain-text candidate previews instead of raw html markup", async () => {
+        listProjectCandidateArticlesMock.mockResolvedValueOnce([
+            {
+                ...manualCandidateArticles[0],
+                summary: '<p>Article URL: <a href="https://example.com/story">https://example.com/story</a></p><p>Points: 42</p>',
+            },
+        ]);
+
+        await openManualGenerateDialog();
+
+        expect(document.body.textContent).toContain("Article URL:");
+        expect(document.body.textContent).not.toContain("<p>");
+        expect(document.body.textContent).not.toContain("<a href=");
     });
 
     it("keeps card detail open when removing a favorite under the favorites filter", async () => {

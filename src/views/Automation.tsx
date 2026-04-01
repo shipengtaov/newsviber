@@ -50,6 +50,7 @@ import { BackToTopButton } from "@/components/ui/BackToTopButton";
 import { useScopedScrollMemory } from "@/hooks/use-scoped-scroll-memory";
 import { useStreamingConversation } from "@/hooks/use-streaming-conversation";
 import { getAutomationReportBodyMarkdown, getAutomationReportPreviewExcerpt } from "@/lib/automation-report";
+import { resolveArticlePreview } from "@/lib/article-html";
 import { formatUtcDateTime } from "@/lib/time";
 import { cn } from "@/lib/utils";
 import { hasConfiguredWebSearch } from "@/lib/web-search-service";
@@ -575,6 +576,7 @@ export default function Automation() {
     const reportBodyScrollRef = useRef<HTMLDivElement | null>(null);
     const reportDiscussionScrollRef = useRef<HTMLDivElement | null>(null);
     const reportDiscussionToggleButtonRef = useRef<HTMLButtonElement | null>(null);
+    const manualCandidateListScrollRef = useRef<HTMLDivElement | null>(null);
 
     const activeProject = projects.find((project) => project.id === activeProjectId) ?? null;
     const activeReportFromList = activeReportId === null
@@ -758,6 +760,19 @@ export default function Automation() {
             isSubscribed = false;
         };
     }, [activeProject, manualDialogOpen, includeConsumed, candidateSearch, candidateSourceId, toast]);
+
+    useEffect(() => {
+        if (!manualDialogOpen) {
+            return;
+        }
+
+        const container = manualCandidateListScrollRef.current;
+        if (!container) {
+            return;
+        }
+
+        container.scrollTop = 0;
+    }, [manualDialogOpen, activeProject?.id, candidateSearch, candidateSourceId, includeConsumed]);
 
     useEffect(() => {
         return addAutomationSyncListener(() => {
@@ -2048,8 +2063,12 @@ export default function Automation() {
                                 </div>
                             </div>
 
-                            <div className="min-h-0 flex-1 overflow-y-auto pr-1 pt-4">
-                                <div className="space-y-3">
+                            <div
+                                ref={manualCandidateListScrollRef}
+                                data-testid="manual-report-candidate-list"
+                                className="min-h-0 flex-1 overflow-y-auto pr-1 pt-4"
+                            >
+                                <div className="flex flex-col gap-3">
                                     {isLoadingCandidates && (
                                         <div className="editor-empty p-6">
                                             {t("loadingCandidates")}
@@ -2063,6 +2082,7 @@ export default function Automation() {
                                     )}
 
                                     {!isLoadingCandidates && articleCandidates.map((article) => {
+                                        const preview = resolveArticlePreview(article.summary, null);
                                         const isSelected = selectedArticleIds.includes(article.id);
                                         const isSelectionLocked = !isSelected && selectedArticleIds.length >= activeProject.max_articles_per_report;
 
@@ -2072,7 +2092,7 @@ export default function Automation() {
                                                 type="button"
                                                 onClick={() => toggleArticleSelection(article.id)}
                                                 disabled={isSelectionLocked}
-                                                className={`w-full rounded-md border p-3 text-left transition-colors ${isSelected ? "border-primary/30 bg-accent" : "border-border hover:border-primary/20 hover:bg-muted/50"} ${isSelectionLocked ? "cursor-not-allowed opacity-60" : ""}`}
+                                                className={`block w-full overflow-hidden rounded-md border p-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 ${isSelected ? "border-primary/30 bg-accent" : "border-border hover:border-primary/20 hover:bg-muted/50"} ${isSelectionLocked ? "cursor-not-allowed opacity-60" : ""}`}
                                             >
                                                 <div className="flex items-start gap-3">
                                                     <Checkbox
@@ -2091,8 +2111,8 @@ export default function Automation() {
                                                             )}
                                                         </div>
                                                         <div className="text-sm font-semibold">{article.title}</div>
-                                                        <p className="line-clamp-3 text-sm text-muted-foreground">
-                                                            {article.summary || t("noSummaryAvailable")}
+                                                        <p className="line-clamp-3 break-words text-sm text-muted-foreground">
+                                                            {preview.text || t("noSummaryAvailable")}
                                                         </p>
                                                     </div>
                                                 </div>
