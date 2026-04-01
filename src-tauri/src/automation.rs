@@ -212,8 +212,8 @@ pub async fn persist_automation_report_cmd(
         return Err("At least one article is required to persist a report.".into());
     }
 
-    if used_article_count != article_ids.len() as i64 {
-        return Err("Used article count does not match the supplied article ids.".into());
+    if used_article_count < article_ids.len() as i64 {
+        return Err("Used article count cannot be smaller than the supplied article ids.".into());
     }
 
     let mut connection = connect_automation_db(&app).await?;
@@ -240,7 +240,7 @@ pub async fn persist_automation_report_cmd(
         .bind(title.trim())
         .bind(full_report)
         .bind(&generation_mode)
-        .bind(article_ids.len() as i64)
+        .bind(used_article_count)
         .execute(&mut *transaction)
         .await
         .map_err(|error| error.to_string())?

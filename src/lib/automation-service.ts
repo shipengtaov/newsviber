@@ -1,10 +1,17 @@
+import { tool, type ToolSet } from "ai";
 import { invoke } from "@tauri-apps/api/core";
 import type { AutomationReportDraft } from "@/lib/ai";
-import { resolveArticlePreview } from "@/lib/article-html";
+import { compactHtmlText, resolveArticlePreview } from "@/lib/article-html";
 import { dispatchAutomationSyncEvent } from "@/lib/automation-events";
 import { normalizeCitationUrl } from "@/lib/citations";
 import { getDb } from "@/lib/db";
+import {
+    formatGlobalChatShortlistLine,
+    type GlobalChatArticleDetail,
+    type GlobalChatArticleShortlistItem,
+} from "@/lib/global-chat-service";
 import { formatUtcDateTime } from "@/lib/time";
+import { z } from "zod";
 
 export type AutomationProject = {
     id: number;
@@ -63,6 +70,9 @@ export type AutomationReportContextArticle = {
     inserted_at: string;
     article_url: string | null;
 };
+
+export type AutomationProjectArticleShortlistItem = GlobalChatArticleShortlistItem;
+export type AutomationProjectArticleDetail = GlobalChatArticleDetail;
 
 export type SaveAutomationProjectInput = {
     name: string;
@@ -176,11 +186,47 @@ type AutomationArticleContextRow = {
     article_url: string | null;
 };
 
+type AutomationReportGenerationResult = {
+    draft: AutomationReportDraft;
+    evidenceArticleIds: number[];
+};
+
+type AutomationReportUserPromptInput =
+    | {
+        mode: "inline";
+        articles: AutomationArticleContextRow[];
+    }
+    | {
+        mode: "indexed";
+        totalArticles: number;
+        coverageSummaryLines: string[];
+        shortlistLines: string[];
+    };
+
+type AutomationArticleToolRecord = {
+    article: AutomationArticleContextRow;
+    shortlistItem: AutomationProjectArticleShortlistItem;
+    detailItem: AutomationProjectArticleDetail;
+    searchText: string;
+};
+
 const DEFAULT_AUTO_INTERVAL_MINUTES = 60;
 const DEFAULT_MAX_ARTICLES_PER_REPORT = 200;
 const DEFAULT_MIN_ARTICLES_PER_REPORT = 10;
 const DEFAULT_CANDIDATE_LIMIT = 200;
+const MAX_CANDIDATE_LIMIT = 1000;
 const MAX_CONTEXT_CHARS_PER_ARTICLE = 1200;
+const SMALL_CONTEXT_MAX_ARTICLES = 40;
+const SMALL_CONTEXT_MAX_PROMPT_CHARS = 30_000;
+const LARGE_CONTEXT_SHORTLIST_LIMIT = 30;
+const LARGE_CONTEXT_SOURCE_SUMMARY_LIMIT = 5;
+const LARGE_CONTEXT_TOOL_LIST_LIMIT = 25;
+const LARGE_CONTEXT_DETAIL_BATCH_SIZE = 5;
+const LARGE_CONTEXT_TARGET_DETAIL_ARTICLES = 12;
+const LARGE_CONTEXT_MAX_DETAIL_ARTICLES = 20;
+const LARGE_CONTEXT_TOOL_LOOP_STEPS = 12;
+const MAX_AUTOMATION_SHORTLIST_PREVIEW_CHARS = 280;
+const MAX_AUTOMATION_DETAIL_CONTENT_CHARS = 4000;
 
 const PROJECT_SELECT_BASE_SQL = `
     SELECT
@@ -338,7 +384,7 @@ function sanitizeLimit(limit: number | undefined): number {
         return DEFAULT_CANDIDATE_LIMIT;
     }
 
-    return Math.max(1, Math.min(500, normalizePositiveInteger(limit, DEFAULT_CANDIDATE_LIMIT)));
+    return Math.max(1, Math.min(MAX_CANDIDATE_LIMIT, normalizePositiveInteger(limit, DEFAULT_CANDIDATE_LIMIT)));
 }
 
 function buildProjectScopeCondition(projectId: number, params: unknown[], articleAlias = "a"): string {
@@ -386,8 +432,17 @@ export function formatAutomationReportSupportingContextLine(
     return `- [${formatUtcDateTime(article.published_at, article.inserted_at)}] ${article.source_name}: ${article.title}${articleUrl ? ` (Article URL: ${articleUrl})` : ""}${contextText ? ` - ${contextText}` : ""}`;
 }
 
-export function buildAutomationPrompt(project: AutomationProject, articles: AutomationArticleContextRow[]): string {
-    const contextLines = articles.map((article, index) => {
+function truncateText(value: string, maxLength: number): string {
+    const trimmed = value.trim();
+    if (trimmed.length <= maxLength) {
+        return trimmed;
+    }
+
+    return `${trimmed.slice(0, Math.max(1, maxLength - 3)).trimEnd()}...`;
+}
+
+function buildAutomationInlineContextBlock(articles: AutomationArticleContextRow[]): string {
+    return articles.map((article, index) => {
         const publishedAt = formatUtcDateTime(article.published_at, "Unknown");
         const contextText = summarizeArticleContextText(article.summary, article.content);
         const articleUrl = normalizeCitationUrl(article.article_url);
@@ -401,19 +456,122 @@ export function buildAutomationPrompt(project: AutomationProject, articles: Auto
             `Context: ${contextText}`,
         ].join("\n");
     }).join("\n\n");
+}
 
-    const evidenceInstructions = project.web_search_enabled
-        ? `- Ground every major point primarily in the supplied articles.
-- If the supplied articles are not enough for a point that clearly needs fresher or broader context, you may use web search sparingly to verify or supplement the missing fact.
+function normalizeAutomationProjectArticleShortlistItem(article: AutomationArticleContextRow): AutomationProjectArticleShortlistItem {
+    const preview = resolveArticlePreview(article.summary, article.content).text || "No summary available.";
+
+    return {
+        id: article.id,
+        source_name: article.source_name,
+        title: article.title,
+        preview: truncateText(preview, MAX_AUTOMATION_SHORTLIST_PREVIEW_CHARS),
+        published_at: article.published_at,
+        inserted_at: article.inserted_at,
+        article_url: normalizeCitationUrl(article.article_url),
+    };
+}
+
+function normalizeAutomationProjectArticleDetail(article: AutomationArticleContextRow): AutomationProjectArticleDetail {
+    const shortlistItem = normalizeAutomationProjectArticleShortlistItem(article);
+
+    return {
+        ...shortlistItem,
+        summary: compactHtmlText(article.summary ?? ""),
+        content: truncateText(compactHtmlText(article.content ?? ""), MAX_AUTOMATION_DETAIL_CONTENT_CHARS),
+    };
+}
+
+function buildAutomationArticleToolRecords(articles: AutomationArticleContextRow[]): AutomationArticleToolRecord[] {
+    return articles.map((article) => {
+        const detailItem = normalizeAutomationProjectArticleDetail(article);
+
+        return {
+            article,
+            shortlistItem: {
+                id: detailItem.id,
+                source_name: detailItem.source_name,
+                title: detailItem.title,
+                preview: detailItem.preview,
+                published_at: detailItem.published_at,
+                inserted_at: detailItem.inserted_at,
+                article_url: detailItem.article_url,
+            },
+            detailItem,
+            searchText: [
+                article.title,
+                compactHtmlText(article.summary ?? ""),
+                compactHtmlText(article.content ?? ""),
+            ].join("\n").toLowerCase(),
+        };
+    });
+}
+
+function buildAutomationCoverageSummaryLines(articles: AutomationArticleContextRow[]): string[] {
+    const sourceCounts = new Map<string, number>();
+    let earliestTimestampMs = Number.POSITIVE_INFINITY;
+    let latestTimestampMs = Number.NEGATIVE_INFINITY;
+    let earliestTimestamp: string | null = null;
+    let latestTimestamp: string | null = null;
+
+    for (const article of articles) {
+        sourceCounts.set(article.source_name, (sourceCounts.get(article.source_name) ?? 0) + 1);
+
+        const timestamp = article.published_at ?? article.inserted_at;
+        const timestampMs = new Date(timestamp).getTime();
+        if (!Number.isFinite(timestampMs)) {
+            continue;
+        }
+
+        if (timestampMs < earliestTimestampMs) {
+            earliestTimestampMs = timestampMs;
+            earliestTimestamp = timestamp;
+        }
+
+        if (timestampMs > latestTimestampMs) {
+            latestTimestampMs = timestampMs;
+            latestTimestamp = timestamp;
+        }
+    }
+
+    const topSources = Array.from(sourceCounts.entries())
+        .sort((left, right) => right[1] - left[1] || left[0].localeCompare(right[0]))
+        .slice(0, LARGE_CONTEXT_SOURCE_SUMMARY_LIMIT)
+        .map(([sourceName, count]) => `${sourceName} (${count})`)
+        .join(", ");
+
+    return [
+        `- Source coverage: ${sourceCounts.size} sources${topSources ? ` - ${topSources}` : ""}`,
+        `- Date coverage: ${earliestTimestamp ? formatUtcDateTime(earliestTimestamp, earliestTimestamp) : "Unknown"} to ${latestTimestamp ? formatUtcDateTime(latestTimestamp, latestTimestamp) : "Unknown"}`,
+    ];
+}
+
+export function buildAutomationReportSystemPrompt(options: {
+    enableWebSearch: boolean;
+    usesArticleTools?: boolean;
+}): string {
+    const evidenceInstructions = options.enableWebSearch
+        ? `- Ground every major point primarily in the supplied project articles.
+- If the supplied project articles are not enough for a point that clearly needs fresher or broader context, you may use web search sparingly to verify or supplement the missing fact.
 - Clearly distinguish external web findings from the supplied project articles, and cite the source URLs inline when using external web findings.
 - If evidence is weak, mixed, or missing even after checking, state the uncertainty clearly.
-- Do not use web search for facts already well supported by the supplied articles.
-- Do not invent facts beyond the supplied articles and any explicitly cited web findings.`
-        : `- Ground every major point in the supplied articles.
+- Do not use web search for facts already well supported by the supplied project articles.
+- Do not invent facts beyond the supplied project articles and any explicitly cited web findings.`
+        : `- Ground every major point in the supplied project articles.
 - If evidence is weak, mixed, or missing, state the uncertainty clearly.
-- Do not invent facts outside the supplied articles.`;
+- Do not invent facts outside the supplied project articles.`;
+    const articleToolInstructions = options.usesArticleTools
+        ? `
+Article tools:
+- The user prompt contains only a compact article index, not full article bodies.
+- Before finalizing the report, inspect the most relevant article IDs with \`get_project_articles\`; do not rely on shortlist metadata alone for detailed factual claims.
+- Use \`list_project_articles\` to browse or search the scoped article set when the initial shortlist is insufficient.
+- Retrieve around ${LARGE_CONTEXT_TARGET_DETAIL_ARTICLES} detailed articles by default.
+- If the retrieved bodies are short, sparse, or duplicate-heavy, expand gradually up to ${LARGE_CONTEXT_MAX_DETAIL_ARTICLES} detailed articles total.
+- Retrieve no more than ${LARGE_CONTEXT_DETAIL_BATCH_SIZE} article IDs per \`get_project_articles\` call.`
+        : "";
 
-    return `You are an AI assistant generating a report from curated news context and the user's focus prompt.
+    return `You are an AI assistant generating an automation report from curated news context and the user's focus prompt.
 
 Return a JSON object with:
 - title: a concise title for the report
@@ -423,22 +581,142 @@ Guidelines:
 - Prioritize satisfying the user's focus prompt, including any requested structure, tone, depth, and output style that can be supported by the supplied evidence.
 - If the user explicitly wants sections such as Key Signals, Ideas, Next Actions, or any other structure, use that structure.
 - If the user does not specify a structure, choose the clearest markdown structure for the material.
-- ${project.web_search_enabled ? "Prefer the supplied project articles first; use external search only when it materially improves accuracy or recency." : "Use only the supplied project articles as evidence."}
 - Cite non-obvious factual claims inline using numeric markdown links such as [1](https://example.com/article).
+- Use only numeric markdown links for citations; do not use named links such as [Reuters](https://example.com/article).
 - When citing the supplied project articles, use the matching Article URL when it is provided in the context.
-- ${project.web_search_enabled ? "When citing external web findings, use the exact source URLs returned by web search." : "Do not invent or guess URLs when a supplied article has no usable Article URL."}
+- ${options.enableWebSearch ? "When citing external web findings, use the exact source URLs returned by web search." : "Do not invent or guess URLs when a supplied article has no usable Article URL."}
 - Place citations at the end of the sentence or bullet they support.
-- Do not output a references section, footnotes list, or bare URLs.
-${evidenceInstructions}
+- Do not output a references section, footnotes list, named-link bibliography, or bare URLs.
+${evidenceInstructions}${articleToolInstructions}
 - Keep the language consistent with the user's prompt.
 - Do not repeat the prompt verbatim.
-- Do not repeat the full report title as a top-level heading in markdown.
+- Do not repeat the full report title as a top-level heading in markdown.`;
+}
 
-User's Focus Prompt:
+export function buildAutomationReportUserPrompt(
+    project: Pick<AutomationProject, "prompt">,
+    input: AutomationReportUserPromptInput,
+): string {
+    if (input.mode === "inline") {
+        return `User's Focus Prompt:
 ${project.prompt}
 
 Selected News Context:
-${contextLines}`;
+${buildAutomationInlineContextBlock(input.articles)}`;
+    }
+
+    return `User's Focus Prompt:
+${project.prompt}
+
+Scoped Article Index:
+- Total selected articles: ${input.totalArticles}
+${input.coverageSummaryLines.join("\n")}
+
+Recent shortlist:
+${input.shortlistLines.length > 0 ? input.shortlistLines.join("\n") : "- No scoped articles are available."}
+
+Use the article tools when the shortlist alone is not sufficient for exact factual claims.`;
+}
+
+function shouldUseInlineAutomationPrompt(
+    project: Pick<AutomationProject, "prompt">,
+    articles: AutomationArticleContextRow[],
+): boolean {
+    if (articles.length > SMALL_CONTEXT_MAX_ARTICLES) {
+        return false;
+    }
+
+    return buildAutomationReportUserPrompt(project, {
+        mode: "inline",
+        articles,
+    }).length <= SMALL_CONTEXT_MAX_PROMPT_CHARS;
+}
+
+const listProjectArticlesToolInputSchema = z.object({
+    offset: z.number().int().min(0).optional().describe("Zero-based offset into the scoped article set."),
+    limit: z.number().int().min(1).max(LARGE_CONTEXT_TOOL_LIST_LIMIT).optional().describe("Maximum number of shortlist rows to return."),
+    search: z.string().optional().describe("Optional case-insensitive search query for title, summary, or content."),
+    sourceId: z.number().int().positive().optional().describe("Optional source ID filter."),
+});
+
+const getProjectArticlesToolInputSchema = z.object({
+    ids: z.array(z.number().int().positive()).min(1).max(LARGE_CONTEXT_DETAIL_BATCH_SIZE).describe("The article IDs to inspect in detail."),
+});
+
+function createAutomationReportArticleToolContext(articles: AutomationArticleContextRow[]): {
+    tools: ToolSet;
+    activeTools: string[];
+    getFetchedEvidenceArticleIds: () => number[];
+} {
+    const records = buildAutomationArticleToolRecords(articles);
+    const recordsById = new Map(records.map((record) => [record.article.id, record]));
+    const fetchedEvidenceArticleIds = new Set<number>();
+
+    function filterRecords(options: { search?: string; sourceId?: number | null }): AutomationArticleToolRecord[] {
+        const search = options.search?.trim().toLowerCase() ?? "";
+        const sourceId = options.sourceId ? Number.parseInt(String(options.sourceId), 10) : null;
+
+        return records.filter((record) => {
+            if (sourceId && record.article.source_id !== sourceId) {
+                return false;
+            }
+
+            if (search && !record.searchText.includes(search)) {
+                return false;
+            }
+
+            return true;
+        });
+    }
+
+    return {
+        tools: {
+            list_project_articles: tool({
+                description: "Browse or search the scoped project articles by article ID before deciding which detailed article bodies to inspect.",
+                inputSchema: listProjectArticlesToolInputSchema,
+                execute: async ({ offset = 0, limit = LARGE_CONTEXT_TOOL_LIST_LIMIT, search, sourceId }) => {
+                    const filteredRecords = filterRecords({ search, sourceId });
+                    const safeOffset = Math.max(0, offset);
+                    const safeLimit = Math.max(1, Math.min(LARGE_CONTEXT_TOOL_LIST_LIMIT, normalizePositiveInteger(limit, LARGE_CONTEXT_TOOL_LIST_LIMIT)));
+
+                    return {
+                        totalCount: filteredRecords.length,
+                        items: filteredRecords
+                            .slice(safeOffset, safeOffset + safeLimit)
+                            .map((record) => record.shortlistItem),
+                    };
+                },
+            }),
+            get_project_articles: tool({
+                description: "Fetch sanitized summaries and truncated bodies for specific scoped project article IDs. Use this before making detailed factual claims.",
+                inputSchema: getProjectArticlesToolInputSchema,
+                execute: async ({ ids }) => {
+                    const requestedIds = sanitizeArticleIds(ids).slice(0, LARGE_CONTEXT_DETAIL_BATCH_SIZE);
+                    const remainingSlots = Math.max(0, LARGE_CONTEXT_MAX_DETAIL_ARTICLES - fetchedEvidenceArticleIds.size);
+
+                    if (remainingSlots === 0) {
+                        return { items: [] as AutomationProjectArticleDetail[] };
+                    }
+
+                    const allowedIds = requestedIds
+                        .filter((articleId) => recordsById.has(articleId))
+                        .slice(0, remainingSlots);
+
+                    const items = allowedIds
+                        .map((articleId) => recordsById.get(articleId))
+                        .filter((record): record is AutomationArticleToolRecord => !!record)
+                        .map((record) => {
+                            fetchedEvidenceArticleIds.add(record.article.id);
+                            return record.detailItem;
+                        });
+
+                    return { items };
+                },
+            }),
+        },
+        activeTools: ["list_project_articles", "get_project_articles"],
+        getFetchedEvidenceArticleIds: () => Array.from(fetchedEvidenceArticleIds),
+    };
 }
 
 async function getAutomationProject(projectId: number): Promise<AutomationProject | null> {
@@ -495,7 +773,7 @@ async function loadArticlesForGeneration(projectId: number, articleIds: number[]
     }
 
     const params: unknown[] = [];
-    const articleIdPlaceholders = sanitizedArticleIds.map((articleId) => pushParam(params, articleId)).join(", ");
+    const articleIdList = sanitizedArticleIds.join(", ");
     const scopeCondition = buildProjectScopeCondition(projectId, params);
     const db = await getDb();
 
@@ -513,7 +791,7 @@ async function loadArticlesForGeneration(projectId: number, articleIds: number[]
                 a.guid AS article_url
             FROM articles a
             JOIN sources s ON s.id = a.source_id
-            WHERE a.id IN (${articleIdPlaceholders})
+            WHERE a.id IN (${articleIdList})
               AND ${scopeCondition}
             ORDER BY a.created_at DESC, a.id DESC
         `,
@@ -529,12 +807,59 @@ async function loadArticlesForGeneration(projectId: number, articleIds: number[]
 async function requestAutomationReport(
     project: AutomationProject,
     articles: AutomationArticleContextRow[],
-): Promise<AutomationReportDraft> {
+): Promise<AutomationReportGenerationResult> {
     const { generateAutomationReportDraft } = await import("@/lib/ai");
-    return generateAutomationReportDraft({
-        prompt: buildAutomationPrompt(project, articles),
+    if (shouldUseInlineAutomationPrompt(project, articles)) {
+        const draft = await generateAutomationReportDraft({
+            systemPrompt: buildAutomationReportSystemPrompt({
+                enableWebSearch: project.web_search_enabled,
+            }),
+            prompt: buildAutomationReportUserPrompt(project, {
+                mode: "inline",
+                articles,
+            }),
+            enableWebSearch: project.web_search_enabled,
+        });
+
+        return {
+            draft,
+            evidenceArticleIds: articles.map((article) => article.id),
+        };
+    }
+
+    const shortlist = buildAutomationArticleToolRecords(articles)
+        .slice(0, LARGE_CONTEXT_SHORTLIST_LIMIT)
+        .map((record) => record.shortlistItem);
+    const articleToolContext = createAutomationReportArticleToolContext(articles);
+    const draft = await generateAutomationReportDraft({
+        systemPrompt: buildAutomationReportSystemPrompt({
+            enableWebSearch: project.web_search_enabled,
+            usesArticleTools: true,
+        }),
+        prompt: buildAutomationReportUserPrompt(project, {
+            mode: "indexed",
+            totalArticles: articles.length,
+            coverageSummaryLines: buildAutomationCoverageSummaryLines(articles),
+            shortlistLines: shortlist.map((article) => formatGlobalChatShortlistLine(article)),
+        }),
         enableWebSearch: project.web_search_enabled,
+        tools: articleToolContext.tools,
+        activeTools: [
+            ...articleToolContext.activeTools,
+            ...(project.web_search_enabled ? ["web_search"] : []),
+        ],
+        maxToolSteps: LARGE_CONTEXT_TOOL_LOOP_STEPS,
     });
+
+    const evidenceArticleIds = articleToolContext.getFetchedEvidenceArticleIds();
+    if (evidenceArticleIds.length === 0) {
+        throw new Error("The report generator did not inspect any article details.");
+    }
+
+    return {
+        draft,
+        evidenceArticleIds,
+    };
 }
 
 async function persistAutomationReport(input: PersistAutomationReportCommandInput): Promise<number> {
@@ -563,11 +888,11 @@ async function performReportGeneration(
 
     const reportId = await persistAutomationReport({
         projectId: project.id,
-        title: generatedReport.title.trim() || "Untitled Insight",
-        fullReport: generatedReport.markdown.trim(),
+        title: generatedReport.draft.title.trim() || "Untitled Insight",
+        fullReport: generatedReport.draft.markdown.trim(),
         generationMode: mode,
-        usedArticleCount: articles.length,
-        articleIds: articles.map((article) => article.id),
+        usedArticleCount: sanitizedArticleIds.length,
+        articleIds: generatedReport.evidenceArticleIds,
         checkedAt: checkedAt ?? null,
     });
 
@@ -760,11 +1085,13 @@ export async function listProjectCandidateArticles(
         search?: string;
         sourceId?: number | null;
         limit?: number;
+        insertedAfter?: string | null;
     } = {},
 ): Promise<AutomationArticleCandidate[]> {
     const includeConsumed = Boolean(options.includeConsumed);
     const normalizedSourceId = options.sourceId ? Number.parseInt(String(options.sourceId), 10) : null;
     const search = options.search?.trim().toLowerCase() ?? "";
+    const insertedAfter = options.insertedAfter?.trim() || null;
     const limit = sanitizeLimit(options.limit);
     const params: unknown[] = [];
     const consumedExistsExpression = buildConsumedExistsExpression(projectId, params);
@@ -780,6 +1107,10 @@ export async function listProjectCandidateArticles(
             LOWER(a.title) LIKE ${searchParam}
             OR LOWER(COALESCE(a.summary, '')) LIKE ${searchParam}
         )`);
+    }
+
+    if (insertedAfter) {
+        innerConditions.push(`a.created_at > ${pushParam(params, insertedAfter)}`);
     }
 
     const db = await getDb();
@@ -878,6 +1209,7 @@ async function runAutoGenerationForProject(project: AutomationProject, checkedAt
 
     const candidates = await listProjectCandidateArticles(project.id, {
         limit: project.max_articles_per_report,
+        insertedAfter: project.last_auto_checked_at,
     });
 
     if (candidates.length === 0) {

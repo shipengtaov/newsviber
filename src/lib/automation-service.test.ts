@@ -34,7 +34,8 @@ vi.mock("@/lib/ai", async () => {
 });
 
 import {
-    buildAutomationPrompt,
+    buildAutomationReportSystemPrompt,
+    buildAutomationReportUserPrompt,
     formatAutomationReportSupportingContextLine,
     generateAutomationReportForProject,
     listAutomationReports,
@@ -62,6 +63,29 @@ const baseAutomationProject = {
     unread_report_count: 0,
 };
 
+function createArticle(id: number, overrides: Partial<{
+    source_id: number;
+    source_name: string;
+    title: string;
+    summary: string | null;
+    content: string | null;
+    published_at: string | null;
+    inserted_at: string;
+    article_url: string | null;
+}> = {}) {
+    return {
+        id,
+        source_id: overrides.source_id ?? 2,
+        source_name: overrides.source_name ?? "HN",
+        title: overrides.title ?? `Article ${id}`,
+        summary: overrides.summary ?? "<p>Inference is getting cheaper.</p>",
+        content: overrides.content ?? "Cheaper inference stack details.",
+        published_at: overrides.published_at ?? "2026-03-12T10:00:00Z",
+        inserted_at: overrides.inserted_at ?? "2026-03-12T10:05:00Z",
+        article_url: overrides.article_url ?? `https://example.com/article-${id}`,
+    };
+}
+
 afterEach(() => {
     dispatchAutomationSyncEventMock.mockReset();
     generateAutomationReportDraftMock.mockReset();
@@ -84,57 +108,51 @@ describe("automation service context helpers", () => {
         )).toBe("Deep dive Second line");
     });
 
-    it("builds a prompt that leaves report structure up to the user's focus prompt", () => {
-        const prompt = buildAutomationPrompt(
-            {
-                ...baseAutomationProject,
-                prompt: "请给我 Key Signals、Ideas 和 Next Actions 三段结构。",
-            },
-            [{
-                id: 9,
-                source_id: 2,
-                source_name: "HN",
-                title: "AI infra costs are dropping",
-                summary: "<p>Inference is getting cheaper.</p>",
-                content: null,
-                published_at: "2026-03-12T10:00:00Z",
-                inserted_at: "2026-03-12T10:05:00Z",
-                article_url: "https://example.com/infra-costs",
-            }],
-        );
+    it("keeps invariant citation and formatting rules in the system prompt", () => {
+        const prompt = buildAutomationReportSystemPrompt({
+            enableWebSearch: false,
+        });
 
         expect(prompt).toContain("Return a JSON object with:");
         expect(prompt).toContain("- title: a concise title for the report");
         expect(prompt).toContain("- markdown: the report body in markdown only");
+        expect(prompt).toContain("Use only numeric markdown links for citations");
+        expect(prompt).toContain("Do not output a references section, footnotes list, named-link bibliography, or bare URLs.");
         expect(prompt).toContain("If the user explicitly wants sections such as Key Signals, Ideas, Next Actions, or any other structure, use that structure.");
         expect(prompt).toContain("Do not repeat the full report title as a top-level heading in markdown.");
-        expect(prompt).not.toContain('Do not default to headings like "Key Signals", "Ideas", or "Next Actions" unless the user\'s prompt explicitly makes that structure the best fit.');
     });
 
-    it("adds web search guidance when the project enables it", () => {
-        const prompt = buildAutomationPrompt(
+    it("keeps report-specific context in the user prompt without duplicating citation rules", () => {
+        const prompt = buildAutomationReportUserPrompt(
             {
                 ...baseAutomationProject,
-                web_search_enabled: true,
+                prompt: "请给我 Key Signals、Ideas 和 Next Actions 三段结构。",
             },
-            [{
-                id: 9,
-                source_id: 2,
-                source_name: "HN",
-                title: "AI infra costs are dropping",
-                summary: "<p>Inference is getting cheaper.</p>",
-                content: null,
-                published_at: "2026-03-12T10:00:00Z",
-                inserted_at: "2026-03-12T10:05:00Z",
-                article_url: "https://example.com/infra-costs",
-            }],
+            {
+                mode: "inline",
+                articles: [createArticle(9, {
+                    title: "AI infra costs are dropping",
+                    article_url: "https://example.com/infra-costs",
+                })],
+            },
         );
 
-        expect(prompt).toContain("use external search only when it materially improves accuracy or recency");
-        expect(prompt).toContain("cite the source URLs inline");
-        expect(prompt).toContain("Do not use web search for facts already well supported");
+        expect(prompt).toContain("User's Focus Prompt:");
+        expect(prompt).toContain("请给我 Key Signals、Ideas 和 Next Actions 三段结构。");
         expect(prompt).toContain("Article URL: https://example.com/infra-costs");
-        expect(prompt).toContain("numeric markdown links such as [1](https://example.com/article)");
+        expect(prompt).not.toContain("numeric markdown links such as [1](https://example.com/article)");
+    });
+
+    it("adds web search and article-tool guidance to the system prompt when enabled", () => {
+        const prompt = buildAutomationReportSystemPrompt({
+            enableWebSearch: true,
+            usesArticleTools: true,
+        });
+
+        expect(prompt).toContain("use web search sparingly to verify or supplement the missing fact");
+        expect(prompt).toContain("Use `list_project_articles` to browse or search the scoped article set");
+        expect(prompt).toContain("Retrieve around 12 detailed articles by default.");
+        expect(prompt).toContain("up to 20 detailed articles total");
     });
 
     it("formats supporting report context lines with safe article URLs only", () => {
@@ -226,10 +244,13 @@ describe("automation service context helpers", () => {
             mode: "manual",
         });
 
-        expect(generateAutomationReportDraftMock).toHaveBeenCalledWith(expect.objectContaining({
+        const generationInput = generateAutomationReportDraftMock.mock.calls[0]?.[0];
+        expect(generationInput).toEqual(expect.objectContaining({
             enableWebSearch: false,
-            prompt: expect.stringContaining("Return a JSON object with:"),
+            systemPrompt: expect.stringContaining("Use only numeric markdown links for citations"),
+            prompt: expect.stringContaining("Selected News Context:"),
         }));
+        expect(generationInput?.tools).toBeUndefined();
         expect(invokeMock).toHaveBeenCalledTimes(1);
 
         const [commandName, payload] = invokeMock.mock.calls[0];
@@ -251,6 +272,119 @@ describe("automation service context helpers", () => {
             full_report: "## Key Signals\n- Faster inference",
         });
         expect(dispatchAutomationSyncEventMock).toHaveBeenCalledTimes(1);
+    });
+
+    it("switches to indexed generation for large contexts and persists only fetched evidence article ids", async () => {
+        const articles = Array.from({ length: 41 }, (_, index) => createArticle(index + 1, {
+            source_id: (index % 3) + 1,
+            source_name: `Source ${(index % 3) + 1}`,
+            title: `Important article ${index + 1}`,
+            summary: `<p>Signal ${index + 1}</p>`,
+            content: `Body ${index + 1} `.repeat(200),
+            article_url: index === 0 ? "file:///tmp/not-safe" : `https://example.com/article-${index + 1}`,
+        }));
+        const selectMock = vi.fn(async (query: string) => {
+            if (query.includes("FROM automation_projects p")) {
+                return [{
+                    id: 8,
+                    name: "Large context",
+                    prompt: "Summarize the most important developments.",
+                    cycle_mode: "manual",
+                    auto_enabled: 0,
+                    auto_interval_minutes: 60,
+                    max_articles_per_report: 200,
+                    min_articles_per_report: 1,
+                    web_search_enabled: 1,
+                    last_auto_checked_at: null,
+                    last_auto_generated_at: null,
+                    source_ids_csv: null,
+                    unread_report_count: 0,
+                }];
+            }
+
+            if (query.includes("FROM articles a")) {
+                return articles;
+            }
+
+            if (query.includes("FROM automation_reports")) {
+                return [{
+                    id: 55,
+                    project_id: 8,
+                    title: "Large context summary",
+                    full_report: "## Summary\n- Key development [1](https://example.com/article-2)",
+                    generation_mode: "manual",
+                    used_article_count: 41,
+                    is_read: 0,
+                    is_favorite: 0,
+                    created_at: "2026-03-13T00:00:00Z",
+                }];
+            }
+
+            throw new Error(`Unexpected select query: ${query}`);
+        });
+
+        getDbMock.mockResolvedValue({
+            select: selectMock,
+            execute: vi.fn(),
+        });
+        generateAutomationReportDraftMock.mockImplementation(async (input: {
+            systemPrompt: string;
+            prompt: string;
+            tools?: Record<string, { execute: (args: unknown) => Promise<unknown> }>;
+            activeTools?: string[];
+            maxToolSteps?: number;
+        }) => {
+            expect(input.systemPrompt).toContain("The user prompt contains only a compact article index");
+            expect(input.prompt).toContain("Scoped Article Index:");
+            expect(input.prompt).toContain("- Total selected articles: 41");
+            expect(input.prompt).toContain("[ID 1]");
+            expect(input.maxToolSteps).toBe(12);
+            expect(input.activeTools).toEqual(["list_project_articles", "get_project_articles", "web_search"]);
+
+            const tools = input.tools!;
+            const shortlistResult = await tools.list_project_articles.execute({
+                offset: 0,
+                limit: 3,
+                search: "important",
+            }) as { totalCount: number; items: Array<{ id: number; article_url: string | null }> };
+            expect(shortlistResult.totalCount).toBe(41);
+            expect(shortlistResult.items).toHaveLength(3);
+            expect(shortlistResult.items[0]?.article_url).toBeNull();
+
+            const detailResult = await tools.get_project_articles.execute({
+                ids: [2, 3],
+            }) as { items: Array<{ id: number; summary: string; content: string; article_url: string | null }> };
+            expect(detailResult.items).toHaveLength(2);
+            expect(detailResult.items[0]?.id).toBe(2);
+            expect(detailResult.items[0]?.summary).toBe("Signal 2");
+            expect(detailResult.items[0]?.content.length).toBeLessThanOrEqual(4000);
+            expect(detailResult.items[0]?.article_url).toBe("https://example.com/article-2");
+
+            return {
+                title: "Large context summary",
+                markdown: "## Summary\n- Key development [1](https://example.com/article-2)\n",
+            };
+        });
+        invokeMock.mockResolvedValue({ reportId: 55 });
+
+        const card = await generateAutomationReportForProject({
+            projectId: 8,
+            articleIds: articles.map((article) => article.id),
+            mode: "manual",
+        });
+
+        expect(invokeMock).toHaveBeenCalledTimes(1);
+        expect(invokeMock).toHaveBeenCalledWith("persist_automation_report_cmd", {
+            input: expect.objectContaining({
+                projectId: 8,
+                usedArticleCount: 41,
+                articleIds: [2, 3],
+            }),
+        });
+        expect(card).toMatchObject({
+            id: 55,
+            used_article_count: 41,
+        });
     });
 });
 

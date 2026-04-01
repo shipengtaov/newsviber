@@ -250,16 +250,49 @@ function normalizeStreamingErrorDetail(detail: string, started: boolean): string
   return detail;
 }
 
-function hasToolErrorInContent(
-  content: Array<{ type: string }>,
-): boolean {
-  return content.some((part) => part.type === "tool-error");
-}
-
 type GenerateAutomationReportDraftInput = {
+  systemPrompt: string;
   prompt: string;
   enableWebSearch: boolean;
+  tools?: ToolSet;
+  activeTools?: string[];
+  maxToolSteps?: number;
 };
+
+type ToolErrorPart = {
+  type: "tool-error";
+  toolName: string;
+  error: unknown;
+};
+
+function findToolErrorInContent(
+  content: Array<{ type: string; toolName?: string; error?: unknown }>,
+): ToolErrorPart | null {
+  for (const part of content) {
+    if (part.type === "tool-error" && typeof part.toolName === "string") {
+      return {
+        type: "tool-error",
+        toolName: part.toolName,
+        error: part.error,
+      };
+    }
+  }
+
+  return null;
+}
+
+function findToolErrorInSteps(
+  steps: Array<{ content: Array<{ type: string; toolName?: string; error?: unknown }> }>,
+): ToolErrorPart | null {
+  for (const step of steps) {
+    const toolError = findToolErrorInContent(step.content);
+    if (toolError) {
+      return toolError;
+    }
+  }
+
+  return null;
+}
 
 export type StreamConversationOptions = {
   enableWebSearch?: boolean;
@@ -663,16 +696,32 @@ export async function streamConversation(
 }
 
 async function attemptGenerateAutomationReportDraft(input: GenerateAutomationReportDraftInput): Promise<AutomationReportDraft> {
-  const tools = canEnableWebSearch(input.enableWebSearch) ? createWebSearchToolSet() : undefined;
+  const toolConfig = resolveConversationToolConfig({
+    enableWebSearch: input.enableWebSearch,
+    tools: input.tools,
+    activeTools: input.activeTools,
+  });
   const result = await generateText({
     model: resolveModel(),
+    system: input.systemPrompt,
     prompt: input.prompt,
     output: Output.object({ schema: automationReportSchema }),
-    ...(tools ? { tools, stopWhen: stepCountIs(WEB_SEARCH_REPORT_STOP_STEPS) } : {}),
+    ...(toolConfig.tools
+      ? {
+          tools: toolConfig.tools,
+          activeTools: toolConfig.activeTools,
+          stopWhen: stepCountIs(input.maxToolSteps ?? WEB_SEARCH_REPORT_STOP_STEPS),
+        }
+      : {}),
   });
 
-  if (tools && result.steps.some((step) => hasToolErrorInContent(step.content))) {
-    throw new WebSearchFallbackError("Web search tool execution failed.");
+  const toolError = findToolErrorInSteps(result.steps);
+  if (toolError) {
+    if (toolError.toolName === "web_search") {
+      throw new WebSearchFallbackError("Web search tool execution failed.");
+    }
+
+    throw new Error(`Tool '${toolError.toolName}' failed. ${getErrorMessage(toolError.error)}`);
   }
 
   return automationReportSchema.parse(result.output);
@@ -680,12 +729,24 @@ async function attemptGenerateAutomationReportDraft(input: GenerateAutomationRep
 
 export async function generateAutomationReportDraft(input: GenerateAutomationReportDraftInput): Promise<AutomationReportDraft> {
   const { provider } = getActiveAIProviderSettings();
+  const hasCustomTools = Boolean(input.tools && Object.keys(input.tools).length > 0);
 
   try {
     try {
       return await attemptGenerateAutomationReportDraft(input);
     } catch (error) {
-      if (!input.enableWebSearch || !shouldRetryWithoutTools(error)) {
+      if (error instanceof WebSearchFallbackError) {
+        if (!input.enableWebSearch) {
+          throw error;
+        }
+
+        return attemptGenerateAutomationReportDraft({
+          ...input,
+          enableWebSearch: false,
+        });
+      }
+
+      if (!input.enableWebSearch || hasCustomTools || !shouldRetryWithoutTools(error)) {
         throw error;
       }
 

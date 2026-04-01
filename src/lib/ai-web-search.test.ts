@@ -72,6 +72,8 @@ vi.mock("@/lib/web-search-service", () => ({
 
 import { generateAutomationReportDraft, streamConversation } from "@/lib/ai";
 
+const AUTOMATION_SYSTEM_PROMPT = "You are generating an automation report.";
+
 function textDelta(text: string) {
   return {
     type: "text-delta" as const,
@@ -117,6 +119,7 @@ describe("AI web search fallback", () => {
       });
 
     await expect(generateAutomationReportDraft({
+      systemPrompt: AUTOMATION_SYSTEM_PROMPT,
       prompt: "Summarize the latest AI news.",
       enableWebSearch: true,
     })).resolves.toEqual({
@@ -126,6 +129,7 @@ describe("AI web search fallback", () => {
 
     expect(generateTextMock).toHaveBeenCalledTimes(2);
     expect(generateTextMock.mock.calls[0]?.[0]).toEqual(expect.objectContaining({
+      system: AUTOMATION_SYSTEM_PROMPT,
       tools: expect.objectContaining({
         web_search: expect.any(Object),
       }),
@@ -146,12 +150,81 @@ describe("AI web search fallback", () => {
     });
 
     await generateAutomationReportDraft({
+      systemPrompt: AUTOMATION_SYSTEM_PROMPT,
       prompt: "Summarize the latest AI news.",
       enableWebSearch: true,
     });
 
     expect(generateTextMock).toHaveBeenCalledTimes(1);
     expect(generateTextMock.mock.calls[0]?.[0]).not.toHaveProperty("tools");
+  });
+
+  it("retries automation report generation without web search while keeping custom article tools", async () => {
+    const customTools = {
+      get_project_articles: {
+        description: "Fetch article details",
+      },
+    } as any;
+
+    generateTextMock
+      .mockResolvedValueOnce({
+        output: {
+          title: "Ignored",
+          markdown: "Ignored",
+        },
+        steps: [{
+          content: [{
+            type: "tool-error",
+            toolName: "web_search",
+            toolCallId: "tool-1",
+            input: { query: "latest ai" },
+            error: new Error("search failed"),
+          }],
+        }],
+      })
+      .mockResolvedValueOnce({
+        output: {
+          title: "Recovered",
+          markdown: "## Summary",
+        },
+        steps: [{
+          content: [],
+        }],
+      });
+
+    await expect(generateAutomationReportDraft({
+      systemPrompt: AUTOMATION_SYSTEM_PROMPT,
+      prompt: "Summarize the latest AI news.",
+      enableWebSearch: true,
+      tools: customTools,
+      activeTools: ["get_project_articles", "web_search"],
+      maxToolSteps: 12,
+    })).resolves.toEqual({
+      title: "Recovered",
+      markdown: "## Summary",
+    });
+
+    expect(generateTextMock).toHaveBeenCalledTimes(2);
+    expect(generateTextMock.mock.calls[0]?.[0]).toEqual(expect.objectContaining({
+      tools: expect.objectContaining({
+        web_search: expect.any(Object),
+        get_project_articles: expect.any(Object),
+      }),
+      activeTools: ["get_project_articles", "web_search"],
+      stopWhen: expect.any(Function),
+    }));
+    expect(generateTextMock.mock.calls[1]?.[0]).toEqual(expect.objectContaining({
+      tools: expect.objectContaining({
+        get_project_articles: expect.any(Object),
+      }),
+      activeTools: ["get_project_articles"],
+      stopWhen: expect.any(Function),
+    }));
+    expect(generateTextMock.mock.calls[1]?.[0]).not.toEqual(expect.objectContaining({
+      tools: expect.objectContaining({
+        web_search: expect.any(Object),
+      }),
+    }));
   });
 
   it("retries streaming conversation without web search after a tool error chunk", async () => {
