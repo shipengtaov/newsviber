@@ -286,7 +286,7 @@ describe("Settings", () => {
         expect(markup).toContain(">Search Provider<");
         expect(markup).toContain('value="Tavily"');
         expect(markup).toContain(">Search Base URL<");
-        expect(markup).toContain('value="https://api.tavily.com/search"');
+        expect(markup).toContain('value="https://api.tavily.com"');
         expect(markup).toContain(">Search API Key<");
     });
 

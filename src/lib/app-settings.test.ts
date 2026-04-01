@@ -167,6 +167,30 @@ describe("app settings persistence", () => {
     });
   });
 
+  it("normalizes persisted Tavily base URLs that still include the legacy search path", async () => {
+    const db = createDbMock({
+      "settings.webSearch.config": JSON.stringify({
+        provider: "tavily",
+        baseUrl: "https://proxy.example.com/tavily/search/",
+        apiKey: "tvly-secret",
+      }),
+    });
+    getDbMock.mockResolvedValue(db);
+
+    const snapshot = await bootstrapAppSettings();
+
+    expect(snapshot.webSearchSettings).toEqual({
+      provider: "tavily",
+      baseUrl: "https://proxy.example.com/tavily",
+      apiKey: "tvly-secret",
+    });
+    expect(readWebSearchSettings()).toEqual({
+      provider: "tavily",
+      baseUrl: "https://proxy.example.com/tavily",
+      apiKey: "tvly-secret",
+    });
+  });
+
   it("migrates structured localStorage settings into SQLite and clears old keys", async () => {
     const db = createDbMock();
     getDbMock.mockResolvedValue(db);

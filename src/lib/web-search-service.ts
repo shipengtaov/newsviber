@@ -1,7 +1,9 @@
 import { readWebSearchSettings } from "@/lib/app-settings";
 import { runtimeFetch } from "@/lib/runtime-fetch";
 import {
+  buildTavilySearchUrl,
   isWebSearchConfigured,
+  normalizeWebSearchSettings,
   type WebSearchSettings,
 } from "@/lib/web-search-config";
 
@@ -79,7 +81,7 @@ export function getWebSearchSettings(): WebSearchSettings {
 }
 
 export function hasConfiguredWebSearch(settings: WebSearchSettings = getWebSearchSettings()): boolean {
-  return isWebSearchConfigured(settings);
+  return isWebSearchConfigured(normalizeWebSearchSettings(settings));
 }
 
 export async function searchWeb(
@@ -91,7 +93,7 @@ export async function searchWeb(
   },
 ): Promise<WebSearchResponse> {
   const query = input.query.trim();
-  const settings = input.settings ?? getWebSearchSettings();
+  const settings = normalizeWebSearchSettings(input.settings ?? getWebSearchSettings());
   const maxResults = normalizeMaxResults(input.maxResults);
 
   if (!query) {
@@ -102,7 +104,7 @@ export async function searchWeb(
     throw new WebSearchUnavailableError("Web search is not configured.");
   }
 
-  const response = await runtimeFetch(settings.baseUrl, {
+  const response = await runtimeFetch(buildTavilySearchUrl(settings.baseUrl), {
     method: "POST",
     headers: {
       "Content-Type": "application/json",

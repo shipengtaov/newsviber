@@ -28,10 +28,10 @@ afterEach(() => {
 });
 
 describe("web search service", () => {
-  it("normalizes Tavily results and passes auth headers", async () => {
+  it("normalizes Tavily results and calls the Tavily search endpoint", async () => {
     readWebSearchSettingsMock.mockReturnValue({
       provider: "tavily",
-      baseUrl: "https://api.tavily.com/search",
+      baseUrl: "https://api.tavily.com",
       apiKey: "tvly-test-key",
     });
     runtimeFetchMock.mockResolvedValue({
@@ -67,6 +67,33 @@ describe("web search service", () => {
           Authorization: "Bearer tvly-test-key",
           "Content-Type": "application/json",
         }),
+      }),
+    );
+  });
+
+  it("avoids duplicating the Tavily search path for legacy base URLs", async () => {
+    runtimeFetchMock.mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: vi.fn().mockResolvedValue({ results: [] }),
+    });
+
+    await expect(searchWeb({
+      query: "ai agents",
+      settings: {
+        provider: "tavily",
+        baseUrl: "https://proxy.example.com/tavily/search/",
+        apiKey: "tvly-test-key",
+      },
+    })).resolves.toEqual({
+      query: "ai agents",
+      results: [],
+    });
+
+    expect(runtimeFetchMock).toHaveBeenCalledWith(
+      "https://proxy.example.com/tavily/search",
+      expect.objectContaining({
+        method: "POST",
       }),
     );
   });
