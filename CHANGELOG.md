@@ -9,6 +9,7 @@ All notable changes to this project will be documented in this file.
 - Added favorites for automation report cards.
 - Added pagination and a list view toggle for automation reports.
 - Added back-to-top controls in the news and automation views.
+- Added web search support for automation projects and discussions, including the related settings and streaming output flow.
 - Added custom context menus for text inputs in release builds.
 
 ### Changed
@@ -16,10 +17,6 @@ All notable changes to this project will be documented in this file.
 - Renamed the Creative workspace to Automation and updated related labels and iconography.
 - Tightened layout spacing across the app.
 - Updated automation project article defaults to 10 minimum and 200 maximum.
-
-### Fixed
-
-- Fixed web search streaming output in automation discussions.
 
 ## [26.3.3] - 2026-03-26
 
