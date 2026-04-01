@@ -129,6 +129,18 @@ describe("global chat normalization helpers", () => {
             summary: "<p>A concise summary with <strong>bold</strong> text</p>",
             published_at: "2026-03-10T09:00:00Z",
             inserted_at: "2026-03-10T09:10:00Z",
-        })).toBe("- [2026-03-10T09:00:00Z] Ben's Bites: Shipping AI features - A concise summary with bold text");
+            article_url: "https://example.com/article",
+        })).toBe("- [2026-03-10T09:00:00Z] Ben's Bites: Shipping AI features (Article URL: https://example.com/article) - A concise summary with bold text");
+    });
+
+    it("omits invalid article URLs from global chat context lines", () => {
+        expect(formatGlobalChatContextLine({
+            source_name: "Ben's Bites",
+            title: "Shipping AI features",
+            summary: "A concise summary",
+            published_at: "2026-03-10T09:00:00Z",
+            inserted_at: "2026-03-10T09:10:00Z",
+            article_url: "file:///tmp/example.txt",
+        })).toBe("- [2026-03-10T09:00:00Z] Ben's Bites: Shipping AI features - A concise summary");
     });
 });

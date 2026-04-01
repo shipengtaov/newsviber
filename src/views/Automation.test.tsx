@@ -8,6 +8,7 @@ import Automation from "@/views/Automation";
 const {
     listAutomationProjectsMock,
     listAutomationReportsMock,
+    listAutomationReportSourceArticlesMock,
     listAutomationSourcesMock,
     markAutomationReportAsReadMock,
     setAutomationReportFavoriteMock,
@@ -17,6 +18,7 @@ const {
 } = vi.hoisted(() => ({
     listAutomationProjectsMock: vi.fn(),
     listAutomationReportsMock: vi.fn(),
+    listAutomationReportSourceArticlesMock: vi.fn(),
     listAutomationSourcesMock: vi.fn(),
     markAutomationReportAsReadMock: vi.fn(),
     setAutomationReportFavoriteMock: vi.fn(),
@@ -173,6 +175,7 @@ vi.mock("@/lib/automation-events", () => ({
 vi.mock("@/lib/automation-service", () => ({
     listAutomationProjects: listAutomationProjectsMock,
     listAutomationReports: listAutomationReportsMock,
+    listAutomationReportSourceArticles: listAutomationReportSourceArticlesMock,
     listAutomationSources: listAutomationSourcesMock,
     markAutomationReportAsRead: markAutomationReportAsReadMock,
     setAutomationReportFavorite: setAutomationReportFavoriteMock,
@@ -213,8 +216,8 @@ vi.mock("@/lib/web-search-service", () => ({
     hasConfiguredWebSearch: vi.fn(() => true),
 }));
 
-vi.mock("react-markdown", () => ({
-    default: ({ children }: { children: string }) => <div data-testid="card-markdown">{children}</div>,
+vi.mock("@/components/chat/ChatMarkdown", () => ({
+    ChatMarkdown: ({ content }: { content: string }) => <div data-testid="card-markdown">{content}</div>,
 }));
 
 vi.mock("@/components/automation/AutomationReportDiscussionPanel", () => ({
@@ -246,6 +249,7 @@ describe("Automation", () => {
     beforeEach(() => {
         listAutomationProjectsMock.mockReset();
         listAutomationReportsMock.mockReset();
+        listAutomationReportSourceArticlesMock.mockReset();
         listAutomationSourcesMock.mockReset();
         markAutomationReportAsReadMock.mockReset();
         setAutomationReportFavoriteMock.mockReset();
@@ -274,6 +278,7 @@ describe("Automation", () => {
         listAutomationSourcesMock.mockResolvedValue([
             { id: 1, name: "Example Source", active: true, article_count: 12 },
         ]);
+        listAutomationReportSourceArticlesMock.mockResolvedValue([]);
         listAutomationReportsMock.mockResolvedValue({
             reports: [
                 {
@@ -387,12 +392,12 @@ describe("Automation", () => {
             throw new Error("Card markdown not found.");
         }
 
-        const prose = markdown.parentElement;
-        if (!(prose instanceof HTMLDivElement) || !(prose.parentElement instanceof HTMLDivElement) || !(prose.parentElement.parentElement instanceof HTMLDivElement)) {
+        const contentWrapper = markdown.parentElement;
+        if (!(contentWrapper instanceof HTMLDivElement) || !(contentWrapper.parentElement instanceof HTMLDivElement)) {
             throw new Error("Card body scroll container not found.");
         }
 
-        return prose.parentElement.parentElement;
+        return contentWrapper.parentElement;
     }
 
     it("does not render the back-to-top button on the project board", async () => {

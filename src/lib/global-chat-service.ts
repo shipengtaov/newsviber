@@ -1,6 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import type { Message } from "@/lib/ai";
 import { compactHtmlText } from "@/lib/article-html";
+import { normalizeCitationUrl } from "@/lib/citations";
 import { getDb } from "@/lib/db";
 import i18n from "@/lib/i18n";
 
@@ -50,6 +51,7 @@ export type GlobalChatArticleContextRow = {
     summary: string;
     published_at: string | null;
     inserted_at: string;
+    article_url: string | null;
 };
 
 type SaveChatThreadScopeCommandInput = {
@@ -525,7 +527,8 @@ export async function listGlobalChatContextArticles(input: Partial<GlobalChatSco
                 a.title,
                 COALESCE(a.summary, '') AS summary,
                 a.published_at,
-                a.created_at AS inserted_at
+                a.created_at AS inserted_at,
+                a.guid AS article_url
             FROM articles a
             JOIN sources s ON s.id = a.source_id
             WHERE ${queryParts.conditions.join(" AND ")}
@@ -541,10 +544,12 @@ export async function listGlobalChatContextArticles(input: Partial<GlobalChatSco
         summary: compactHtmlText(row.summary ?? ""),
         published_at: row.published_at ?? null,
         inserted_at: row.inserted_at,
+        article_url: normalizeCitationUrl(row.article_url),
     }));
 }
 
-export function formatGlobalChatContextLine(article: Pick<GlobalChatArticleContextRow, "source_name" | "title" | "summary" | "published_at" | "inserted_at">): string {
+export function formatGlobalChatContextLine(article: Pick<GlobalChatArticleContextRow, "source_name" | "title" | "summary" | "published_at" | "inserted_at" | "article_url">): string {
     const summary = compactHtmlText(article.summary);
-    return `- [${article.published_at ?? article.inserted_at ?? "Unknown"}] ${article.source_name}: ${article.title}${summary ? ` - ${summary}` : ""}`;
+    const articleUrl = normalizeCitationUrl(article.article_url);
+    return `- [${article.published_at ?? article.inserted_at ?? "Unknown"}] ${article.source_name}: ${article.title}${articleUrl ? ` (Article URL: ${articleUrl})` : ""}${summary ? ` - ${summary}` : ""}`;
 }

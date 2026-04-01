@@ -241,6 +241,9 @@
     --chat-markdown-quote-border: hsl(var(--primary) / 0.2);
     --chat-markdown-table-bg: hsl(var(--card));
     --chat-markdown-table-header-bg: hsl(var(--muted) / 0.6);
+    --chat-markdown-citation-bg: hsl(var(--accent));
+    --chat-markdown-citation-fg: hsl(var(--accent-foreground));
+    --chat-markdown-citation-border: hsl(var(--border));
     @apply prose prose-sm max-w-none break-words dark:prose-invert;
     color: var(--chat-markdown-body);
     @apply prose-headings:mt-4 prose-headings:mb-2 prose-headings:font-semibold prose-headings:tracking-tight;
@@ -279,6 +282,9 @@
     --chat-markdown-quote-border: hsl(0 0% 100% / 0.22);
     --chat-markdown-table-bg: transparent;
     --chat-markdown-table-header-bg: hsl(0 0% 100% / 0.1);
+    --chat-markdown-citation-bg: hsl(0 0% 100% / 0.14);
+    --chat-markdown-citation-fg: hsl(var(--primary-foreground));
+    --chat-markdown-citation-border: hsl(0 0% 100% / 0.18);
   }
 
   .chat-markdown :where(blockquote) {
@@ -333,6 +339,55 @@
 
   .chat-markdown-link:hover {
     opacity: 0.85;
+  }
+
+  .chat-markdown-citation-sup {
+    @apply relative ml-1 inline-flex align-super;
+    top: -0.1em;
+  }
+
+  .chat-markdown-citation {
+    @apply relative inline-flex min-w-4 items-center justify-center rounded-full border px-1 py-0 text-[0.7rem] font-semibold no-underline transition-opacity;
+    background-color: var(--chat-markdown-citation-bg);
+    border-color: var(--chat-markdown-citation-border);
+    color: var(--chat-markdown-citation-fg);
+    line-height: 1.1;
+  }
+
+  .chat-markdown-citation:hover {
+    opacity: 0.9;
+  }
+
+  .chat-markdown-citation:focus-visible {
+    @apply outline-none ring-2 ring-ring ring-offset-2;
+  }
+
+  .chat-markdown-citation-label {
+    @apply block;
+  }
+
+  .chat-markdown-citation-tooltip {
+    @apply pointer-events-none fixed z-[90] w-max rounded-md border px-2.5 py-2 text-left text-[11px] font-normal shadow-elevated;
+    background-color: hsl(var(--popover));
+    border-color: hsl(var(--border));
+    color: hsl(var(--popover-foreground));
+    opacity: 1;
+  }
+
+  .chat-markdown-citation-tooltip-top {
+    transform: translateY(-100%);
+  }
+
+  .chat-markdown-citation-tooltip-bottom {
+    transform: none;
+  }
+
+  .chat-markdown-citation-host {
+    @apply block text-xs font-medium;
+  }
+
+  .chat-markdown-citation-url {
+    @apply mt-1 block break-all text-[11px] opacity-90;
   }
 
   .chat-markdown-table-wrapper {

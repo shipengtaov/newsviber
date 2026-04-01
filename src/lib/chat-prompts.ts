@@ -9,6 +9,17 @@ export function getChatMarkdownFormattingInstructions(): string {
 - Avoid deep nesting, long boilerplate sections, or overly rigid templates.`;
 }
 
+function getInlineCitationFormattingInstructions(options: { includeExternalWebSources: boolean }): string {
+  return `Citation rules:
+- Cite non-obvious factual claims inline using numeric markdown links such as [1](https://example.com/article).
+- Put citations at the end of the sentence or bullet they support.
+- Use the supplied article URLs when citing the provided news context.
+${options.includeExternalWebSources ? "- If you use external web findings, cite them with the exact source URLs returned by web search." : ""}
+- Reuse the same URL with the same number within a reply when practical.
+- Do not output a references section, footnotes list, or bare URLs.
+- Do not invent or guess URLs.`;
+}
+
 function appendChatMarkdownFormatting(basePrompt: string): string {
   return `${basePrompt.trim()}
 
@@ -21,6 +32,40 @@ export type GlobalChatSystemPromptInput = {
   sourceCoverageLines: string[];
   contextLines: string[];
 };
+
+export type AutomationReportDiscussionSystemPromptInput = {
+  title: string;
+  bodyMarkdown: string;
+  supportingContextLines: string[];
+  enableWebSearch?: boolean;
+};
+
+export function buildAutomationReportDiscussionSystemPrompt({
+  title,
+  bodyMarkdown,
+  supportingContextLines,
+  enableWebSearch = false,
+}: AutomationReportDiscussionSystemPromptInput): string {
+  return appendChatMarkdownFormatting(`You are discussing an automation report you generated.
+Report Data:
+Title: ${title}
+Body:
+${bodyMarkdown}
+
+Supporting article context:
+${supportingContextLines.length > 0 ? supportingContextLines.join("\n") : "- No supporting article URLs are available for this report."}
+
+${enableWebSearch
+  ? `Prefer the report content first. When the report does not clearly answer the user's question, or the user asks for fresher facts, external validation, entity identification, or missing background, use web search before answering from memory.
+Do not ask the user to search in a browser when web search can help you resolve the question yourself.
+If you use external web findings, clearly distinguish them from the report content and cite the source URLs inline.
+If web search does not return enough evidence, say that clearly.`
+  : "Use the report content as your primary evidence and do not invent facts beyond it."}
+
+${getInlineCitationFormattingInstructions({ includeExternalWebSources: enableWebSearch })}
+
+Be concise and explore the user's questions further.`);
+}
 
 export function buildGlobalChatSystemPrompt({
   scopeSummary,
@@ -38,32 +83,7 @@ ${sourceCoverageLines.join("\n")}
 Relevant news context:
 ${contextLines.join("\n")}
 
+${getInlineCitationFormattingInstructions({ includeExternalWebSources: false })}
+
 Answer the user's question primarily with the supplied context. If the context is sparse or missing facts, say that clearly instead of inventing details.`);
-}
-
-export type AutomationReportDiscussionSystemPromptInput = {
-  title: string;
-  bodyMarkdown: string;
-  enableWebSearch?: boolean;
-};
-
-export function buildAutomationReportDiscussionSystemPrompt({
-  title,
-  bodyMarkdown,
-  enableWebSearch = false,
-}: AutomationReportDiscussionSystemPromptInput): string {
-  return appendChatMarkdownFormatting(`You are discussing an automation report you generated.
-Report Data:
-Title: ${title}
-Body:
-${bodyMarkdown}
-
-${enableWebSearch
-  ? `Prefer the report content first. When the report does not clearly answer the user's question, or the user asks for fresher facts, external validation, entity identification, or missing background, use web search before answering from memory.
-Do not ask the user to search in a browser when web search can help you resolve the question yourself.
-If you use external web findings, clearly distinguish them from the report content and cite the source URLs inline.
-If web search does not return enough evidence, say that clearly.`
-  : "Use the report content as your primary evidence and do not invent facts beyond it."}
-
-Be concise and explore the user's questions further.`);
 }

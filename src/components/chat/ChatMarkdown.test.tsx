@@ -50,6 +50,17 @@ npm test
     expect(markup).toContain("chat-markdown-link-disabled");
   });
 
+  it("renders numeric markdown links as citation chips with a tooltip", () => {
+    const markup = renderToStaticMarkup(
+      <ChatMarkdown content={"增长放缓 [1](https://example.com/article)"} />,
+    );
+
+    expect(markup).toContain("chat-markdown-citation-sup");
+    expect(markup).toContain("chat-markdown-citation-tooltip");
+    expect(markup).toContain("example.com");
+    expect(markup).toContain("https://example.com/article");
+  });
+
   it("applies inverse tone styles without changing markdown safety behavior", () => {
     const markup = renderToStaticMarkup(
       <ChatMarkdown

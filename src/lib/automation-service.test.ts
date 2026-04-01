@@ -35,6 +35,7 @@ vi.mock("@/lib/ai", async () => {
 
 import {
     buildAutomationPrompt,
+    formatAutomationReportSupportingContextLine,
     generateAutomationReportForProject,
     listAutomationReports,
     listAutomationProjects,
@@ -98,6 +99,7 @@ describe("automation service context helpers", () => {
                 content: null,
                 published_at: "2026-03-12T10:00:00Z",
                 inserted_at: "2026-03-12T10:05:00Z",
+                article_url: "https://example.com/infra-costs",
             }],
         );
 
@@ -124,12 +126,37 @@ describe("automation service context helpers", () => {
                 content: null,
                 published_at: "2026-03-12T10:00:00Z",
                 inserted_at: "2026-03-12T10:05:00Z",
+                article_url: "https://example.com/infra-costs",
             }],
         );
 
         expect(prompt).toContain("use external search only when it materially improves accuracy or recency");
         expect(prompt).toContain("cite the source URLs inline");
         expect(prompt).toContain("Do not use web search for facts already well supported");
+        expect(prompt).toContain("Article URL: https://example.com/infra-costs");
+        expect(prompt).toContain("numeric markdown links such as [1](https://example.com/article)");
+    });
+
+    it("formats supporting report context lines with safe article URLs only", () => {
+        expect(formatAutomationReportSupportingContextLine({
+            source_name: "HN",
+            title: "AI infra costs are dropping",
+            summary: "<p>Inference is getting cheaper.</p>",
+            content: null,
+            published_at: "2026-03-12T10:00:00Z",
+            inserted_at: "2026-03-12T10:05:00Z",
+            article_url: "https://example.com/infra-costs",
+        })).toContain("Article URL: https://example.com/infra-costs");
+
+        expect(formatAutomationReportSupportingContextLine({
+            source_name: "HN",
+            title: "AI infra costs are dropping",
+            summary: "<p>Inference is getting cheaper.</p>",
+            content: null,
+            published_at: "2026-03-12T10:00:00Z",
+            inserted_at: "2026-03-12T10:05:00Z",
+            article_url: "file:///tmp/example.txt",
+        })).not.toContain("Article URL:");
     });
 
     it("persists the generated markdown body directly into full_report", async () => {
@@ -162,6 +189,7 @@ describe("automation service context helpers", () => {
                     content: "Cheaper inference stack details.",
                     published_at: "2026-03-12T08:00:00Z",
                     inserted_at: "2026-03-12T08:05:00Z",
+                    article_url: "https://example.com/llm-infra",
                 }];
             }
 

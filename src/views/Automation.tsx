@@ -21,15 +21,19 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { addAutomationSyncListener } from "@/lib/automation-events";
 import { AutomationReportDiscussionPanel, AutomationReportDiscussionRail } from "@/components/automation/AutomationReportDiscussionPanel";
+import { ChatMarkdown } from "@/components/chat/ChatMarkdown";
 import {
     type AutomationArticleCandidate,
     type AutomationReport,
+    type AutomationReportContextArticle,
     type AutomationProject,
     type AutomationSourceOption,
     deleteAutomationProject,
+    formatAutomationReportSupportingContextLine,
     generateAutomationReportForProject,
     listAutomationReports,
     listAutomationProjects,
+    listAutomationReportSourceArticles,
     listAutomationSources,
     listProjectCandidateArticles,
     markAllAutomationReportsAsRead,
@@ -49,7 +53,6 @@ import { getAutomationReportBodyMarkdown, getAutomationReportPreviewExcerpt } fr
 import { formatUtcDateTime } from "@/lib/time";
 import { cn } from "@/lib/utils";
 import { hasConfiguredWebSearch } from "@/lib/web-search-service";
-import ReactMarkdown from "react-markdown";
 import { ArrowLeft, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Ellipsis, LayoutGrid, Lightbulb, List, Loader2, MessageSquare, MoreHorizontal, Pencil, Plus, Star, Trash2, WandSparkles } from "lucide-react";
 
 type ProjectFormState = {
@@ -523,6 +526,7 @@ export default function Automation() {
     const [activeProjectId, setActiveProjectId] = useState<number | null>(null);
     const [activeReportId, setActiveReportId] = useState<number | null>(null);
     const [activeReportSnapshot, setActiveReportSnapshot] = useState<AutomationReport | null>(null);
+    const [activeReportSourceArticles, setActiveReportSourceArticles] = useState<AutomationReportContextArticle[]>([]);
 
     const [projectDialogOpen, setProjectDialogOpen] = useState(false);
     const [editingProjectId, setEditingProjectId] = useState<number | null>(null);
@@ -583,6 +587,10 @@ export default function Automation() {
             ? "ready"
             : "unavailable";
     const activeReportBodyMarkdown = activeReport ? getAutomationReportBodyMarkdown(activeReport) : "";
+    const activeReportSupportingContextLines = useMemo(
+        () => activeReportSourceArticles.map((article) => formatAutomationReportSupportingContextLine(article)),
+        [activeReportSourceArticles],
+    );
     const activeProjectUnreadCount = activeProject
         ? activeProject.unread_report_count
         : 0;
@@ -660,6 +668,7 @@ export default function Automation() {
     useEffect(() => {
         if (activeReportId === null) {
             setActiveReportSnapshot(null);
+            setActiveReportSourceArticles([]);
             return;
         }
 
@@ -667,6 +676,38 @@ export default function Automation() {
             setActiveReportSnapshot(activeReportFromList);
         }
     }, [activeReportFromList, activeReportId]);
+
+    useEffect(() => {
+        const reportId = activeReport?.id ?? null;
+
+        if (reportId === null) {
+            setActiveReportSourceArticles([]);
+            return;
+        }
+
+        const resolvedReportId = reportId;
+        let isDisposed = false;
+
+        async function loadReportSourceArticles() {
+            try {
+                const articles = await listAutomationReportSourceArticles(resolvedReportId);
+                if (!isDisposed) {
+                    setActiveReportSourceArticles(articles);
+                }
+            } catch (error) {
+                console.error(`Failed to load source articles for report ${resolvedReportId}`, error);
+                if (!isDisposed) {
+                    setActiveReportSourceArticles([]);
+                }
+            }
+        }
+
+        void loadReportSourceArticles();
+
+        return () => {
+            isDisposed = true;
+        };
+    }, [activeReport?.id]);
 
     useEffect(() => {
         if (!isReportDiscussionOpen) {
@@ -1337,6 +1378,7 @@ export default function Automation() {
                 const systemPrompt = buildAutomationReportDiscussionSystemPrompt({
                     title: activeReport.title,
                     bodyMarkdown: activeReportBodyMarkdown,
+                    supportingContextLines: activeReportSupportingContextLines,
                     enableWebSearch: activeProject?.web_search_enabled,
                 });
 
@@ -1440,9 +1482,7 @@ export default function Automation() {
 
                             <div ref={reportBodyScrollRef} className="min-h-0 flex-1 overflow-y-auto">
                                 <div className="mx-auto w-full max-w-4xl px-3 py-3 md:px-4 md:py-4">
-                                    <div className="prose prose-sm max-w-none break-words dark:prose-invert">
-                                        <ReactMarkdown>{activeReportBodyMarkdown}</ReactMarkdown>
-                                    </div>
+                                    <ChatMarkdown content={activeReportBodyMarkdown} />
                                 </div>
                             </div>
                         </div>

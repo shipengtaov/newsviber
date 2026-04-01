@@ -2,6 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 import type { AutomationReportDraft } from "@/lib/ai";
 import { resolveArticlePreview } from "@/lib/article-html";
 import { dispatchAutomationSyncEvent } from "@/lib/automation-events";
+import { normalizeCitationUrl } from "@/lib/citations";
 import { getDb } from "@/lib/db";
 import { formatUtcDateTime } from "@/lib/time";
 
@@ -49,6 +50,18 @@ export type AutomationArticleCandidate = {
     published_at: string | null;
     inserted_at: string;
     is_consumed: boolean;
+};
+
+export type AutomationReportContextArticle = {
+    id: number;
+    source_id: number;
+    source_name: string;
+    title: string;
+    summary: string;
+    content: string | null;
+    published_at: string | null;
+    inserted_at: string;
+    article_url: string | null;
 };
 
 export type SaveAutomationProjectInput = {
@@ -160,6 +173,7 @@ type AutomationArticleContextRow = {
     content: string | null;
     published_at: string | null;
     inserted_at: string;
+    article_url: string | null;
 };
 
 const DEFAULT_AUTO_INTERVAL_MINUTES = 60;
@@ -363,16 +377,27 @@ export function summarizeArticleContextText(summary: string | null, content: str
     return base.slice(0, MAX_CONTEXT_CHARS_PER_ARTICLE);
 }
 
+export function formatAutomationReportSupportingContextLine(
+    article: Pick<AutomationReportContextArticle, "source_name" | "title" | "summary" | "content" | "published_at" | "inserted_at" | "article_url">,
+): string {
+    const contextText = summarizeArticleContextText(article.summary, article.content);
+    const articleUrl = normalizeCitationUrl(article.article_url);
+
+    return `- [${formatUtcDateTime(article.published_at, article.inserted_at)}] ${article.source_name}: ${article.title}${articleUrl ? ` (Article URL: ${articleUrl})` : ""}${contextText ? ` - ${contextText}` : ""}`;
+}
+
 export function buildAutomationPrompt(project: AutomationProject, articles: AutomationArticleContextRow[]): string {
     const contextLines = articles.map((article, index) => {
         const publishedAt = formatUtcDateTime(article.published_at, "Unknown");
         const contextText = summarizeArticleContextText(article.summary, article.content);
+        const articleUrl = normalizeCitationUrl(article.article_url);
 
         return [
             `Article ${index + 1}`,
             `Source: ${article.source_name}`,
             `Title: ${article.title}`,
             `Published: ${publishedAt}`,
+            ...(articleUrl ? [`Article URL: ${articleUrl}`] : []),
             `Context: ${contextText}`,
         ].join("\n");
     }).join("\n\n");
@@ -399,6 +424,11 @@ Guidelines:
 - If the user explicitly wants sections such as Key Signals, Ideas, Next Actions, or any other structure, use that structure.
 - If the user does not specify a structure, choose the clearest markdown structure for the material.
 - ${project.web_search_enabled ? "Prefer the supplied project articles first; use external search only when it materially improves accuracy or recency." : "Use only the supplied project articles as evidence."}
+- Cite non-obvious factual claims inline using numeric markdown links such as [1](https://example.com/article).
+- When citing the supplied project articles, use the matching Article URL when it is provided in the context.
+- ${project.web_search_enabled ? "When citing external web findings, use the exact source URLs returned by web search." : "Do not invent or guess URLs when a supplied article has no usable Article URL."}
+- Place citations at the end of the sentence or bullet they support.
+- Do not output a references section, footnotes list, or bare URLs.
 ${evidenceInstructions}
 - Keep the language consistent with the user's prompt.
 - Do not repeat the prompt verbatim.
@@ -479,7 +509,8 @@ async function loadArticlesForGeneration(projectId: number, articleIds: number[]
                 a.summary,
                 a.content,
                 a.published_at,
-                a.created_at AS inserted_at
+                a.created_at AS inserted_at,
+                a.guid AS article_url
             FROM articles a
             JOIN sources s ON s.id = a.source_id
             WHERE a.id IN (${articleIdPlaceholders})
@@ -489,7 +520,10 @@ async function loadArticlesForGeneration(projectId: number, articleIds: number[]
         params,
     );
 
-    return rows;
+    return rows.map((row) => ({
+        ...row,
+        article_url: normalizeCitationUrl(row.article_url),
+    }));
 }
 
 async function requestAutomationReport(
@@ -774,6 +808,36 @@ export async function listProjectCandidateArticles(
     );
 
     return rows.map(normalizeAutomationArticleCandidate);
+}
+
+export async function listAutomationReportSourceArticles(reportId: number): Promise<AutomationReportContextArticle[]> {
+    const db = await getDb();
+    const rows = await db.select<AutomationArticleContextRow[]>(
+        `
+            SELECT
+                a.id,
+                a.source_id,
+                s.name AS source_name,
+                a.title,
+                COALESCE(a.summary, '') AS summary,
+                a.content,
+                a.published_at,
+                a.created_at AS inserted_at,
+                a.guid AS article_url
+            FROM automation_report_articles report_articles
+            JOIN articles a ON a.id = report_articles.article_id
+            JOIN sources s ON s.id = a.source_id
+            WHERE report_articles.report_id = $1
+            ORDER BY a.created_at DESC, a.id DESC
+        `,
+        [reportId],
+    );
+
+    return rows.map((row) => ({
+        ...row,
+        summary: row.summary ?? "",
+        article_url: normalizeCitationUrl(row.article_url),
+    }));
 }
 
 export async function generateAutomationReportForProject(input: GenerateAutomationReportInput): Promise<AutomationReport> {
