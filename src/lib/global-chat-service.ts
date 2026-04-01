@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import type { Message } from "@/lib/ai";
-import { compactHtmlText } from "@/lib/article-html";
+import { compactHtmlText, resolveArticlePreview } from "@/lib/article-html";
 import { normalizeCitationUrl } from "@/lib/citations";
 import { getDb } from "@/lib/db";
 import i18n from "@/lib/i18n";
@@ -46,12 +46,28 @@ export type GlobalChatScopeInput = {
 };
 
 export type GlobalChatArticleContextRow = {
+    id?: number;
     source_name: string;
     title: string;
     summary: string;
     published_at: string | null;
     inserted_at: string;
     article_url: string | null;
+};
+
+export type GlobalChatArticleShortlistItem = {
+    id: number;
+    source_name: string;
+    title: string;
+    preview: string;
+    published_at: string | null;
+    inserted_at: string;
+    article_url: string | null;
+};
+
+export type GlobalChatArticleDetail = GlobalChatArticleShortlistItem & {
+    summary: string;
+    content: string;
 };
 
 type SaveChatThreadScopeCommandInput = {
@@ -106,6 +122,17 @@ type GlobalChatSourceRow = {
     matching_article_count: number | null;
 };
 
+type GlobalChatArticleRecordRow = {
+    id: number;
+    source_name: string;
+    title: string;
+    summary: string | null;
+    content: string | null;
+    published_at: string | null;
+    inserted_at: string;
+    article_url: string | null;
+};
+
 type GlobalChatContextQueryParts = {
     conditions: string[];
     params: Array<number | string>;
@@ -116,6 +143,10 @@ const GLOBAL_CHAT_PRESET_DAY_SET = new Set([1, 3, 7, 30]);
 const DEFAULT_GLOBAL_CHAT_PRESET_DAYS = 7;
 const DEFAULT_GLOBAL_CHAT_TITLE_MAX_LENGTH = 60;
 const DEFAULT_GLOBAL_CHAT_CONTEXT_LIMIT = 50;
+const DEFAULT_GLOBAL_CHAT_SHORTLIST_LIMIT = 12;
+const DEFAULT_GLOBAL_CHAT_SEARCH_LIMIT = 6;
+const MAX_GLOBAL_CHAT_SHORTLIST_PREVIEW_CHARS = 280;
+const MAX_GLOBAL_CHAT_DETAIL_CONTENT_CHARS = 4000;
 const GLOBAL_CHAT_THREAD_SELECT_BASE_SQL = `
     SELECT
         t.id,
@@ -168,6 +199,19 @@ function sanitizeSourceIds(sourceIds: number[]): number[] {
 
     for (const sourceId of sourceIds) {
         const parsed = Number.parseInt(String(sourceId), 10);
+        if (Number.isFinite(parsed) && parsed > 0) {
+            seen.add(parsed);
+        }
+    }
+
+    return Array.from(seen);
+}
+
+function sanitizeArticleIds(articleIds: number[]): number[] {
+    const seen = new Set<number>();
+
+    for (const articleId of articleIds) {
+        const parsed = Number.parseInt(String(articleId), 10);
         if (Number.isFinite(parsed) && parsed > 0) {
             seen.add(parsed);
         }
@@ -400,6 +444,42 @@ function normalizeGlobalChatSource(row: GlobalChatSourceRow): GlobalChatSourceOp
     };
 }
 
+function truncateText(value: string, maxLength: number): string {
+    const trimmed = value.trim();
+    if (trimmed.length <= maxLength) {
+        return trimmed;
+    }
+
+    return `${trimmed.slice(0, Math.max(1, maxLength - 3)).trimEnd()}...`;
+}
+
+function buildGlobalChatArticlePreview(summary: string | null | undefined, content: string | null | undefined): string {
+    const preview = resolveArticlePreview(summary, content).text || "No summary available.";
+    return truncateText(preview, MAX_GLOBAL_CHAT_SHORTLIST_PREVIEW_CHARS);
+}
+
+function normalizeGlobalChatArticleShortlistRow(row: GlobalChatArticleRecordRow): GlobalChatArticleShortlistItem {
+    return {
+        id: row.id,
+        source_name: row.source_name,
+        title: row.title,
+        preview: buildGlobalChatArticlePreview(row.summary, row.content),
+        published_at: row.published_at ?? null,
+        inserted_at: row.inserted_at,
+        article_url: normalizeCitationUrl(row.article_url),
+    };
+}
+
+function normalizeGlobalChatArticleDetailRow(row: GlobalChatArticleRecordRow): GlobalChatArticleDetail {
+    const shortlistItem = normalizeGlobalChatArticleShortlistRow(row);
+
+    return {
+        ...shortlistItem,
+        summary: compactHtmlText(row.summary ?? ""),
+        content: truncateText(compactHtmlText(row.content ?? ""), MAX_GLOBAL_CHAT_DETAIL_CONTENT_CHARS),
+    };
+}
+
 function toSaveChatThreadScopeCommandInput(input: GlobalChatScopeInput, threadId?: number): SaveChatThreadScopeCommandInput {
     const normalized = normalizeGlobalChatScopeInput(input);
     return {
@@ -548,8 +628,120 @@ export async function listGlobalChatContextArticles(input: Partial<GlobalChatSco
     }));
 }
 
+export async function listGlobalChatShortlistArticles(input: Partial<GlobalChatScopeInput>, limit = DEFAULT_GLOBAL_CHAT_SHORTLIST_LIMIT): Promise<GlobalChatArticleShortlistItem[]> {
+    const sanitizedLimit = Math.max(1, Math.min(50, Number.parseInt(String(limit), 10) || DEFAULT_GLOBAL_CHAT_SHORTLIST_LIMIT));
+    const db = await getDb();
+    const queryParts = buildGlobalChatArticleQueryParts(input);
+    const rows = await db.select<GlobalChatArticleRecordRow[]>(
+        `
+            SELECT
+                a.id,
+                s.name AS source_name,
+                a.title,
+                a.summary,
+                a.content,
+                a.published_at,
+                a.created_at AS inserted_at,
+                a.guid AS article_url
+            FROM articles a
+            JOIN sources s ON s.id = a.source_id
+            WHERE ${queryParts.conditions.join(" AND ")}
+            ORDER BY julianday(${queryParts.event_timestamp_expression}) DESC, a.id DESC
+            LIMIT ${sanitizedLimit}
+        `,
+        queryParts.params,
+    );
+
+    return rows.map(normalizeGlobalChatArticleShortlistRow);
+}
+
+export async function getGlobalChatArticlesByIds(
+    input: Partial<GlobalChatScopeInput>,
+    articleIds: number[],
+): Promise<GlobalChatArticleDetail[]> {
+    const sanitizedArticleIds = sanitizeArticleIds(articleIds);
+    if (sanitizedArticleIds.length === 0) {
+        return [];
+    }
+
+    const db = await getDb();
+    const queryParts = buildGlobalChatArticleQueryParts(input);
+    const idPlaceholders = sanitizedArticleIds.map((articleId) => pushParam(queryParts.params, articleId)).join(", ");
+    const rows = await db.select<GlobalChatArticleRecordRow[]>(
+        `
+            SELECT
+                a.id,
+                s.name AS source_name,
+                a.title,
+                a.summary,
+                a.content,
+                a.published_at,
+                a.created_at AS inserted_at,
+                a.guid AS article_url
+            FROM articles a
+            JOIN sources s ON s.id = a.source_id
+            WHERE ${queryParts.conditions.join(" AND ")}
+              AND a.id IN (${idPlaceholders})
+            ORDER BY julianday(${queryParts.event_timestamp_expression}) DESC, a.id DESC
+        `,
+        queryParts.params,
+    );
+
+    const rowsById = new Map(rows.map((row) => [row.id, normalizeGlobalChatArticleDetailRow(row)]));
+    return sanitizedArticleIds
+        .map((articleId) => rowsById.get(articleId))
+        .filter((article): article is GlobalChatArticleDetail => !!article);
+}
+
+export async function searchGlobalChatArticlesInScope(
+    input: Partial<GlobalChatScopeInput>,
+    query: string,
+    limit = DEFAULT_GLOBAL_CHAT_SEARCH_LIMIT,
+): Promise<GlobalChatArticleShortlistItem[]> {
+    const trimmedQuery = query.trim().toLowerCase();
+    if (!trimmedQuery) {
+        return [];
+    }
+
+    const sanitizedLimit = Math.max(1, Math.min(25, Number.parseInt(String(limit), 10) || DEFAULT_GLOBAL_CHAT_SEARCH_LIMIT));
+    const db = await getDb();
+    const queryParts = buildGlobalChatArticleQueryParts(input);
+    const searchParam = pushParam(queryParts.params, `%${trimmedQuery}%`);
+    const rows = await db.select<GlobalChatArticleRecordRow[]>(
+        `
+            SELECT
+                a.id,
+                s.name AS source_name,
+                a.title,
+                a.summary,
+                a.content,
+                a.published_at,
+                a.created_at AS inserted_at,
+                a.guid AS article_url
+            FROM articles a
+            JOIN sources s ON s.id = a.source_id
+            WHERE ${queryParts.conditions.join(" AND ")}
+              AND (
+                  LOWER(a.title) LIKE ${searchParam}
+                  OR LOWER(COALESCE(a.summary, '')) LIKE ${searchParam}
+                  OR LOWER(COALESCE(a.content, '')) LIKE ${searchParam}
+              )
+            ORDER BY julianday(${queryParts.event_timestamp_expression}) DESC, a.id DESC
+            LIMIT ${sanitizedLimit}
+        `,
+        queryParts.params,
+    );
+
+    return rows.map(normalizeGlobalChatArticleShortlistRow);
+}
+
 export function formatGlobalChatContextLine(article: Pick<GlobalChatArticleContextRow, "source_name" | "title" | "summary" | "published_at" | "inserted_at" | "article_url">): string {
     const summary = compactHtmlText(article.summary);
     const articleUrl = normalizeCitationUrl(article.article_url);
     return `- [${article.published_at ?? article.inserted_at ?? "Unknown"}] ${article.source_name}: ${article.title}${articleUrl ? ` (Article URL: ${articleUrl})` : ""}${summary ? ` - ${summary}` : ""}`;
+}
+
+export function formatGlobalChatShortlistLine(article: Pick<GlobalChatArticleShortlistItem, "id" | "source_name" | "title" | "preview" | "published_at" | "inserted_at" | "article_url">): string {
+    const articleUrl = normalizeCitationUrl(article.article_url);
+    return `- [ID ${article.id}] [${article.published_at ?? article.inserted_at ?? "Unknown"}] ${article.source_name}: ${article.title}${articleUrl ? ` (Article URL: ${articleUrl})` : ""}${article.preview ? ` - ${article.preview}` : ""}`;
 }

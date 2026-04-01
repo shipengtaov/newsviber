@@ -5,6 +5,7 @@ import {
     buildGlobalChatEventTimestampExpression,
     buildGlobalChatTitle,
     formatGlobalChatContextLine,
+    formatGlobalChatShortlistLine,
     normalizeGlobalChatMessage,
     normalizeGlobalChatScopeInput,
     normalizeGlobalChatThread,
@@ -142,5 +143,17 @@ describe("global chat normalization helpers", () => {
             inserted_at: "2026-03-10T09:10:00Z",
             article_url: "file:///tmp/example.txt",
         })).toBe("- [2026-03-10T09:00:00Z] Ben's Bites: Shipping AI features - A concise summary");
+    });
+
+    it("formats compact shortlist lines with article IDs", () => {
+        expect(formatGlobalChatShortlistLine({
+            id: 42,
+            source_name: "Ben's Bites",
+            title: "Shipping AI features",
+            preview: "A concise summary",
+            published_at: "2026-03-10T09:00:00Z",
+            inserted_at: "2026-03-10T09:10:00Z",
+            article_url: "https://example.com/article",
+        })).toBe("- [ID 42] [2026-03-10T09:00:00Z] Ben's Bites: Shipping AI features (Article URL: https://example.com/article) - A concise summary");
     });
 });

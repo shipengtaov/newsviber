@@ -8,7 +8,7 @@ import { createOpenAI } from "@ai-sdk/openai";
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import { createOllama } from "ai-sdk-ollama";
 import { createOpenRouter } from "@openrouter/ai-sdk-provider";
-import { createGateway, generateObject, generateText, Output, stepCountIs, streamText, tool } from "ai";
+import { createGateway, generateObject, generateText, Output, stepCountIs, ToolLoopAgent, type ToolSet, tool } from "ai";
 import { createMinimax, createMinimaxOpenAI } from "vercel-minimax-ai-provider";
 import { z } from "zod";
 import { createZhipu } from "zhipu-ai-provider";
@@ -61,9 +61,9 @@ export type ProviderFlavor =
   | "openai-compatible";
 
 const API_KEY_OPTIONAL_PROVIDERS = new Set(["ollama", "custom"]);
-const STREAMING_CHUNK_TIMEOUT_MS = 10_000;
+const STREAMING_CHUNK_TIMEOUT_MS = 300_000;
+const CHAT_TOOL_LOOP_STOP_STEPS = 4;
 const WEB_SEARCH_REPORT_STOP_STEPS = 5;
-const WEB_SEARCH_STREAM_STOP_STEPS = 4;
 
 const webSearchToolInputSchema = z.object({
   query: z.string().describe("A short web search query for the missing fact or latest context."),
@@ -124,10 +124,16 @@ function createStreamingError(
   options?: { started: boolean },
 ): StreamingContractError {
   const detailText = detail.trim();
+  const isFirstChunkTimeout = !options?.started && detailText.toLowerCase().includes("no stream chunk arrived");
+  const shouldSuggestDifferentProvider = !options?.started
+    && !isRequestCancelledErrorMessage(detailText)
+    && !detailText.toLowerCase().includes("no stream chunk arrived");
   const prefix = options?.started
     ? "Streaming response was interrupted."
-    : "Streaming chat requires real-time chunked output.";
-  const suffix = options?.started
+    : isFirstChunkTimeout
+      ? "Streaming response timed out before the first chunk."
+      : "Streaming chat requires real-time chunked output.";
+  const suffix = !shouldSuggestDifferentProvider
     ? ""
     : " Please switch to a provider/model that supports streaming.";
 
@@ -192,7 +198,7 @@ export function getErrorMessage(error: unknown): string {
   return String(error || "Unknown AI error.");
 }
 
-function shouldRetryWithoutWebSearch(error: unknown): boolean {
+function shouldRetryWithoutTools(error: unknown): boolean {
   if (error instanceof WebSearchFallbackError || error instanceof WebSearchUnavailableError) {
     return true;
   }
@@ -232,6 +238,18 @@ function canEnableWebSearch(enableWebSearch: boolean): boolean {
   return enableWebSearch && hasConfiguredWebSearch();
 }
 
+function isRequestCancelledErrorMessage(message: string): boolean {
+  return message.trim().toLowerCase() === "request cancelled";
+}
+
+function normalizeStreamingErrorDetail(detail: string, started: boolean): string {
+  if (!started && isRequestCancelledErrorMessage(detail)) {
+    return `No stream chunk arrived within ${STREAMING_CHUNK_TIMEOUT_MS / 1000} seconds.`;
+  }
+
+  return detail;
+}
+
 function hasToolErrorInContent(
   content: Array<{ type: string }>,
 ): boolean {
@@ -243,9 +261,17 @@ type GenerateAutomationReportDraftInput = {
   enableWebSearch: boolean;
 };
 
-type StreamConversationOptions = {
+export type StreamConversationOptions = {
   enableWebSearch?: boolean;
+  tools?: ToolSet;
+  activeTools?: string[];
+  onRetryWithoutTools?: () => void;
   onRetryWithoutWebSearch?: () => void;
+};
+
+type ResolvedConversationToolConfig = {
+  tools?: ToolSet;
+  activeTools?: string[];
 };
 
 export function isMiniMaxAnthropicEndpoint(url: string): boolean {
@@ -467,11 +493,10 @@ async function attemptStreamConversation(
   messages: Message[],
   onTextUpdate: (text: string) => void,
   abortSignal: AbortSignal | undefined,
-  enableWebSearch: boolean,
+  options: StreamConversationOptions,
 ): Promise<string> {
   const { provider } = getActiveAIProviderSettings();
-  const useWebSearch = canEnableWebSearch(enableWebSearch);
-  const tools = useWebSearch ? createWebSearchToolSet() : undefined;
+  const toolConfig = resolveConversationToolConfig(options);
   let fullText = "";
   let streamError: unknown = null;
   let hasReceivedTextChunk = false;
@@ -497,18 +522,25 @@ async function attemptStreamConversation(
     onTextUpdate("");
   }
 
-  const result = streamText({
+  const agent = new ToolLoopAgent({
     model: resolveModel(),
-    messages: buildMessageArray(messages),
-    abortSignal,
-    timeout: { chunkMs: STREAMING_CHUNK_TIMEOUT_MS },
-    ...(tools ? { tools, stopWhen: stepCountIs(WEB_SEARCH_STREAM_STOP_STEPS) } : {}),
-    onError({ error }) {
-      streamError = error;
-    },
+    ...(toolConfig.tools
+      ? {
+          tools: toolConfig.tools,
+          activeTools: toolConfig.activeTools,
+          stopWhen: stepCountIs(CHAT_TOOL_LOOP_STOP_STEPS),
+        }
+      : {}),
   });
+  let result: Awaited<ReturnType<ToolLoopAgent["stream"]>> | null = null;
 
   try {
+    result = await agent.stream({
+      messages: buildMessageArray(messages),
+      abortSignal,
+      timeout: { chunkMs: STREAMING_CHUNK_TIMEOUT_MS },
+    });
+
     for await (const part of result.fullStream) {
       switch (part.type) {
         case "start-step": {
@@ -534,7 +566,11 @@ async function attemptStreamConversation(
           break;
         }
         case "tool-error": {
-          throw new WebSearchFallbackError(getErrorMessage(part.error));
+          if (part.toolName === "web_search") {
+            throw new WebSearchFallbackError(getErrorMessage(part.error));
+          }
+
+          throw new Error(`Tool '${part.toolName}' failed. ${getErrorMessage(part.error)}`);
         }
         case "error": {
           streamError = part.error;
@@ -547,7 +583,10 @@ async function attemptStreamConversation(
 
           throw createStreamingError(
             provider.name,
-            part.reason || `No stream chunk arrived within ${STREAMING_CHUNK_TIMEOUT_MS / 1000} seconds.`,
+            normalizeStreamingErrorDetail(
+              part.reason || `No stream chunk arrived within ${STREAMING_CHUNK_TIMEOUT_MS / 1000} seconds.`,
+              hasReceivedTextChunk,
+            ),
             { started: hasReceivedTextChunk },
           );
         }
@@ -564,15 +603,19 @@ async function attemptStreamConversation(
       throw new Error("AI response was aborted.");
     }
 
-    throw createStreamingError(provider.name, getErrorMessage(error), {
+    throw createStreamingError(provider.name, normalizeStreamingErrorDetail(getErrorMessage(error), hasReceivedTextChunk), {
       started: hasReceivedTextChunk,
     });
   }
 
   if (streamError) {
-    throw createStreamingError(provider.name, getErrorMessage(streamError), {
-      started: hasReceivedTextChunk,
-    });
+    throw createStreamingError(
+      provider.name,
+      normalizeStreamingErrorDetail(getErrorMessage(streamError), hasReceivedTextChunk),
+      {
+        started: hasReceivedTextChunk,
+      },
+    );
   }
 
   const resultWithText = result as { text?: PromiseLike<string> };
@@ -591,15 +634,12 @@ export async function streamConversation(
   abortSignal?: AbortSignal,
   options: StreamConversationOptions = {},
 ): Promise<string> {
+  const toolConfig = resolveConversationToolConfig(options);
+
   try {
-    return await attemptStreamConversation(
-      messages,
-      onTextUpdate,
-      abortSignal,
-      Boolean(options.enableWebSearch),
-    );
+    return await attemptStreamConversation(messages, onTextUpdate, abortSignal, options);
   } catch (error) {
-    if (!options.enableWebSearch || !shouldRetryWithoutWebSearch(error)) {
+    if (!toolConfig.tools || !shouldRetryWithoutTools(error)) {
       throw error;
     }
 
@@ -607,8 +647,18 @@ export async function streamConversation(
       throw error;
     }
 
-    options.onRetryWithoutWebSearch?.();
-    return attemptStreamConversation(messages, onTextUpdate, abortSignal, false);
+    notifyRetryWithoutTools(options);
+    return attemptStreamConversation(
+      messages,
+      onTextUpdate,
+      abortSignal,
+      {
+        ...options,
+        enableWebSearch: false,
+        tools: undefined,
+        activeTools: undefined,
+      },
+    );
   }
 }
 
@@ -635,7 +685,7 @@ export async function generateAutomationReportDraft(input: GenerateAutomationRep
     try {
       return await attemptGenerateAutomationReportDraft(input);
     } catch (error) {
-      if (!input.enableWebSearch || !shouldRetryWithoutWebSearch(error)) {
+      if (!input.enableWebSearch || !shouldRetryWithoutTools(error)) {
         throw error;
       }
 
@@ -682,5 +732,35 @@ ${trimmedPrompt}`,
     return optimizedPrompt;
   } catch (error) {
     throw new Error(`${provider.name}: ${getErrorMessage(error)}`);
+  }
+}
+
+function resolveConversationToolConfig(options: StreamConversationOptions): ResolvedConversationToolConfig {
+  const mergedTools: ToolSet = {
+    ...(canEnableWebSearch(Boolean(options.enableWebSearch)) ? createWebSearchToolSet() : {}),
+    ...(options.tools ?? {}),
+  };
+
+  const toolNames = Object.keys(mergedTools);
+  if (toolNames.length === 0) {
+    return {};
+  }
+
+  const activeTools = options.activeTools?.filter((toolName) => toolName in mergedTools);
+
+  return {
+    tools: mergedTools,
+    activeTools: activeTools && activeTools.length > 0 ? activeTools : undefined,
+  };
+}
+
+function notifyRetryWithoutTools(options: StreamConversationOptions) {
+  const callbacks = new Set([
+    options.onRetryWithoutTools,
+    options.onRetryWithoutWebSearch,
+  ]);
+
+  for (const callback of callbacks) {
+    callback?.();
   }
 }

@@ -12,26 +12,30 @@ const SCOPE_PANEL_COLLAPSED_STORAGE_KEY = "globalChatScopePanelCollapsed_v1";
 
 const {
     mockDeleteGlobalChatThread,
+    mockGetGlobalChatArticlesByIds,
     mockGetGlobalChatThread,
-    mockListGlobalChatContextArticles,
     mockListGlobalChatMessages,
+    mockListGlobalChatShortlistArticles,
     mockListGlobalChatSources,
     mockListGlobalChatThreads,
     mockPersistGlobalChatMessage,
     mockReplaceMessages,
     mockSaveGlobalChatThreadScope,
+    mockSearchGlobalChatArticlesInScope,
     mockSend,
     mockToast,
 } = vi.hoisted(() => ({
     mockDeleteGlobalChatThread: vi.fn(),
+    mockGetGlobalChatArticlesByIds: vi.fn(),
     mockGetGlobalChatThread: vi.fn(),
-    mockListGlobalChatContextArticles: vi.fn(),
     mockListGlobalChatMessages: vi.fn(),
+    mockListGlobalChatShortlistArticles: vi.fn(),
     mockListGlobalChatSources: vi.fn(),
     mockListGlobalChatThreads: vi.fn(),
     mockPersistGlobalChatMessage: vi.fn(),
     mockReplaceMessages: vi.fn(),
     mockSaveGlobalChatThreadScope: vi.fn(),
+    mockSearchGlobalChatArticlesInScope: vi.fn(),
     mockSend: vi.fn(),
     mockToast: vi.fn(),
 }));
@@ -186,16 +190,18 @@ vi.mock("@/lib/global-chat-service", () => {
             custom_end_date: "2026-03-19",
         })),
         deleteGlobalChatThread: mockDeleteGlobalChatThread,
-        formatGlobalChatContextLine: vi.fn(() => "Context line"),
+        formatGlobalChatShortlistLine: vi.fn((article: { id: number }) => `Shortlist line ${article.id}`),
         formatLocalDateInputValue: vi.fn(() => "2026-03-19"),
+        getGlobalChatArticlesByIds: mockGetGlobalChatArticlesByIds,
         getGlobalChatThread: mockGetGlobalChatThread,
-        listGlobalChatContextArticles: mockListGlobalChatContextArticles,
         listGlobalChatMessages: mockListGlobalChatMessages,
+        listGlobalChatShortlistArticles: mockListGlobalChatShortlistArticles,
         listGlobalChatSources: mockListGlobalChatSources,
         listGlobalChatThreads: mockListGlobalChatThreads,
         normalizeGlobalChatScopeInput,
         persistGlobalChatMessage: mockPersistGlobalChatMessage,
         saveGlobalChatThreadScope: mockSaveGlobalChatThreadScope,
+        searchGlobalChatArticlesInScope: mockSearchGlobalChatArticlesInScope,
     };
 });
 
@@ -254,20 +260,23 @@ describe("GlobalChat scope panel defaults", () => {
         sessionStorage.clear();
         mockToast.mockReset();
         mockDeleteGlobalChatThread.mockReset();
+        mockGetGlobalChatArticlesByIds.mockReset();
         mockGetGlobalChatThread.mockReset();
-        mockListGlobalChatContextArticles.mockReset();
         mockListGlobalChatMessages.mockReset();
+        mockListGlobalChatShortlistArticles.mockReset();
         mockListGlobalChatSources.mockReset();
         mockListGlobalChatThreads.mockReset();
         mockPersistGlobalChatMessage.mockReset();
         mockReplaceMessages.mockReset();
         mockSaveGlobalChatThreadScope.mockReset();
+        mockSearchGlobalChatArticlesInScope.mockReset();
         mockSend.mockReset();
 
         mockDeleteGlobalChatThread.mockResolvedValue(undefined);
+        mockGetGlobalChatArticlesByIds.mockResolvedValue([]);
         mockGetGlobalChatThread.mockResolvedValue(null);
-        mockListGlobalChatContextArticles.mockResolvedValue([]);
         mockListGlobalChatMessages.mockResolvedValue([]);
+        mockListGlobalChatShortlistArticles.mockResolvedValue([]);
         mockListGlobalChatSources.mockResolvedValue([]);
         mockListGlobalChatThreads.mockResolvedValue([]);
         mockPersistGlobalChatMessage.mockResolvedValue(1);
@@ -282,6 +291,7 @@ describe("GlobalChat scope panel defaults", () => {
             created_at: "2026-03-19T00:00:00Z",
             updated_at: "2026-03-19T00:00:00Z",
         });
+        mockSearchGlobalChatArticlesInScope.mockResolvedValue([]);
 
         const actEnvironment = globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean };
         previousActEnvironment = actEnvironment.IS_REACT_ACT_ENVIRONMENT;
@@ -540,5 +550,72 @@ describe("GlobalChat scope panel defaults", () => {
         await settleGlobalChat();
 
         expect(document.activeElement).toBe(chatInput);
+    });
+
+    it("builds a shortlist-based prompt and exposes local article tools when sending a message", async () => {
+        mockListGlobalChatSources.mockResolvedValue([{
+            id: 5,
+            name: "Reuters",
+            active: true,
+            article_count: 20,
+            matching_article_count: 5,
+        }]);
+        mockListGlobalChatShortlistArticles.mockResolvedValue([{
+            id: 42,
+            source_name: "Reuters",
+            title: "Example headline",
+            preview: "Example summary",
+            published_at: "2026-03-12T08:00:00Z",
+            inserted_at: "2026-03-12T08:05:00Z",
+            article_url: "https://example.com/article",
+        }]);
+
+        renderGlobalChat();
+        await settleGlobalChat();
+
+        const chatInput = getChatInput();
+        const chatForm = chatInput.closest("form");
+
+        expect(chatForm).toBeInstanceOf(HTMLFormElement);
+
+        act(() => {
+            const valueSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
+            valueSetter?.call(chatInput, "What happened this week?");
+            chatInput.dispatchEvent(new Event("change", { bubbles: true }));
+        });
+        await settleGlobalChat();
+
+        act(() => {
+            chatForm?.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+        });
+        await settleGlobalChat();
+
+        expect(mockSend).toHaveBeenCalledTimes(1);
+
+        const sendInput = mockSend.mock.calls[0]?.[0];
+        expect(sendInput).toEqual(expect.objectContaining({
+            streamOptions: expect.objectContaining({
+                tools: expect.objectContaining({
+                    get_articles_by_id: expect.any(Object),
+                    search_articles_in_scope: expect.any(Object),
+                }),
+            }),
+        }));
+
+        const conversation = await sendInput.buildConversation([], {
+            role: "user",
+            content: "What happened this week?",
+        });
+
+        expect(mockListGlobalChatShortlistArticles).toHaveBeenCalledWith(expect.objectContaining({
+            time_range_mode: "preset",
+            preset_days: 7,
+        }));
+        expect(conversation[0]).toEqual(expect.objectContaining({
+            role: "system",
+            content: expect.stringContaining("Recent scoped article shortlist:"),
+        }));
+        expect(conversation[0]?.content).toContain("Shortlist line 42");
+        expect(conversation[0]?.content).toContain("article retrieval tools are available");
     });
 });

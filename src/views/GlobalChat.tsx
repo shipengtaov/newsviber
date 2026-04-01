@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { tool } from "ai";
 import { useTranslation } from "react-i18next";
 import { useNavigate, useParams } from "react-router-dom";
 import { Bot, ChevronLeft, ChevronRight, MessageSquare, Plus, Send, Trash2, User } from "lucide-react";
+import { z } from "zod";
 import { ChatMarkdown } from "@/components/chat/ChatMarkdown";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -29,16 +31,18 @@ import {
     createDefaultGlobalChatScopeInput,
     createGlobalChatCustomRangeFromPresetDays,
     deleteGlobalChatThread,
-    formatGlobalChatContextLine,
+    formatGlobalChatShortlistLine,
     formatLocalDateInputValue,
+    getGlobalChatArticlesByIds,
     getGlobalChatThread,
-    listGlobalChatContextArticles,
     listGlobalChatMessages,
+    listGlobalChatShortlistArticles,
     listGlobalChatSources,
     listGlobalChatThreads,
     normalizeGlobalChatScopeInput,
     persistGlobalChatMessage,
     saveGlobalChatThreadScope,
+    searchGlobalChatArticlesInScope,
     type GlobalChatScopeInput,
     type GlobalChatSourceOption,
     type GlobalChatThread,
@@ -64,6 +68,13 @@ const MIN_CHAT_THREADS_PANEL_WIDTH = 220;
 const MAX_CHAT_THREADS_PANEL_WIDTH = 420;
 const EXPANDED_SCOPE_PANEL_WIDTH = 320;
 const COLLAPSED_SCOPE_PANEL_WIDTH = 56;
+const GLOBAL_CHAT_GET_ARTICLES_INPUT_SCHEMA = z.object({
+    ids: z.array(z.number().int().positive()).min(1).max(12).describe("Relevant shortlist article IDs to inspect in more detail."),
+});
+const GLOBAL_CHAT_SEARCH_ARTICLES_INPUT_SCHEMA = z.object({
+    query: z.string().min(1).max(200).describe("A keyword query to search within the current thread scope."),
+    limit: z.number().int().min(1).max(10).optional().describe("Maximum number of shortlist results to return."),
+});
 
 function clampChatThreadsPanelWidth(width: number): number {
     return Math.min(MAX_CHAT_THREADS_PANEL_WIDTH, Math.max(MIN_CHAT_THREADS_PANEL_WIDTH, width));
@@ -163,6 +174,32 @@ function pruneInactiveSourceIds(scope: GlobalChatScopeInput, sources: GlobalChat
     return {
         ...scope,
         source_ids: nextSourceIds,
+    };
+}
+
+function createGlobalChatToolSet(scopeSnapshot: GlobalChatScopeInput) {
+    return {
+        get_articles_by_id: tool({
+            description: "Fetch detailed local article evidence for the specified shortlist article IDs within the current thread scope. Use this when the shortlist is not enough to answer accurately.",
+            inputSchema: GLOBAL_CHAT_GET_ARTICLES_INPUT_SCHEMA,
+            execute: async ({ ids }) => {
+                const articles = await getGlobalChatArticlesByIds(scopeSnapshot, ids);
+                return {
+                    articles,
+                };
+            },
+        }),
+        search_articles_in_scope: tool({
+            description: "Search local scoped articles by keyword within the current thread scope. Use this when the relevant article is not obvious from the shortlist.",
+            inputSchema: GLOBAL_CHAT_SEARCH_ARTICLES_INPUT_SCHEMA,
+            execute: async ({ query, limit }) => {
+                const results = await searchGlobalChatArticlesInScope(scopeSnapshot, query, limit);
+                return {
+                    query,
+                    results,
+                };
+            },
+        }),
     };
 }
 
@@ -593,6 +630,7 @@ export default function GlobalChat() {
 
         const inputValue = input.trim();
         const scopeSnapshot = normalizeGlobalChatScopeInput(scope);
+        const globalChatToolSet = createGlobalChatToolSet(scopeSnapshot);
         let targetThread = activeThread;
         setInput("");
 
@@ -624,7 +662,7 @@ export default function GlobalChat() {
                 void refreshThreads();
             },
             buildConversation: async (history, userMessage) => {
-                const articles = await listGlobalChatContextArticles(scopeSnapshot);
+                const shortlistArticles = await listGlobalChatShortlistArticles(scopeSnapshot);
                 const normalizedScope = normalizeGlobalChatScopeInput(scopeSnapshot);
                 const scopedSources = normalizedScope.source_ids.length === 0
                     ? sources
@@ -634,13 +672,13 @@ export default function GlobalChat() {
                     : scopedSources.map((source) => (
                         `- ${source.name}: ${source.matching_article_count} matching article(s) in the current time range, ${source.article_count} total stored`
                     ));
-                const contextLines = articles.length === 0
+                const shortlistLines = shortlistArticles.length === 0
                     ? ["- No articles matched the current thread filters."]
-                    : articles.map((article) => formatGlobalChatContextLine(article));
+                    : shortlistArticles.map((article) => formatGlobalChatShortlistLine(article));
                 const systemPrompt = buildGlobalChatSystemPrompt({
                     scopeSummary: buildScopeSummary(scopeSnapshot, sources, t),
                     sourceCoverageLines,
-                    contextLines,
+                    shortlistLines,
                 });
 
                 return [
@@ -648,6 +686,9 @@ export default function GlobalChat() {
                     ...history,
                     userMessage,
                 ];
+            },
+            streamOptions: {
+                tools: globalChatToolSet,
             },
             onAssistantComplete: async ({ assistantMessage }) => {
                 if (!targetThread) {
@@ -904,8 +945,7 @@ export default function GlobalChat() {
 
                                                     if (isPreparingMessage) {
                                                         return (
-                                                            <div className="flex items-center gap-3 text-muted-foreground">
-                                                                <span>{t("connectingToModel")}</span>
+                                                            <div className="flex items-center text-muted-foreground" aria-label={t("connectingToModel")}>
                                                                 <div className="flex items-center space-x-1">
                                                                     <span className="h-2 w-2 animate-bounce rounded-full bg-primary/40" />
                                                                     <span className="h-2 w-2 animate-bounce rounded-full bg-primary/60 [animation-delay:0.2s]" />

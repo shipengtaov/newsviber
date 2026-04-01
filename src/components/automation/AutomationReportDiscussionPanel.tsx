@@ -141,8 +141,7 @@ export function AutomationReportDiscussionPanel({
 
                                 if (isPreparingMessage) {
                                     return (
-                                        <div className="flex items-center gap-3 text-muted-foreground">
-                                            <span>{t("connectingToModel")}</span>
+                                        <div className="flex items-center text-muted-foreground" aria-label={t("connectingToModel")}>
                                             <div className="flex items-center space-x-1">
                                                 <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-primary/40" />
                                                 <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-primary/60 [animation-delay:0.2s]" />

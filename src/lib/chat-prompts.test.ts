@@ -10,13 +10,15 @@ describe("chat prompt builders", () => {
     const prompt = buildGlobalChatSystemPrompt({
       scopeSummary: "Time range: Last 7 Days. Data sources: All active sources.",
       sourceCoverageLines: ["- Reuters: 5 matching article(s) in the current time range, 20 total stored"],
-      contextLines: ["- [2026-03-12T08:00:00Z] Reuters: Example headline (Article URL: https://example.com/article) - Example summary"],
+      shortlistLines: ["- [ID 42] [2026-03-12T08:00:00Z] Reuters: Example headline (Article URL: https://example.com/article) - Example summary"],
     });
 
     expect(prompt).toContain("Current thread scope:");
-    expect(prompt).toContain("Relevant news context:");
+    expect(prompt).toContain("Recent scoped article shortlist:");
+    expect(prompt).toContain("[ID 42]");
     expect(prompt).toContain(getChatMarkdownFormattingInstructions());
     expect(prompt).toContain("numeric markdown links such as [1](https://example.com/article)");
+    expect(prompt).toContain("If you need more evidence and article retrieval tools are available");
   });
 
   it("preserves automation report context while appending markdown guidance", () => {

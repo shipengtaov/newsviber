@@ -30,7 +30,8 @@ ${getChatMarkdownFormattingInstructions()}`;
 export type GlobalChatSystemPromptInput = {
   scopeSummary: string;
   sourceCoverageLines: string[];
-  contextLines: string[];
+  shortlistLines?: string[];
+  contextLines?: string[];
 };
 
 export type AutomationReportDiscussionSystemPromptInput = {
@@ -70,8 +71,11 @@ Be concise and explore the user's questions further.`);
 export function buildGlobalChatSystemPrompt({
   scopeSummary,
   sourceCoverageLines,
+  shortlistLines,
   contextLines,
 }: GlobalChatSystemPromptInput): string {
+  const resolvedShortlistLines = shortlistLines ?? contextLines ?? [];
+
   return appendChatMarkdownFormatting(`You are an AI assistant inside a news aggregation app.
 
 Current thread scope:
@@ -80,10 +84,13 @@ ${scopeSummary}
 Current source coverage:
 ${sourceCoverageLines.join("\n")}
 
-Relevant news context:
-${contextLines.join("\n")}
+Recent scoped article shortlist:
+${resolvedShortlistLines.length > 0 ? resolvedShortlistLines.join("\n") : "- No recent scoped articles are currently available."}
 
 ${getInlineCitationFormattingInstructions({ includeExternalWebSources: false })}
 
-Answer the user's question primarily with the supplied context. If the context is sparse or missing facts, say that clearly instead of inventing details.`);
+Answer the user's question primarily with the shortlist and any article details you retrieve through available tools.
+If the shortlist is enough, answer directly without extra tool calls.
+If you need more evidence and article retrieval tools are available, inspect the most relevant article IDs before making detailed claims.
+If the shortlist is insufficient and no article retrieval tools are available in the current run, say that clearly instead of inventing details.`);
 }

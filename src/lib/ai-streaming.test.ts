@@ -21,10 +21,29 @@ const { streamTextMock, getActiveAIProviderSettingsMock } = vi.hoisted(() => ({
 
 vi.mock("ai", async () => {
   const actual = await vi.importActual<typeof import("ai")>("ai");
+  class ToolLoopAgentMock {
+    private settings: Record<string, unknown>;
+
+    constructor(settings: Record<string, unknown>) {
+      this.settings = settings;
+    }
+
+    get tools() {
+      return this.settings.tools ?? {};
+    }
+
+    async stream(options: Record<string, unknown>) {
+      return streamTextMock({
+        ...this.settings,
+        ...options,
+      });
+    }
+  }
 
   return {
     ...actual,
     streamText: streamTextMock,
+    ToolLoopAgent: ToolLoopAgentMock,
   };
 });
 
@@ -94,7 +113,7 @@ describe("streamConversation", () => {
     await expect(completionPromise).resolves.toBe("Hello world");
     expect(chunks).toEqual(["Hello", "Hello world"]);
     expect(streamTextMock).toHaveBeenCalledWith(expect.objectContaining({
-      timeout: { chunkMs: 10_000 },
+      timeout: { chunkMs: 300_000 },
     }));
   });
 
@@ -144,7 +163,7 @@ describe("streamConversation", () => {
       fullStream: (async function* () {
         yield {
           type: "abort" as const,
-          reason: "No stream chunk arrived within 10 seconds.",
+          reason: "No stream chunk arrived within 300 seconds.",
         };
       })(),
       text: Promise.resolve(""),
@@ -153,7 +172,22 @@ describe("streamConversation", () => {
     await expect(
       streamConversation([{ role: "user", content: "Hello" }], vi.fn()),
     ).rejects.toThrow(
-      "MockAI: Streaming chat requires real-time chunked output. No stream chunk arrived within 10 seconds. Please switch to a provider/model that supports streaming.",
+      "MockAI: Streaming response timed out before the first chunk. No stream chunk arrived within 300 seconds.",
+    );
+  });
+
+  it("normalizes Tauri request cancellation before the first chunk into a timeout-style error", async () => {
+    streamTextMock.mockImplementation(() => ({
+      fullStream: (async function* () {
+        throw "Request cancelled";
+      })(),
+      text: Promise.resolve(""),
+    }));
+
+    await expect(
+      streamConversation([{ role: "user", content: "Hello" }], vi.fn()),
+    ).rejects.toThrow(
+      "MockAI: Streaming response timed out before the first chunk. No stream chunk arrived within 300 seconds.",
     );
   });
 

@@ -28,11 +28,30 @@ const {
 
 vi.mock("ai", async () => {
   const actual = await vi.importActual<typeof import("ai")>("ai");
+  class ToolLoopAgentMock {
+    private settings: Record<string, unknown>;
+
+    constructor(settings: Record<string, unknown>) {
+      this.settings = settings;
+    }
+
+    get tools() {
+      return this.settings.tools ?? {};
+    }
+
+    async stream(options: Record<string, unknown>) {
+      return streamTextMock({
+        ...this.settings,
+        ...options,
+      });
+    }
+  }
 
   return {
     ...actual,
     generateText: generateTextMock,
     streamText: streamTextMock,
+    ToolLoopAgent: ToolLoopAgentMock,
   };
 });
 
@@ -208,5 +227,45 @@ describe("AI web search fallback", () => {
     )).resolves.toBe("Recovered answer");
 
     expect(onRetryWithoutWebSearch).toHaveBeenCalledTimes(1);
+  });
+
+  it("retries a streamed answer without custom tools when the provider rejects tool calling", async () => {
+    streamTextMock
+      .mockRejectedValueOnce(new Error("This model does not support tools"))
+      .mockImplementationOnce(() => ({
+        fullStream: (async function* () {
+          yield textDelta("Recovered answer");
+        })(),
+        text: Promise.resolve("Recovered answer"),
+      }));
+
+    const customTool = {
+      lookup_article: {
+        description: "Lookup article details",
+        inputSchema: {
+          type: "object",
+        },
+      },
+    } as any;
+    const onRetryWithoutTools = vi.fn();
+
+    await expect(streamConversation(
+      [{ role: "user", content: "Tell me more" }],
+      vi.fn(),
+      undefined,
+      {
+        tools: customTool,
+        onRetryWithoutTools,
+      },
+    )).resolves.toBe("Recovered answer");
+
+    expect(streamTextMock).toHaveBeenCalledTimes(2);
+    expect(streamTextMock.mock.calls[0]?.[0]).toEqual(expect.objectContaining({
+      tools: expect.objectContaining({
+        lookup_article: expect.any(Object),
+      }),
+    }));
+    expect(streamTextMock.mock.calls[1]?.[0]).not.toHaveProperty("tools");
+    expect(onRetryWithoutTools).toHaveBeenCalledTimes(1);
   });
 });

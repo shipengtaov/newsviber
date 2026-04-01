@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { Message } from "@/lib/ai";
+import type { Message, StreamConversationOptions } from "@/lib/ai";
 import {
   beginStreamingConversation,
   createStreamingConversationState,
@@ -22,9 +22,7 @@ type ConversationBuilder = (
 type SendConversationInput = {
   content: string;
   buildConversation: ConversationBuilder;
-  streamOptions?: {
-    enableWebSearch?: boolean;
-  };
+  streamOptions?: StreamConversationOptions;
   onUserMessageCommitted?: (input: {
     history: Message[];
     userMessage: Message;
@@ -157,7 +155,7 @@ export function useStreamingConversation() {
         abortController.signal,
         {
           ...streamOptions,
-          onRetryWithoutWebSearch: () => {
+          onRetryWithoutTools: () => {
             applyState(
               restartStreamingConversation({
                 messages: messagesRef.current,
