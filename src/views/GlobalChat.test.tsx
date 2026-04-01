@@ -8,6 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import GlobalChat from "@/views/GlobalChat";
 
 const DESKTOP_LAYOUT_MEDIA_QUERY = "(min-width: 1024px)";
+const CHAT_THREADS_PANEL_WIDTH_STORAGE_KEY = "globalChatThreadsPanelWidth_v1";
 const SCOPE_PANEL_COLLAPSED_STORAGE_KEY = "globalChatScopePanelCollapsed_v1";
 
 const {
@@ -61,6 +62,8 @@ vi.mock("react-i18next", () => ({
                     return "Saved threads";
                 case "startNewThread":
                     return "Start new thread";
+                case "deleteChat":
+                    return "Delete chat";
                 case "liveThread":
                     return "Live thread";
                 case "scopeChangesNote":
@@ -119,6 +122,8 @@ vi.mock("react-i18next", () => ({
                     return "Time range";
                 case "sourceScopeLabel":
                     return "Sources";
+                case "resizeChatThreadsPanel":
+                    return "Resize chat threads panel";
                 default:
                     return namespace ? `${namespace}:${key}` : key;
             }
@@ -252,6 +257,7 @@ describe("GlobalChat scope panel defaults", () => {
     let root: Root;
     let desktopLayoutMatches = true;
     let originalMatchMedia: typeof window.matchMedia | undefined;
+    let originalPointerEvent: typeof PointerEvent | undefined;
     let originalScrollIntoView: typeof HTMLElement.prototype.scrollIntoView | undefined;
     let previousActEnvironment: boolean | undefined;
 
@@ -298,6 +304,7 @@ describe("GlobalChat scope panel defaults", () => {
         actEnvironment.IS_REACT_ACT_ENVIRONMENT = true;
 
         originalMatchMedia = window.matchMedia;
+        originalPointerEvent = globalThis.PointerEvent;
         originalScrollIntoView = HTMLElement.prototype.scrollIntoView;
         desktopLayoutMatches = true;
         window.matchMedia = vi.fn().mockImplementation((query: string) => ({
@@ -310,6 +317,7 @@ describe("GlobalChat scope panel defaults", () => {
             removeListener: vi.fn(),
             dispatchEvent: vi.fn(),
         }));
+        globalThis.PointerEvent = MouseEvent as typeof PointerEvent;
         HTMLElement.prototype.scrollIntoView = vi.fn();
 
         container = document.createElement("div");
@@ -326,6 +334,7 @@ describe("GlobalChat scope panel defaults", () => {
         localStorage.clear();
         sessionStorage.clear();
         window.matchMedia = originalMatchMedia as typeof window.matchMedia;
+        globalThis.PointerEvent = originalPointerEvent as typeof PointerEvent;
         HTMLElement.prototype.scrollIntoView = originalScrollIntoView as typeof HTMLElement.prototype.scrollIntoView;
         (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = previousActEnvironment;
     });
@@ -402,6 +411,12 @@ describe("GlobalChat scope panel defaults", () => {
         return threadsPanel as HTMLElement;
     }
 
+    function getThreadsPanelShell(): HTMLDivElement {
+        const panelShell = getThreadsPanel().parentElement;
+        expect(panelShell).toBeInstanceOf(HTMLDivElement);
+        return panelShell as HTMLDivElement;
+    }
+
     function getThreadsScrollContainer(): HTMLDivElement {
         const scrollContainer = Array.from(getThreadsPanel().children).find((child) => (
             child instanceof HTMLDivElement
@@ -423,6 +438,21 @@ describe("GlobalChat scope panel defaults", () => {
         const conversationScrollContainer = getConversationSection().children.item(1);
         expect(conversationScrollContainer).toBeInstanceOf(HTMLDivElement);
         return conversationScrollContainer as HTMLDivElement;
+    }
+
+    function getThreadTitleButton(title: string): HTMLButtonElement {
+        const threadButton = Array.from(container.querySelectorAll("button")).find((candidate) => (
+            candidate.textContent?.includes(title)
+        ));
+
+        expect(threadButton).toBeInstanceOf(HTMLButtonElement);
+        return threadButton as HTMLButtonElement;
+    }
+
+    function getThreadsResizeHandle(): HTMLDivElement {
+        const resizeHandle = container.querySelector('div[role="separator"][aria-label="Resize chat threads panel"]');
+        expect(resizeHandle).toBeInstanceOf(HTMLDivElement);
+        return resizeHandle as HTMLDivElement;
     }
 
     it("defaults the desktop scope panel to collapsed when no stored preference exists", async () => {
@@ -499,17 +529,25 @@ describe("GlobalChat scope panel defaults", () => {
         renderGlobalChat();
         await settleGlobalChat();
 
+        const threadsPanelShell = getThreadsPanelShell();
         const threadsPanel = getThreadsPanel();
         const threadsScrollContainer = getThreadsScrollContainer();
         const conversationSection = getConversationSection();
         const conversationScrollContainer = getConversationScrollContainer();
 
+        expect(threadsPanelShell.className).toContain("min-w-0");
+        expect(threadsPanelShell.className).toContain("w-full");
+
         expect(threadsPanel.className).toContain("h-full");
         expect(threadsPanel.className).toContain("min-h-0");
+        expect(threadsPanel.className).toContain("min-w-0");
+        expect(threadsPanel.className).toContain("w-full");
 
         expect(threadsScrollContainer.className).toContain("max-h-72");
         expect(threadsScrollContainer.className).toContain("min-h-0");
         expect(threadsScrollContainer.className).toContain("flex-1");
+        expect(threadsScrollContainer.className).toContain("min-w-0");
+        expect(threadsScrollContainer.className).toContain("w-full");
 
         expect(conversationSection.className).toContain("min-h-0");
         expect(conversationSection.className).toContain("flex-1");
@@ -517,6 +555,101 @@ describe("GlobalChat scope panel defaults", () => {
 
         expect(conversationScrollContainer.className).toContain("min-h-0");
         expect(conversationScrollContainer.className).toContain("flex-1");
+    });
+
+    it("keeps saved thread rows width-constrained so the delete button follows panel resizing", async () => {
+        const longThreadTitle = "A very long saved conversation title that should truncate before pushing the delete button out of place";
+        mockListGlobalChatThreads.mockResolvedValue([{
+            id: 7,
+            title: longThreadTitle,
+            time_range_mode: "preset",
+            preset_days: 7,
+            custom_start_date: null,
+            custom_end_date: null,
+            source_ids: [],
+            created_at: "2026-03-19T00:00:00Z",
+            updated_at: "2026-03-19T01:00:00Z",
+        }]);
+
+        renderGlobalChat();
+        await settleGlobalChat();
+
+        const threadsPanelShell = getThreadsPanelShell();
+        const threadsPanel = getThreadsPanel();
+        const threadsScrollContainer = getThreadsScrollContainer();
+        const titleButton = getThreadTitleButton(longThreadTitle);
+        const threadRow = titleButton.parentElement;
+        const rowButtons = threadRow ? Array.from(threadRow.querySelectorAll("button")) : [];
+        const deleteButton = rowButtons.find((button) => button !== titleButton) ?? null;
+        const titleText = titleButton.firstElementChild;
+        const timestampText = titleButton.lastElementChild;
+
+        expect(threadsPanelShell.className).toContain("min-w-0");
+        expect(threadsPanelShell.className).toContain("w-full");
+        expect(threadsPanel.className).toContain("min-w-0");
+        expect(threadsPanel.className).toContain("w-full");
+        expect(threadsScrollContainer.className).toContain("min-w-0");
+        expect(threadsScrollContainer.className).toContain("w-full");
+
+        expect(threadRow).toBeInstanceOf(HTMLDivElement);
+        expect((threadRow as HTMLDivElement).className).toContain("w-full");
+        expect((threadRow as HTMLDivElement).className).toContain("min-w-0");
+        expect((threadRow as HTMLDivElement).className).toContain("grid");
+        expect((threadRow as HTMLDivElement).className).toContain("grid-cols-[minmax(0,1fr)_auto]");
+        expect((threadRow as HTMLDivElement).className).toContain("items-center");
+
+        expect(titleButton.className).toContain("w-full");
+        expect(titleButton.className).toContain("min-w-0");
+        expect(titleButton.className).toContain("overflow-hidden");
+        expect(titleButton.className).toContain("text-left");
+        expect(titleButton.textContent).toContain(longThreadTitle);
+
+        expect(titleText).toBeInstanceOf(HTMLDivElement);
+        expect((titleText as HTMLDivElement).className).toContain("truncate");
+
+        expect(timestampText).toBeInstanceOf(HTMLDivElement);
+        expect((timestampText as HTMLDivElement).className).toContain("truncate");
+
+        expect(rowButtons).toHaveLength(2);
+        expect(deleteButton).toBeInstanceOf(HTMLButtonElement);
+        expect(deleteButton?.parentElement).toBe(threadRow);
+        expect((deleteButton as HTMLButtonElement).className).toContain("shrink-0");
+    });
+
+    it("shrinks the desktop threads panel within bounds while dragging the resize handle", async () => {
+        renderGlobalChat();
+        await settleGlobalChat();
+
+        const threadsPanelShell = getThreadsPanelShell();
+        const resizeHandle = getThreadsResizeHandle();
+
+        expect(threadsPanelShell.style.width).toBe("288px");
+        expect(resizeHandle.getAttribute("aria-valuenow")).toBe("288");
+
+        act(() => {
+            resizeHandle.dispatchEvent(new PointerEvent("pointerdown", {
+                bubbles: true,
+                button: 0,
+                clientX: 400,
+            }));
+        });
+        await flushAsyncWork();
+
+        act(() => {
+            window.dispatchEvent(new PointerEvent("pointermove", {
+                bubbles: true,
+                clientX: 240,
+            }));
+        });
+        await flushAsyncWork();
+
+        expect(threadsPanelShell.style.width).toBe("220px");
+        expect(resizeHandle.getAttribute("aria-valuenow")).toBe("220");
+        expect(localStorage.getItem(CHAT_THREADS_PANEL_WIDTH_STORAGE_KEY)).toBe("220");
+
+        act(() => {
+            window.dispatchEvent(new PointerEvent("pointerup", { bubbles: true }));
+        });
     });
 
     it("focuses the chat input after clicking new chat from an existing thread", async () => {

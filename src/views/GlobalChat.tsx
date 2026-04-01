@@ -788,10 +788,10 @@ export default function GlobalChat() {
 
             <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-hidden lg:flex-row">
                 <div
-                    className="relative min-h-0 shrink-0"
+                    className="relative min-h-0 min-w-0 w-full shrink-0"
                     style={isDesktopLayout ? { width: chatThreadsPanelWidth } : undefined}
                 >
-                    <aside className="surface-panel flex h-full min-h-0 flex-col">
+                    <aside className="surface-panel flex h-full min-h-0 w-full min-w-0 flex-col">
                         <div className="border-b border-border px-3 py-2">
                             <div className="space-y-2">
                                 <div>
@@ -804,8 +804,8 @@ export default function GlobalChat() {
                                 </Button>
                             </div>
                         </div>
-                        <ScrollArea className="max-h-72 min-h-0 flex-1 lg:max-h-none">
-                            <div className="space-y-1 p-2 lg:pr-[17px]">
+                        <ScrollArea className="max-h-72 min-h-0 w-full min-w-0 flex-1 lg:max-h-none">
+                            <div className="w-full min-w-0 space-y-1 p-2 lg:pr-[17px]">
                                 {isLoadingThreads && threads.length === 0 && (
                                     <EmptyState
                                         title={t("loadingConversations")}
@@ -828,7 +828,7 @@ export default function GlobalChat() {
                                         <div
                                             key={thread.id}
                                             className={cn(
-                                                "flex items-start gap-2 rounded-md border p-1.5 transition-colors duration-100",
+                                                "grid w-full min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-2 rounded-md border p-1.5 transition-colors duration-100",
                                                 isActive
                                                     ? "border-border bg-muted"
                                                     : "border-transparent hover:bg-muted/50",
@@ -836,11 +836,13 @@ export default function GlobalChat() {
                                         >
                                             <button
                                                 type="button"
-                                                className="min-w-0 flex-1 text-left"
+                                                className="w-full min-w-0 overflow-hidden text-left"
                                                 onClick={() => navigate(`/chat/${thread.id}`)}
                                             >
                                                 <div className="truncate text-sm font-medium text-foreground">{thread.title}</div>
-                                                <div className="mt-1 text-xs text-muted-foreground">{formatUtcDateTime(thread.updated_at, t("unknown", { ns: "common" }))}</div>
+                                                <div className="mt-1 truncate text-xs text-muted-foreground">
+                                                    {formatUtcDateTime(thread.updated_at, t("unknown", { ns: "common" }))}
+                                                </div>
                                             </button>
                                             <Button
                                                 type="button"
