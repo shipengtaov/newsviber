@@ -79,6 +79,7 @@ Current release targets:
 - macOS Apple Silicon
 - macOS Intel
 - Windows x64
+- Windows ARM64
 
 Linux packaging is not part of the current release flow.
 

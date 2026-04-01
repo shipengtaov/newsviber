@@ -20,7 +20,7 @@ vi.mock("react-i18next", () => ({
 
 vi.mock("@/components/update/AppUpdateProvider", () => ({
     useAppUpdate: () => ({
-        currentVersion: "26.3.3",
+        currentVersion: "26.4.0",
     }),
 }));
 
@@ -73,7 +73,7 @@ describe("Sidebar", () => {
         expect(markup).not.toContain("Information workspace");
         expect(markup).not.toContain("Navigate");
         expect(markup).toContain(`>${translations.appName}<`);
-        expect(markup).toContain(">v26.3.3<");
+        expect(markup).toContain(">v26.4.0<");
     });
 
     it("uses the updated expanded width while preserving the collapsed width", () => {

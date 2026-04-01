@@ -35,10 +35,10 @@ describe("app version helper", () => {
 
     it("caches the native version lookup inside Tauri", async () => {
         mockIsTauri.mockReturnValue(true);
-        mockGetVersion.mockResolvedValue("26.3.3");
+        mockGetVersion.mockResolvedValue("26.4.0");
 
-        await expect(getAppVersion()).resolves.toBe("26.3.3");
-        await expect(getAppVersion()).resolves.toBe("26.3.3");
+        await expect(getAppVersion()).resolves.toBe("26.4.0");
+        await expect(getAppVersion()).resolves.toBe("26.4.0");
         expect(mockGetVersion).toHaveBeenCalledTimes(1);
     });
 

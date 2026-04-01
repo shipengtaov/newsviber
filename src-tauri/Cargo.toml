@@ -1,6 +1,6 @@
 [package]
 name = "news-viber"
-version = "26.3.3"
+version = "26.4.0"
 description = "News Viber"
 authors = ["Pengtao Shi"]
 edition = "2021"

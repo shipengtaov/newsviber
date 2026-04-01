@@ -28,7 +28,7 @@ const translations: Record<string, Record<string, string>> = {
         updateAvailableStatus: "Version 27.0.0 is available",
         updateAvailableStatusDesc: "A signed update published on Mar 20 is ready to install.",
         noUpdateStatus: "No update pending",
-        noUpdateStatusDesc: "You're currently running version 26.3.3.",
+        noUpdateStatusDesc: "You're currently running version 26.4.0.",
         restartReadyStatus: "Restart required",
         restartReadyStatusDesc: "Restart to finish applying the update.",
         updateCheckFailedStatus: "Could not check for updates",
@@ -100,7 +100,7 @@ const {
         geminiProvider,
         mockUpdateState: {
             checkForUpdates: vi.fn(),
-            currentVersion: "26.3.3",
+            currentVersion: "26.4.0",
             downloadProgress: {
                 contentLength: null,
                 downloadedBytes: 0,
@@ -234,7 +234,7 @@ describe("Settings", () => {
         }));
         Object.assign(mockUpdateState, {
             checkForUpdates: vi.fn(),
-            currentVersion: "26.3.3",
+            currentVersion: "26.4.0",
             downloadProgress: {
                 contentLength: null,
                 downloadedBytes: 0,
@@ -295,7 +295,7 @@ describe("Settings", () => {
 
         expect(markup).toContain(">Software Update<");
         expect(markup).toContain(">Current Version<");
-        expect(markup).toContain(">v26.3.3<");
+        expect(markup).toContain(">v26.4.0<");
         expect(markup).toContain(">Check for Updates<");
         expect(markup).not.toContain(">Available updates will appear here.<");
     });
