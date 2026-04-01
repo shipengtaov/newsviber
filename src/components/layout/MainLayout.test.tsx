@@ -20,7 +20,7 @@ vi.mock("react-i18next", () => ({
 
 vi.mock("@/components/update/AppUpdateProvider", () => ({
     useAppUpdate: () => ({
-        currentVersion: "26.4.0",
+        currentVersion: "26.4.1",
     }),
 }));
 

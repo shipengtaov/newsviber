@@ -2,6 +2,25 @@
 
 All notable changes to this project will be documented in this file.
 
+## [26.4.1] - 2026-04-01
+
+### Added
+
+- Added inline citation chips and article URL context in chat responses.
+- Added a large-context retrieval flow for automation manual reports.
+- Added pagination and page selection for manual report candidates.
+
+### Changed
+
+- Reworked chat streaming with ToolLoopAgent support and shortlist retrieval.
+- Focused the new chat input by default and refined split chat panel scrolling.
+- Constrained chat thread rows during panel resize.
+- Normalized Tavily base URLs and the search endpoint construction.
+
+### Fixed
+
+- Fixed manual report candidate list spacing and preview rendering.
+
 ## [26.4.0] - 2026-04-01
 
 ### Added

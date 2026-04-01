@@ -5,7 +5,7 @@ use std::error::Error;
 
 pub async fn scrape_custom(url: &str, list_selector: &str, title_selector: &str, link_selector: &str) -> Result<Vec<super::rss::ParsedArticle>, Box<dyn Error>> {
     let client = Client::builder()
-        .user_agent("News Viber/26.4.0 (Custom Scraper)")
+        .user_agent("News Viber/26.4.1 (Custom Scraper)")
         .build()?;
     
     let html_content = client.get(url).send().await?.text().await?;
