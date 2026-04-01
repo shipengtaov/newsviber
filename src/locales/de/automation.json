@@ -84,6 +84,8 @@
     "includePreviouslyUsed": "Zuvor für dieses Projekt verwendete Artikel einbeziehen",
     "nSelected": "{{count}} ausgewählt",
     "nMax": "{{count}} max",
+    "selectCurrentPage": "Seite auswählen",
+    "deselectCurrentPage": "Seitenauswahl aufheben",
     "clearSelection": "Auswahl löschen",
     "loadingCandidates": "Kandidatenartikel werden geladen...",
     "noArticlesMatch": "Keine Artikel entsprechen den aktuellen Filtern.",

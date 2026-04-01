@@ -10,7 +10,7 @@ const {
     listAutomationReportsMock,
     listAutomationReportSourceArticlesMock,
     listAutomationSourcesMock,
-    listProjectCandidateArticlesMock,
+    listProjectCandidateArticlePageMock,
     markAutomationReportAsReadMock,
     setAutomationReportFavoriteMock,
     mockUseMainLayoutScrollContainer,
@@ -22,7 +22,7 @@ const {
     listAutomationReportsMock: vi.fn(),
     listAutomationReportSourceArticlesMock: vi.fn(),
     listAutomationSourcesMock: vi.fn(),
-    listProjectCandidateArticlesMock: vi.fn(),
+    listProjectCandidateArticlePageMock: vi.fn(),
     markAutomationReportAsReadMock: vi.fn(),
     setAutomationReportFavoriteMock: vi.fn(),
     mockUseMainLayoutScrollContainer: vi.fn(),
@@ -115,6 +115,9 @@ const automationTranslations: Record<string, string> = {
     includePreviouslyUsed: "Include previously used articles for this project",
     nSelected: "{{count}} selected",
     nMax: "{{count}} max",
+    selectCurrentPage: "Select page",
+    deselectCurrentPage: "Deselect page",
+    clearSelection: "Clear selection",
     loadingCandidates: "Loading candidate articles...",
     noArticlesMatch: "No articles match the current filters.",
     inserted: "Inserted {{date}}",
@@ -146,6 +149,27 @@ const manualCandidateArticles = [
         is_consumed: true,
     },
 ];
+
+function createManualCandidateArticle(id: number, overrides: Partial<{
+    source_id: number;
+    source_name: string;
+    title: string;
+    summary: string;
+    published_at: string | null;
+    inserted_at: string;
+    is_consumed: boolean;
+}> = {}) {
+    return {
+        id,
+        source_id: overrides.source_id ?? 1,
+        source_name: overrides.source_name ?? "Example Source",
+        title: overrides.title ?? `Candidate Article ${id}`,
+        summary: overrides.summary ?? `Summary for candidate article ${id}.`,
+        published_at: overrides.published_at ?? null,
+        inserted_at: overrides.inserted_at ?? `2026-03-${String(Math.max(1, 31 - id)).padStart(2, "0")}T00:00:00Z`,
+        is_consumed: overrides.is_consumed ?? false,
+    };
+}
 
 function translate(template: string, options?: Record<string, unknown>) {
     return template.replace(/\{\{(\w+)\}\}/g, (_, key: string) => String(options?.[key] ?? ""));
@@ -317,7 +341,7 @@ vi.mock("@/lib/automation-service", () => ({
     listAutomationReports: listAutomationReportsMock,
     listAutomationReportSourceArticles: listAutomationReportSourceArticlesMock,
     listAutomationSources: listAutomationSourcesMock,
-    listProjectCandidateArticles: listProjectCandidateArticlesMock,
+    listProjectCandidateArticlePage: listProjectCandidateArticlePageMock,
     markAutomationReportAsRead: markAutomationReportAsReadMock,
     setAutomationReportFavorite: setAutomationReportFavoriteMock,
     deleteAutomationProject: vi.fn(),
@@ -391,7 +415,7 @@ describe("Automation", () => {
         listAutomationReportsMock.mockReset();
         listAutomationReportSourceArticlesMock.mockReset();
         listAutomationSourcesMock.mockReset();
-        listProjectCandidateArticlesMock.mockReset();
+        listProjectCandidateArticlePageMock.mockReset();
         markAutomationReportAsReadMock.mockReset();
         setAutomationReportFavoriteMock.mockReset();
         mockUseMainLayoutScrollContainer.mockReset();
@@ -420,7 +444,10 @@ describe("Automation", () => {
         listAutomationSourcesMock.mockResolvedValue([
             { id: 1, name: "Example Source", active: true, article_count: 12 },
         ]);
-        listProjectCandidateArticlesMock.mockResolvedValue(manualCandidateArticles);
+        listProjectCandidateArticlePageMock.mockResolvedValue({
+            items: manualCandidateArticles,
+            totalCount: manualCandidateArticles.length,
+        });
         listAutomationReportSourceArticlesMock.mockResolvedValue([]);
         listAutomationReportsMock.mockResolvedValue({
             reports: [
@@ -555,6 +582,18 @@ describe("Automation", () => {
         return button;
     }
 
+    function getLastBodyButtonByText(text: string): HTMLButtonElement {
+        const button = Array.from(document.body.querySelectorAll("button"))
+            .reverse()
+            .find((candidate) => candidate.textContent?.includes(text));
+
+        if (!(button instanceof HTMLButtonElement)) {
+            throw new Error(`Button "${text}" not found in document body.`);
+        }
+
+        return button;
+    }
+
     function getManualCandidateList(): HTMLDivElement {
         const list = document.body.querySelector('[data-testid="manual-report-candidate-list"]');
         if (!(list instanceof HTMLDivElement)) {
@@ -631,6 +670,23 @@ describe("Automation", () => {
             valueSetter?.call(select, value);
             select.dispatchEvent(new Event("change", { bubbles: true }));
         });
+    }
+
+    function setupPaginatedManualCandidates(totalCount: number) {
+        const items = Array.from({ length: totalCount }, (_, index) => createManualCandidateArticle(index + 1));
+
+        listProjectCandidateArticlePageMock.mockImplementation((_projectId: number, options?: { offset?: number; limit?: number; search?: string; sourceId?: number | null; includeConsumed?: boolean }) => {
+            const offset = options?.offset ?? 0;
+            const limit = options?.limit ?? 12;
+            const pagedItems = items.slice(offset, offset + limit);
+
+            return Promise.resolve({
+                items: pagedItems,
+                totalCount: items.length,
+            });
+        });
+
+        return items;
     }
 
     it("does not render the back-to-top button on the project board", async () => {
@@ -836,8 +892,55 @@ describe("Automation", () => {
         expect(getManualCandidateList().scrollTop).toBe(0);
     });
 
-    it("resets the manual candidate list scroll when the search filter changes", async () => {
+    it("renders paginated manual candidates and loads the next page on demand", async () => {
+        setupPaginatedManualCandidates(15);
         await openManualGenerateDialog();
+
+        expect(document.body.textContent).toContain("Page 1 / 2");
+        expect(document.body.textContent).toContain("Candidate Article 1");
+        expect(document.body.textContent).not.toContain("Candidate Article 13");
+        expect(listProjectCandidateArticlePageMock).toHaveBeenLastCalledWith(1, expect.objectContaining({
+            offset: 0,
+            limit: 12,
+        }));
+
+        act(() => {
+            getLastBodyButtonByText("Next").click();
+        });
+        await settleAutomation();
+
+        expect(document.body.textContent).toContain("Page 2 / 2");
+        expect(document.body.textContent).toContain("Candidate Article 13");
+        expect(document.body.textContent).not.toContain("Candidate Article 12");
+        expect(listProjectCandidateArticlePageMock).toHaveBeenLastCalledWith(1, expect.objectContaining({
+            offset: 12,
+            limit: 12,
+        }));
+    });
+
+    it("resets the manual candidate list scroll when the candidate page changes", async () => {
+        setupPaginatedManualCandidates(15);
+        await openManualGenerateDialog();
+
+        const candidateList = getManualCandidateList();
+        candidateList.scrollTop = 240;
+
+        act(() => {
+            getLastBodyButtonByText("Next").click();
+        });
+        await settleAutomation();
+
+        expect(getManualCandidateList().scrollTop).toBe(0);
+    });
+
+    it("resets the manual candidate page and scroll when the search filter changes", async () => {
+        setupPaginatedManualCandidates(15);
+        await openManualGenerateDialog();
+
+        act(() => {
+            getLastBodyButtonByText("Next").click();
+        });
+        await settleAutomation();
 
         const candidateList = getManualCandidateList();
         candidateList.scrollTop = 240;
@@ -845,11 +948,23 @@ describe("Automation", () => {
         updateInputValue(getManualSearchInput(), "Candidate");
         await settleAutomation();
 
+        expect(document.body.textContent).toContain("Page 1 / 2");
         expect(getManualCandidateList().scrollTop).toBe(0);
+        expect(listProjectCandidateArticlePageMock).toHaveBeenLastCalledWith(1, expect.objectContaining({
+            offset: 0,
+            limit: 12,
+            search: "Candidate",
+        }));
     });
 
-    it("resets the manual candidate list scroll when the source filter changes", async () => {
+    it("resets the manual candidate page and scroll when the source filter changes", async () => {
+        setupPaginatedManualCandidates(15);
         await openManualGenerateDialog();
+
+        act(() => {
+            getLastBodyButtonByText("Next").click();
+        });
+        await settleAutomation();
 
         const candidateList = getManualCandidateList();
         candidateList.scrollTop = 240;
@@ -857,11 +972,23 @@ describe("Automation", () => {
         updateSelectValue(getManualSourceSelect(), "1");
         await settleAutomation();
 
+        expect(document.body.textContent).toContain("Page 1 / 2");
         expect(getManualCandidateList().scrollTop).toBe(0);
+        expect(listProjectCandidateArticlePageMock).toHaveBeenLastCalledWith(1, expect.objectContaining({
+            offset: 0,
+            limit: 12,
+            sourceId: 1,
+        }));
     });
 
-    it("resets the manual candidate list scroll when including previously used articles", async () => {
+    it("resets the manual candidate page and scroll when including previously used articles", async () => {
+        setupPaginatedManualCandidates(15);
         await openManualGenerateDialog();
+
+        act(() => {
+            getLastBodyButtonByText("Next").click();
+        });
+        await settleAutomation();
 
         const candidateList = getManualCandidateList();
         candidateList.scrollTop = 240;
@@ -871,7 +998,13 @@ describe("Automation", () => {
         });
         await settleAutomation();
 
+        expect(document.body.textContent).toContain("Page 1 / 2");
         expect(getManualCandidateList().scrollTop).toBe(0);
+        expect(listProjectCandidateArticlePageMock).toHaveBeenLastCalledWith(1, expect.objectContaining({
+            offset: 0,
+            limit: 12,
+            includeConsumed: true,
+        }));
     });
 
     it("does not reset the manual candidate list scroll when selecting an article", async () => {
@@ -888,13 +1021,101 @@ describe("Automation", () => {
         expect(getManualCandidateList().scrollTop).toBe(240);
     });
 
+    it("selects and deselects the current page without affecting selections on other pages", async () => {
+        setupPaginatedManualCandidates(15);
+        await openManualGenerateDialog();
+
+        act(() => {
+            getBodyButtonByText("Candidate Article 1").click();
+        });
+        await settleAutomation();
+
+        act(() => {
+            getLastBodyButtonByText("Next").click();
+        });
+        await settleAutomation();
+
+        act(() => {
+            getLabeledCheckbox("Select page").click();
+        });
+        await settleAutomation();
+
+        expect(document.body.textContent).toContain("4 selected / 12 max");
+        expect(getLabeledCheckbox("Select page").checked).toBe(true);
+
+        act(() => {
+            getLabeledCheckbox("Select page").click();
+        });
+        await settleAutomation();
+
+        expect(document.body.textContent).toContain("1 selected / 12 max");
+        expect(getLabeledCheckbox("Select page").checked).toBe(false);
+    });
+
+    it("shows the selection cap toast instead of partially selecting a page", async () => {
+        setupPaginatedManualCandidates(15);
+        await openManualGenerateDialog();
+
+        act(() => {
+            getLabeledCheckbox("Select page").click();
+        });
+        await settleAutomation();
+
+        expect(document.body.textContent).toContain("12 selected / 12 max");
+
+        toastMock.mockClear();
+
+        act(() => {
+            getLastBodyButtonByText("Next").click();
+        });
+        await settleAutomation();
+
+        act(() => {
+            getLabeledCheckbox("Select page").click();
+        });
+        await settleAutomation();
+
+        expect(document.body.textContent).toContain("12 selected / 12 max");
+        expect(toastMock).toHaveBeenCalledWith(expect.objectContaining({
+            title: "Select up to 12",
+            variant: "destructive",
+        }));
+    });
+
+    it("keeps the current candidate list visible while the next page is loading", async () => {
+        const pageTwoPromise = new Promise<{ items: ReturnType<typeof createManualCandidateArticle>[]; totalCount: number }>(() => {});
+
+        listProjectCandidateArticlePageMock.mockImplementation((_projectId: number, options?: { offset?: number; limit?: number }) => {
+            if ((options?.offset ?? 0) === 0) {
+                return Promise.resolve({
+                    items: Array.from({ length: 12 }, (_, index) => createManualCandidateArticle(index + 1)),
+                    totalCount: 15,
+                });
+            }
+
+            return pageTwoPromise;
+        });
+
+        await openManualGenerateDialog();
+
+        act(() => {
+            getLastBodyButtonByText("Next").click();
+        });
+        await flushAsyncWork();
+        expect(listProjectCandidateArticlePageMock).toHaveBeenCalledTimes(2);
+
+        expect(document.body.textContent).toContain("Candidate Article 1");
+        expect(document.body.textContent).not.toContain("Loading candidate articles...");
+    });
+
     it("renders sanitized plain-text candidate previews instead of raw html markup", async () => {
-        listProjectCandidateArticlesMock.mockResolvedValueOnce([
-            {
+        listProjectCandidateArticlePageMock.mockResolvedValueOnce({
+            items: [{
                 ...manualCandidateArticles[0],
                 summary: '<p>Article URL: <a href="https://example.com/story">https://example.com/story</a></p><p>Points: 42</p>',
-            },
-        ]);
+            }],
+            totalCount: 1,
+        });
 
         await openManualGenerateDialog();
 

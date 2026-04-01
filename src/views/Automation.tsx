@@ -33,9 +33,9 @@ import {
     generateAutomationReportForProject,
     listAutomationReports,
     listAutomationProjects,
+    listProjectCandidateArticlePage,
     listAutomationReportSourceArticles,
     listAutomationSources,
-    listProjectCandidateArticles,
     markAllAutomationReportsAsRead,
     markAutomationReportAsRead,
     saveAutomationProject,
@@ -542,9 +542,11 @@ export default function Automation() {
 
     const [manualDialogOpen, setManualDialogOpen] = useState(false);
     const [articleCandidates, setArticleCandidates] = useState<AutomationArticleCandidate[]>([]);
+    const [articleCandidateTotalCount, setArticleCandidateTotalCount] = useState(0);
     const [candidateSearch, setCandidateSearch] = useState("");
     const [candidateSourceId, setCandidateSourceId] = useState("all");
     const [includeConsumed, setIncludeConsumed] = useState(false);
+    const [manualCandidatePage, setManualCandidatePage] = useState(0);
     const [selectedArticleIds, setSelectedArticleIds] = useState<number[]>([]);
     const [isLoadingCandidates, setIsLoadingCandidates] = useState(false);
     const [isGenerating, setIsGenerating] = useState(false);
@@ -577,6 +579,7 @@ export default function Automation() {
     const reportDiscussionScrollRef = useRef<HTMLDivElement | null>(null);
     const reportDiscussionToggleButtonRef = useRef<HTMLButtonElement | null>(null);
     const manualCandidateListScrollRef = useRef<HTMLDivElement | null>(null);
+    const manualSelectPageCheckboxRef = useRef<HTMLInputElement | null>(null);
 
     const activeProject = projects.find((project) => project.id === activeProjectId) ?? null;
     const activeReportFromList = activeReportId === null
@@ -608,6 +611,23 @@ export default function Automation() {
     const compactPaginationLabel = totalReportCount > 0
         ? t("pageXOfY", { page: currentPage + 1, total: totalPages })
         : "";
+    const manualCandidatePageSize = activeProject
+        ? Math.min(DEFAULT_PAGE_SIZE, activeProject.max_articles_per_report)
+        : DEFAULT_PAGE_SIZE;
+    const manualCandidateTotalPages = Math.max(1, Math.ceil(Math.max(articleCandidateTotalCount, 1) / manualCandidatePageSize));
+    const manualCandidatePaginationItems = manualCandidateTotalPages > 1
+        ? buildAutomationPaginationItems(manualCandidatePage, manualCandidateTotalPages)
+        : [];
+    const canGoToPreviousCandidatePage = manualCandidatePage > 0;
+    const canGoToNextCandidatePage = manualCandidatePage < manualCandidateTotalPages - 1;
+    const manualCandidatePaginationLabel = articleCandidateTotalCount > 0
+        ? t("pageXOfY", { page: manualCandidatePage + 1, total: manualCandidateTotalPages })
+        : "";
+    const areAllVisibleCandidatesSelected = articleCandidates.length > 0
+        && articleCandidates.every((article) => selectedArticleIds.includes(article.id));
+    const hasVisibleCandidateSelection = articleCandidates.some((article) => selectedArticleIds.includes(article.id));
+    const showCandidateLoadingPlaceholder = isLoadingCandidates && articleCandidates.length === 0;
+    const showCandidateRefreshIndicator = isLoadingCandidates && articleCandidates.length > 0;
     const backToTopLabel = t("backToTop", { ns: "common" });
     const automationScrollScopeKey = activeReportId !== null
         ? null
@@ -730,18 +750,30 @@ export default function Automation() {
         }
 
         const projectId = activeProject.id;
+        const requestedPage = manualCandidatePage;
         let isSubscribed = true;
 
         async function loadCandidates() {
             setIsLoadingCandidates(true);
             try {
-                const result = await listProjectCandidateArticles(projectId, {
+                const result = await listProjectCandidateArticlePage(projectId, {
                     includeConsumed,
                     search: candidateSearch,
                     sourceId: candidateSourceId === "all" ? null : Number.parseInt(candidateSourceId, 10),
+                    offset: requestedPage * manualCandidatePageSize,
+                    limit: manualCandidatePageSize,
                 });
                 if (isSubscribed) {
-                    setArticleCandidates(result);
+                    const maxPage = Math.max(0, Math.ceil(Math.max(result.totalCount, 1) / manualCandidatePageSize) - 1);
+                    setArticleCandidateTotalCount(result.totalCount);
+
+                    if (requestedPage > maxPage) {
+                        setArticleCandidates([]);
+                        setManualCandidatePage(maxPage);
+                        return;
+                    }
+
+                    setArticleCandidates(result.items);
                 }
             } catch (error) {
                 if (isSubscribed) {
@@ -759,7 +791,7 @@ export default function Automation() {
         return () => {
             isSubscribed = false;
         };
-    }, [activeProject, manualDialogOpen, includeConsumed, candidateSearch, candidateSourceId, toast]);
+    }, [activeProject, manualDialogOpen, includeConsumed, candidateSearch, candidateSourceId, manualCandidatePage, manualCandidatePageSize, toast]);
 
     useEffect(() => {
         if (!manualDialogOpen) {
@@ -772,7 +804,15 @@ export default function Automation() {
         }
 
         container.scrollTop = 0;
-    }, [manualDialogOpen, activeProject?.id, candidateSearch, candidateSourceId, includeConsumed]);
+    }, [manualDialogOpen, activeProject?.id, candidateSearch, candidateSourceId, includeConsumed, manualCandidatePage]);
+
+    useEffect(() => {
+        if (!manualSelectPageCheckboxRef.current) {
+            return;
+        }
+
+        manualSelectPageCheckboxRef.current.indeterminate = hasVisibleCandidateSelection && !areAllVisibleCandidatesSelected;
+    }, [hasVisibleCandidateSelection, areAllVisibleCandidatesSelected]);
 
     useEffect(() => {
         return addAutomationSyncListener(() => {
@@ -787,7 +827,7 @@ export default function Automation() {
                 void refreshCandidateArticles(activeProjectId);
             }
         });
-    }, [activeProjectId, currentPage, manualDialogOpen, includeConsumed, candidateSearch, candidateSourceId, reportFilterMode]);
+    }, [activeProjectId, currentPage, manualDialogOpen, includeConsumed, candidateSearch, candidateSourceId, manualCandidatePage, manualCandidatePageSize, reportFilterMode]);
 
     useEffect(() => {
         replaceChatMessages([]);
@@ -882,12 +922,23 @@ export default function Automation() {
 
     async function refreshCandidateArticles(projectId: number) {
         try {
-            const result = await listProjectCandidateArticles(projectId, {
+            const result = await listProjectCandidateArticlePage(projectId, {
                 includeConsumed,
                 search: candidateSearch,
                 sourceId: candidateSourceId === "all" ? null : Number.parseInt(candidateSourceId, 10),
+                offset: manualCandidatePage * manualCandidatePageSize,
+                limit: manualCandidatePageSize,
             });
-            setArticleCandidates(result);
+            const maxPage = Math.max(0, Math.ceil(Math.max(result.totalCount, 1) / manualCandidatePageSize) - 1);
+            setArticleCandidateTotalCount(result.totalCount);
+
+            if (manualCandidatePage > maxPage) {
+                setArticleCandidates([]);
+                setManualCandidatePage(maxPage);
+                return;
+            }
+
+            setArticleCandidates(result.items);
         } catch (error) {
             console.error(error);
         }
@@ -1166,10 +1217,13 @@ export default function Automation() {
             return;
         }
 
+        setArticleCandidates([]);
+        setArticleCandidateTotalCount(0);
         setSelectedArticleIds([]);
         setCandidateSearch("");
         setCandidateSourceId("all");
         setIncludeConsumed(false);
+        setManualCandidatePage(0);
         setManualDialogOpen(true);
     }
 
@@ -1177,6 +1231,9 @@ export default function Automation() {
         saveAutomationScrollPosition();
         setManualDialogOpen(false);
         closeProjectDialog();
+        setArticleCandidates([]);
+        setArticleCandidateTotalCount(0);
+        setManualCandidatePage(0);
         setSelectedArticleIds([]);
         setIsReportDiscussionOpen(false);
         setIsProjectInfoOpen(false);
@@ -1208,6 +1265,41 @@ export default function Automation() {
         setCurrentPage(nextPage);
         void loadReports(activeProjectId, nextPage, reportFilterMode);
         mainScrollRef.current?.scrollTo?.({ top: 0, behavior: "smooth" });
+    }
+
+    function goToManualCandidatePage(page: number) {
+        const nextPage = Math.max(0, page);
+        if (nextPage === manualCandidatePage) {
+            return;
+        }
+
+        setManualCandidatePage(nextPage);
+    }
+
+    function setCurrentPageArticleSelection(shouldSelect: boolean) {
+        if (!activeProject || articleCandidates.length === 0) {
+            return;
+        }
+
+        const currentPageArticleIds = articleCandidates.map((article) => article.id);
+        const pageArticleIdSet = new Set(currentPageArticleIds);
+
+        setSelectedArticleIds((currentSelectedIds) => {
+            if (!shouldSelect) {
+                return currentSelectedIds.filter((articleId) => !pageArticleIdSet.has(articleId));
+            }
+
+            const pageArticleIdsToAdd = currentPageArticleIds.filter((articleId) => !currentSelectedIds.includes(articleId));
+            if (currentSelectedIds.length + pageArticleIdsToAdd.length > activeProject.max_articles_per_report) {
+                toast({
+                    title: t("selectUpToN", { count: activeProject.max_articles_per_report }),
+                    variant: "destructive",
+                });
+                return currentSelectedIds;
+            }
+
+            return [...currentSelectedIds, ...pageArticleIdsToAdd];
+        });
     }
 
     function handleProjectDialogOpenChange(open: boolean) {
@@ -2023,13 +2115,22 @@ export default function Automation() {
                                         <Label>{t("searchArticles")}</Label>
                                         <Input
                                             value={candidateSearch}
-                                            onChange={(event) => setCandidateSearch(event.target.value)}
+                                            onChange={(event) => {
+                                                setCandidateSearch(event.target.value);
+                                                setManualCandidatePage(0);
+                                            }}
                                             placeholder={t("searchByTitle")}
                                         />
                                     </div>
                                     <div className="space-y-2">
                                         <Label>{t("filterBySource")}</Label>
-                                        <Select value={candidateSourceId} onValueChange={setCandidateSourceId}>
+                                        <Select
+                                            value={candidateSourceId}
+                                            onValueChange={(value) => {
+                                                setCandidateSourceId(value);
+                                                setManualCandidatePage(0);
+                                            }}
+                                        >
                                             <SelectTrigger>
                                                 <SelectValue placeholder={t("allSources")} />
                                             </SelectTrigger>
@@ -2048,18 +2149,40 @@ export default function Automation() {
                                 <label className="flex items-center gap-3 text-sm text-muted-foreground">
                                     <Checkbox
                                         checked={includeConsumed}
-                                        onChange={(event) => setIncludeConsumed(event.target.checked)}
+                                        onChange={(event) => {
+                                            setIncludeConsumed(event.target.checked);
+                                            setManualCandidatePage(0);
+                                        }}
                                     />
                                     {t("includePreviouslyUsed")}
                                 </label>
 
-                                <div className="flex items-center justify-between text-sm">
-                                    <span className="text-muted-foreground">
-                                        {t("nSelected", { count: selectedArticleIds.length })} / {t("nMax", { count: activeProject.max_articles_per_report })}
-                                    </span>
-                                    <Button type="button" variant="ghost" size="sm" onClick={() => setSelectedArticleIds([])} disabled={selectedArticleIds.length === 0}>
-                                        {t("clearSelection")}
-                                    </Button>
+                                <div className="flex items-center justify-between gap-4 text-sm">
+                                    <div className="flex min-w-0 items-center gap-3">
+                                        <label className="flex items-center gap-2 text-muted-foreground">
+                                            <Checkbox
+                                                ref={manualSelectPageCheckboxRef}
+                                                checked={areAllVisibleCandidatesSelected}
+                                                onChange={(event) => setCurrentPageArticleSelection(event.target.checked)}
+                                                disabled={articleCandidates.length === 0}
+                                            />
+                                            <span>{t("selectCurrentPage")}</span>
+                                        </label>
+                                        {showCandidateRefreshIndicator && (
+                                            <Loader2
+                                                className="h-3.5 w-3.5 animate-spin text-muted-foreground"
+                                                aria-label={t("loadingCandidates")}
+                                            />
+                                        )}
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-muted-foreground">
+                                            {t("nSelected", { count: selectedArticleIds.length })} / {t("nMax", { count: activeProject.max_articles_per_report })}
+                                        </span>
+                                        <Button type="button" variant="ghost" size="sm" onClick={() => setSelectedArticleIds([])} disabled={selectedArticleIds.length === 0}>
+                                            {t("clearSelection")}
+                                        </Button>
+                                    </div>
                                 </div>
                             </div>
 
@@ -2069,19 +2192,19 @@ export default function Automation() {
                                 className="min-h-0 flex-1 overflow-y-auto pr-1 pt-4"
                             >
                                 <div className="flex flex-col gap-3">
-                                    {isLoadingCandidates && (
+                                    {showCandidateLoadingPlaceholder && (
                                         <div className="editor-empty p-6">
                                             {t("loadingCandidates")}
                                         </div>
                                     )}
 
-                                    {!isLoadingCandidates && articleCandidates.length === 0 && (
+                                    {!showCandidateLoadingPlaceholder && articleCandidates.length === 0 && (
                                         <div className="editor-empty p-6">
                                             {t("noArticlesMatch")}
                                         </div>
                                     )}
 
-                                    {!isLoadingCandidates && articleCandidates.map((article) => {
+                                    {articleCandidates.map((article) => {
                                         const preview = resolveArticlePreview(article.summary, null);
                                         const isSelected = selectedArticleIds.includes(article.id);
                                         const isSelectionLocked = !isSelected && selectedArticleIds.length >= activeProject.max_articles_per_report;
@@ -2121,6 +2244,99 @@ export default function Automation() {
                                     })}
                                 </div>
                             </div>
+
+                            {articleCandidateTotalCount > 0 && (
+                                <div className="mt-3 flex items-center justify-between gap-2 border-t pt-3">
+                                    <div className="flex items-center gap-2 sm:hidden">
+                                        <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={() => goToManualCandidatePage(Math.max(0, manualCandidatePage - 1))}
+                                            disabled={!canGoToPreviousCandidatePage}
+                                        >
+                                            <ChevronLeft className="h-3.5 w-3.5" />
+                                            <span className="sr-only">{t("previousPage", { ns: "common" })}</span>
+                                        </Button>
+                                        <span className="min-w-0 flex-1 text-center text-xs text-muted-foreground">
+                                            {manualCandidatePaginationLabel}
+                                        </span>
+                                        <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={() => goToManualCandidatePage(manualCandidatePage + 1)}
+                                            disabled={!canGoToNextCandidatePage}
+                                        >
+                                            <span className="sr-only">{t("nextPage", { ns: "common" })}</span>
+                                            <ChevronRight className="h-3.5 w-3.5" />
+                                        </Button>
+                                    </div>
+
+                                    <div className="hidden items-center justify-center gap-2 sm:flex">
+                                        <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={() => goToManualCandidatePage(Math.max(0, manualCandidatePage - 1))}
+                                            disabled={!canGoToPreviousCandidatePage}
+                                        >
+                                            <ChevronLeft className="h-3.5 w-3.5" />
+                                            {t("previous", { ns: "common" })}
+                                        </Button>
+
+                                        <nav aria-label={t("pagination", { ns: "common" })} className="flex items-center gap-1">
+                                            {manualCandidatePaginationItems.map((item) => {
+                                                if (item.type === "ellipsis") {
+                                                    return (
+                                                        <span
+                                                            key={item.key}
+                                                            className="flex h-7 w-7 items-center justify-center text-muted-foreground"
+                                                            aria-hidden="true"
+                                                        >
+                                                            <MoreHorizontal className="h-3.5 w-3.5" />
+                                                        </span>
+                                                    );
+                                                }
+
+                                                const isCurrentPage = item.page === manualCandidatePage;
+
+                                                return (
+                                                    <Button
+                                                        key={item.page}
+                                                        type="button"
+                                                        variant={isCurrentPage ? "default" : "ghost"}
+                                                        size="sm"
+                                                        aria-current={isCurrentPage ? "page" : undefined}
+                                                        onClick={isCurrentPage ? undefined : () => goToManualCandidatePage(item.page)}
+                                                        className={cn(
+                                                            "h-7 min-w-7 px-2 text-xs",
+                                                            isCurrentPage && "pointer-events-none",
+                                                        )}
+                                                    >
+                                                        {item.page + 1}
+                                                    </Button>
+                                                );
+                                            })}
+                                        </nav>
+
+                                        <span className="text-xs text-muted-foreground">
+                                            {manualCandidatePaginationLabel}
+                                        </span>
+
+                                        <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={() => goToManualCandidatePage(manualCandidatePage + 1)}
+                                            disabled={!canGoToNextCandidatePage}
+                                        >
+                                            {t("next", { ns: "common" })}
+                                            <ChevronRight className="h-3.5 w-3.5" />
+                                        </Button>
+                                    </div>
+                                </div>
+                            )}
                         </div>
 
                         <DialogFooter className="shrink-0 border-t bg-background px-4 py-3 sm:justify-end">

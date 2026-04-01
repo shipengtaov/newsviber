@@ -84,6 +84,8 @@
     "includePreviouslyUsed": "このプロジェクトで以前使用した記事を含める",
     "nSelected": "{{count}} 件選択",
     "nMax": "最大 {{count}} 件",
+    "selectCurrentPage": "このページを全選択",
+    "deselectCurrentPage": "このページの選択を解除",
     "clearSelection": "選択をクリア",
     "loadingCandidates": "候補記事を読み込み中...",
     "noArticlesMatch": "現在のフィルターに一致する記事がありません。",

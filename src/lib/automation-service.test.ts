@@ -38,6 +38,8 @@ import {
     buildAutomationReportUserPrompt,
     formatAutomationReportSupportingContextLine,
     generateAutomationReportForProject,
+    listProjectCandidateArticlePage,
+    listProjectCandidateArticles,
     listAutomationReports,
     listAutomationProjects,
     markAllAutomationReportsAsRead,
@@ -385,6 +387,126 @@ describe("automation service context helpers", () => {
             id: 55,
             used_article_count: 41,
         });
+    });
+});
+
+describe("automation candidate article listing", () => {
+    it("returns paginated candidate articles with total count, filters, and stable ordering", async () => {
+        const selectMock = vi.fn()
+            .mockResolvedValueOnce([{ cnt: 3 }])
+            .mockResolvedValueOnce([{
+                id: 32,
+                source_id: 5,
+                source_name: "Example Source",
+                title: "Signal B",
+                summary: "Second summary",
+                published_at: "2026-03-15T00:00:00Z",
+                inserted_at: "2026-03-16T00:00:00Z",
+                is_consumed: 0,
+            }, {
+                id: 31,
+                source_id: 5,
+                source_name: "Example Source",
+                title: "Signal A",
+                summary: null,
+                published_at: null,
+                inserted_at: "2026-03-15T00:00:00Z",
+                is_consumed: 1,
+            }]);
+
+        getDbMock.mockResolvedValue({
+            select: selectMock,
+            execute: vi.fn(),
+        });
+
+        await expect(listProjectCandidateArticlePage(7, {
+            sourceId: 5,
+            search: " Signal ",
+            includeConsumed: false,
+            insertedAfter: "2026-03-01T00:00:00Z",
+            limit: 2,
+            offset: 4,
+        })).resolves.toEqual({
+            totalCount: 3,
+            items: [{
+                id: 32,
+                source_id: 5,
+                source_name: "Example Source",
+                title: "Signal B",
+                summary: "Second summary",
+                published_at: "2026-03-15T00:00:00Z",
+                inserted_at: "2026-03-16T00:00:00Z",
+                is_consumed: false,
+            }, {
+                id: 31,
+                source_id: 5,
+                source_name: "Example Source",
+                title: "Signal A",
+                summary: "",
+                published_at: null,
+                inserted_at: "2026-03-15T00:00:00Z",
+                is_consumed: true,
+            }],
+        });
+
+        const [countSql, countParams] = selectMock.mock.calls[0] ?? [];
+        expect(countSql).toContain("SELECT COUNT(*) AS cnt");
+        expect(countSql).toContain("WHERE is_consumed = 0");
+        expect(countSql).toContain("LOWER(a.title) LIKE $5");
+        expect(countSql).toContain("LOWER(COALESCE(a.summary, '')) LIKE $5");
+        expect(countSql).toContain("a.source_id = $4");
+        expect(countSql).toContain("a.created_at > $6");
+        expect(countParams).toEqual([7, 7, 7, 5, "%signal%", "2026-03-01T00:00:00Z"]);
+
+        const [pageSql, pageParams] = selectMock.mock.calls[1] ?? [];
+        expect(pageSql).toContain("ORDER BY inserted_at DESC, id DESC");
+        expect(pageSql).toContain("LIMIT $7");
+        expect(pageSql).toContain("OFFSET $8");
+        expect(pageParams).toEqual([7, 7, 7, 5, "%signal%", "2026-03-01T00:00:00Z", 2, 4]);
+    });
+
+    it("keeps the array helper behavior and can include previously consumed articles", async () => {
+        const selectMock = vi.fn()
+            .mockResolvedValueOnce([{ cnt: 1 }])
+            .mockResolvedValueOnce([{
+                id: 55,
+                source_id: 2,
+                source_name: "HN",
+                title: "Reusable article",
+                summary: "Useful summary",
+                published_at: null,
+                inserted_at: "2026-03-20T00:00:00Z",
+                is_consumed: 1,
+            }]);
+
+        getDbMock.mockResolvedValue({
+            select: selectMock,
+            execute: vi.fn(),
+        });
+
+        await expect(listProjectCandidateArticles(9, {
+            includeConsumed: true,
+            limit: 1,
+        })).resolves.toEqual([{
+            id: 55,
+            source_id: 2,
+            source_name: "HN",
+            title: "Reusable article",
+            summary: "Useful summary",
+            published_at: null,
+            inserted_at: "2026-03-20T00:00:00Z",
+            is_consumed: true,
+        }]);
+
+        const [countSql, countParams] = selectMock.mock.calls[0] ?? [];
+        expect(countSql).toContain("SELECT COUNT(*) AS cnt");
+        expect(countSql).not.toContain("WHERE is_consumed = 0");
+        expect(countParams).toEqual([9, 9, 9]);
+
+        const [pageSql, pageParams] = selectMock.mock.calls[1] ?? [];
+        expect(pageSql).toContain("LIMIT $4");
+        expect(pageSql).not.toContain("OFFSET");
+        expect(pageParams).toEqual([9, 9, 9, 1]);
     });
 });
 

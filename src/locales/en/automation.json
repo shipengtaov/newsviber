@@ -87,6 +87,8 @@
     "includePreviouslyUsed": "Include previously used articles for this project",
     "nSelected": "{{count}} selected",
     "nMax": "{{count}} max",
+    "selectCurrentPage": "Select page",
+    "deselectCurrentPage": "Deselect page",
     "clearSelection": "Clear selection",
     "loadingCandidates": "Loading candidate articles...",
     "noArticlesMatch": "No articles match the current filters.",

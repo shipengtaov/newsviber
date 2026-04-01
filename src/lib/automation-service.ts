@@ -59,6 +59,11 @@ export type AutomationArticleCandidate = {
     is_consumed: boolean;
 };
 
+export type AutomationArticleCandidatePage = {
+    items: AutomationArticleCandidate[];
+    totalCount: number;
+};
+
 export type AutomationReportContextArticle = {
     id: number;
     source_id: number;
@@ -415,6 +420,60 @@ function buildConsumedExistsExpression(projectId: number, params: unknown[], art
         WHERE consumed_reports.project_id = ${projectParam}
           AND consumed_articles.article_id = ${articleAlias}.id
     )`;
+}
+
+function buildProjectCandidateArticleQuery(
+    projectId: number,
+    options: {
+        includeConsumed: boolean;
+        sourceId: number | null;
+        search: string;
+        insertedAfter: string | null;
+    },
+): {
+    fromSql: string;
+    params: unknown[];
+} {
+    const params: unknown[] = [];
+    const consumedExistsExpression = buildConsumedExistsExpression(projectId, params);
+    const innerConditions = [buildProjectScopeCondition(projectId, params)];
+
+    if (options.sourceId && options.sourceId > 0) {
+        innerConditions.push(`a.source_id = ${pushParam(params, options.sourceId)}`);
+    }
+
+    if (options.search) {
+        const searchParam = pushParam(params, `%${options.search}%`);
+        innerConditions.push(`(
+            LOWER(a.title) LIKE ${searchParam}
+            OR LOWER(COALESCE(a.summary, '')) LIKE ${searchParam}
+        )`);
+    }
+
+    if (options.insertedAfter) {
+        innerConditions.push(`a.created_at > ${pushParam(params, options.insertedAfter)}`);
+    }
+
+    return {
+        params,
+        fromSql: `
+            FROM (
+                SELECT
+                    a.id,
+                    a.source_id,
+                    s.name AS source_name,
+                    a.title,
+                    a.summary,
+                    a.published_at,
+                    a.created_at AS inserted_at,
+                    ${consumedExistsExpression} AS is_consumed
+                FROM articles a
+                JOIN sources s ON s.id = a.source_id
+                WHERE ${innerConditions.join(" AND ")}
+            ) candidate_articles
+            ${options.includeConsumed ? "" : "WHERE is_consumed = 0"}
+        `,
+    };
 }
 
 export function summarizeArticleContextText(summary: string | null, content: string | null): string {
@@ -1088,57 +1147,62 @@ export async function listProjectCandidateArticles(
         insertedAfter?: string | null;
     } = {},
 ): Promise<AutomationArticleCandidate[]> {
+    const page = await listProjectCandidateArticlePage(projectId, options);
+    return page.items;
+}
+
+export async function listProjectCandidateArticlePage(
+    projectId: number,
+    options: {
+        includeConsumed?: boolean;
+        search?: string;
+        sourceId?: number | null;
+        offset?: number;
+        limit?: number;
+        insertedAfter?: string | null;
+    } = {},
+): Promise<AutomationArticleCandidatePage> {
     const includeConsumed = Boolean(options.includeConsumed);
     const normalizedSourceId = options.sourceId ? Number.parseInt(String(options.sourceId), 10) : null;
     const search = options.search?.trim().toLowerCase() ?? "";
     const insertedAfter = options.insertedAfter?.trim() || null;
+    const offset = Math.max(0, options.offset ?? 0);
     const limit = sanitizeLimit(options.limit);
-    const params: unknown[] = [];
-    const consumedExistsExpression = buildConsumedExistsExpression(projectId, params);
-    const innerConditions = [buildProjectScopeCondition(projectId, params)];
-
-    if (normalizedSourceId && normalizedSourceId > 0) {
-        innerConditions.push(`a.source_id = ${pushParam(params, normalizedSourceId)}`);
-    }
-
-    if (search) {
-        const searchParam = pushParam(params, `%${search}%`);
-        innerConditions.push(`(
-            LOWER(a.title) LIKE ${searchParam}
-            OR LOWER(COALESCE(a.summary, '')) LIKE ${searchParam}
-        )`);
-    }
-
-    if (insertedAfter) {
-        innerConditions.push(`a.created_at > ${pushParam(params, insertedAfter)}`);
-    }
+    const { fromSql, params } = buildProjectCandidateArticleQuery(projectId, {
+        includeConsumed,
+        sourceId: normalizedSourceId,
+        search,
+        insertedAfter,
+    });
 
     const db = await getDb();
-    const rows = await db.select<AutomationArticleCandidateRow[]>(
-        `
-            SELECT *
-            FROM (
-                SELECT
-                    a.id,
-                    a.source_id,
-                    s.name AS source_name,
-                    a.title,
-                    a.summary,
-                    a.published_at,
-                    a.created_at AS inserted_at,
-                    ${consumedExistsExpression} AS is_consumed
-                FROM articles a
-                JOIN sources s ON s.id = a.source_id
-                WHERE ${innerConditions.join(" AND ")}
-            ) candidate_articles
-            ${includeConsumed ? "" : "WHERE is_consumed = 0"}
-            ORDER BY inserted_at DESC, id DESC
-            LIMIT ${limit}
-        `,
+    const countRows = await db.select<{ cnt: number }[]>(
+        `SELECT COUNT(*) AS cnt ${fromSql}`,
         params,
     );
+    const totalCount = Number(countRows[0]?.cnt) || 0;
 
-    return rows.map(normalizeAutomationArticleCandidate);
+    const pageParams = [...params];
+    let sql = `
+        SELECT *
+        ${fromSql}
+        ORDER BY inserted_at DESC, id DESC
+        LIMIT ${pushParam(pageParams, limit)}
+    `;
+
+    if (offset > 0) {
+        sql += ` OFFSET ${pushParam(pageParams, offset)}`;
+    }
+
+    const rows = await db.select<AutomationArticleCandidateRow[]>(
+        sql,
+        pageParams,
+    );
+
+    return {
+        items: rows.map(normalizeAutomationArticleCandidate),
+        totalCount,
+    };
 }
 
 export async function listAutomationReportSourceArticles(reportId: number): Promise<AutomationReportContextArticle[]> {

@@ -84,6 +84,8 @@
     "includePreviouslyUsed": "包含此專案先前使用過的文章",
     "nSelected": "已選 {{count}}",
     "nMax": "最多 {{count}}",
+    "selectCurrentPage": "全選本頁",
+    "deselectCurrentPage": "取消全選本頁",
     "clearSelection": "清除選擇",
     "loadingCandidates": "載入候選文章中...",
     "noArticlesMatch": "沒有文章符合目前篩選條件。",
