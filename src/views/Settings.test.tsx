@@ -67,6 +67,7 @@ const translations: Record<string, Record<string, string>> = {
         about: "About",
         aboutTwitter: "Twitter",
         aboutGithub: "GitHub",
+        aboutDiscord: "Discord",
         aboutFeedback: "Issues",
     },
 };
@@ -255,17 +256,24 @@ describe("Settings", () => {
         const markup = renderToStaticMarkup(<Settings />);
         const dataManagementIndex = markup.indexOf(">Data Management<");
         const aboutIndex = markup.indexOf(">About<");
+        const discordIndex = markup.indexOf(">Discord<");
+        const githubIndex = markup.indexOf(">GitHub<");
+        const twitterIndex = markup.indexOf(">Twitter<");
+        const issuesIndex = markup.indexOf(">Issues<");
 
         expect(dataManagementIndex).toBeGreaterThan(-1);
         expect(aboutIndex).toBeGreaterThan(dataManagementIndex);
-        expect(markup).toContain(">Twitter<");
-        expect(markup).toContain(">GitHub<");
-        expect(markup).toContain(">Issues<");
+        expect(discordIndex).toBeGreaterThan(aboutIndex);
+        expect(githubIndex).toBeGreaterThan(discordIndex);
+        expect(twitterIndex).toBeGreaterThan(githubIndex);
+        expect(issuesIndex).toBeGreaterThan(twitterIndex);
         expect(markup).toContain('href="https://x.com/shipengtao"');
         expect(markup).toContain('href="https://github.com/shipengtaov/newsviber"');
+        expect(markup).toContain('href="https://discord.gg/u7SMbjKWr"');
         expect(markup).toContain('href="https://github.com/shipengtaov/newsviber/issues/new"');
         expect(markup).not.toContain(">https://x.com/shipengtao<");
         expect(markup).not.toContain(">https://github.com/shipengtaov/newsviber<");
+        expect(markup).not.toContain(">https://discord.gg/u7SMbjKWr<");
     });
 
     it("renders the saved provider selection on the first render", () => {

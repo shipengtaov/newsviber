@@ -2,7 +2,7 @@
 
 Desktop AI Intelligence Workspace for news, chat, and ideas.
 
-[中文文档](./README_ZH.md) · [Releases](https://github.com/shipengtaov/newsviber/releases) · [Issues](https://github.com/shipengtaov/newsviber/issues/new)
+[中文文档](./README_ZH.md) · [Releases](https://github.com/shipengtaov/newsviber/releases) · [Issues](https://github.com/shipengtaov/newsviber/issues/new) · [Discord](https://discord.gg/u7SMbjKWr)
 
 ## Overview
 

@@ -2,7 +2,7 @@
 
 面向新闻、对话与自动化产出的桌面 AI 情报工作台。
 
-[English](./README.md) · [Releases](https://github.com/shipengtaov/newsviber/releases) · [Issues](https://github.com/shipengtaov/newsviber/issues/new)
+[English](./README.md) · [Releases](https://github.com/shipengtaov/newsviber/releases) · [Issues](https://github.com/shipengtaov/newsviber/issues/new) · [Discord](https://discord.gg/u7SMbjKWr)
 
 ## 概览
 

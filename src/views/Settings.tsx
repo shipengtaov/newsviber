@@ -70,6 +70,17 @@ function GitHubLogoIcon({ className }: BrandIconProps) {
     );
 }
 
+function DiscordLogoIcon({ className }: BrandIconProps) {
+    return (
+        <svg viewBox="0 0 24 24" aria-hidden="true" className={className}>
+            <path
+                fill="currentColor"
+                d="M20.317 4.369A19.791 19.791 0 0 0 15.885 3a13.66 13.66 0 0 0-.672 1.376a18.27 18.27 0 0 0-5.42 0A13.597 13.597 0 0 0 9.121 3a19.736 19.736 0 0 0-4.439 1.372C1.873 8.58 1.113 12.683 1.493 16.729a19.91 19.91 0 0 0 5.447 2.771a14.145 14.145 0 0 0 1.167-1.904a12.955 12.955 0 0 1-1.84-.889c.154-.111.305-.228.452-.348c3.548 1.623 7.39 1.623 10.897 0c.149.122.3.239.452.348c-.587.346-1.204.644-1.844.89c.34.66.73 1.296 1.168 1.903a19.865 19.865 0 0 0 5.451-2.772c.446-4.688-.761-8.754-3.379-12.36ZM8.18 14.249c-1.061 0-1.934-.971-1.934-2.163c0-1.193.854-2.164 1.934-2.164c1.089 0 1.954.98 1.935 2.164c0 1.192-.855 2.163-1.935 2.163Zm7.64 0c-1.061 0-1.934-.971-1.934-2.163c0-1.193.854-2.164 1.934-2.164c1.089 0 1.954.98 1.935 2.164c0 1.192-.846 2.163-1.935 2.163Z"
+            />
+        </svg>
+    );
+}
+
 type AboutLink = {
     key: string;
     labelKey: string;
@@ -79,16 +90,22 @@ type AboutLink = {
 
 const ABOUT_LINKS: AboutLink[] = [
     {
-        key: "twitter",
-        labelKey: "aboutTwitter",
-        url: "https://x.com/shipengtao",
-        Icon: XLogoIcon,
+        key: "discord",
+        labelKey: "aboutDiscord",
+        url: "https://discord.gg/u7SMbjKWr",
+        Icon: DiscordLogoIcon,
     },
     {
         key: "github",
         labelKey: "aboutGithub",
         url: "https://github.com/shipengtaov/newsviber",
         Icon: GitHubLogoIcon,
+    },
+    {
+        key: "twitter",
+        labelKey: "aboutTwitter",
+        url: "https://x.com/shipengtao",
+        Icon: XLogoIcon,
     },
     {
         key: "feedback",

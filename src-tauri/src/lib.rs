@@ -22,6 +22,8 @@ const HELP_MENU_ID_TWITTER: &str = "help.twitter";
 #[cfg(not(mobile))]
 const HELP_MENU_ID_GITHUB: &str = "help.github";
 #[cfg(not(mobile))]
+const HELP_MENU_ID_DISCORD: &str = "help.discord";
+#[cfg(not(mobile))]
 const HELP_MENU_ID_ISSUES: &str = "help.issues";
 #[cfg(target_os = "macos")]
 const APP_DISPLAY_NAME: &str = "News Viber";
@@ -31,6 +33,7 @@ fn help_menu_url(menu_id: &str) -> Option<&'static str> {
     match menu_id {
         HELP_MENU_ID_TWITTER => Some("https://x.com/shipengtao"),
         HELP_MENU_ID_GITHUB => Some("https://github.com/shipengtaov/newsviber"),
+        HELP_MENU_ID_DISCORD => Some("https://discord.gg/u7SMbjKWr"),
         HELP_MENU_ID_ISSUES => Some("https://github.com/shipengtaov/newsviber/issues/new"),
         _ => None,
     }
@@ -48,7 +51,8 @@ fn app_event_for_menu_id(menu_id: &str) -> Option<&'static str> {
 mod tests {
     use super::{
         app_event_for_menu_id, help_menu_url, APP_EVENT_EXPORT_SOURCES_OPML,
-        FILE_MENU_ID_EXPORT_SOURCES_OPML, HELP_MENU_ID_GITHUB, HELP_MENU_ID_ISSUES,
+        FILE_MENU_ID_EXPORT_SOURCES_OPML, HELP_MENU_ID_DISCORD, HELP_MENU_ID_GITHUB,
+        HELP_MENU_ID_ISSUES,
     };
 
     #[test]
@@ -56,6 +60,10 @@ mod tests {
         assert_eq!(
             help_menu_url(HELP_MENU_ID_GITHUB),
             Some("https://github.com/shipengtaov/newsviber")
+        );
+        assert_eq!(
+            help_menu_url(HELP_MENU_ID_DISCORD),
+            Some("https://discord.gg/u7SMbjKWr")
         );
         assert_eq!(
             help_menu_url(HELP_MENU_ID_ISSUES),
@@ -84,7 +92,7 @@ fn padded_help_menu_label(label: &str) -> String {
 #[cfg(not(mobile))]
 fn build_help_link_items<R: Runtime>(
     app_handle: &AppHandle<R>,
-) -> tauri::Result<[MenuItem<R>; 3]> {
+) -> tauri::Result<[MenuItem<R>; 4]> {
     let twitter_item = MenuItem::with_id(
         app_handle,
         HELP_MENU_ID_TWITTER,
@@ -99,6 +107,13 @@ fn build_help_link_items<R: Runtime>(
         true,
         None::<&str>,
     )?;
+    let discord_item = MenuItem::with_id(
+        app_handle,
+        HELP_MENU_ID_DISCORD,
+        padded_help_menu_label("Open Discord"),
+        true,
+        None::<&str>,
+    )?;
     let issues_item = MenuItem::with_id(
         app_handle,
         HELP_MENU_ID_ISSUES,
@@ -107,7 +122,7 @@ fn build_help_link_items<R: Runtime>(
         None::<&str>,
     )?;
 
-    Ok([twitter_item, github_item, issues_item])
+    Ok([twitter_item, github_item, discord_item, issues_item])
 }
 
 #[cfg(not(mobile))]
@@ -160,14 +175,14 @@ fn build_macos_menu<R: Runtime>(app_handle: &AppHandle<R>) -> tauri::Result<Menu
         ],
     )?;
 
-    let [twitter_item, github_item, issues_item] = build_help_link_items(app_handle)?;
+    let [twitter_item, github_item, discord_item, issues_item] = build_help_link_items(app_handle)?;
     let export_sources_item = build_export_sources_opml_item(app_handle)?;
     let help_menu = Submenu::with_id_and_items(
         app_handle,
         HELP_SUBMENU_ID,
         "Help",
         true,
-        &[&twitter_item, &github_item, &issues_item],
+        &[&twitter_item, &github_item, &discord_item, &issues_item],
     )?;
 
     Menu::with_items(
@@ -231,7 +246,7 @@ fn build_macos_menu<R: Runtime>(app_handle: &AppHandle<R>) -> tauri::Result<Menu
 #[cfg(not(any(target_os = "macos", mobile)))]
 fn build_default_desktop_menu<R: Runtime>(app_handle: &AppHandle<R>) -> tauri::Result<Menu<R>> {
     let menu = Menu::default(app_handle)?;
-    let [twitter_item, github_item, issues_item] = build_help_link_items(app_handle)?;
+    let [twitter_item, github_item, discord_item, issues_item] = build_help_link_items(app_handle)?;
 
     let help_menu = match menu.get(HELP_SUBMENU_ID).and_then(|item| item.as_submenu().cloned()) {
         Some(help_menu) => help_menu,
@@ -247,7 +262,7 @@ fn build_default_desktop_menu<R: Runtime>(app_handle: &AppHandle<R>) -> tauri::R
         help_menu.append(&PredefinedMenuItem::separator(app_handle)?)?;
     }
 
-    help_menu.append_items(&[&twitter_item, &github_item, &issues_item])?;
+    help_menu.append_items(&[&twitter_item, &github_item, &discord_item, &issues_item])?;
     insert_export_sources_item(app_handle, &menu)?;
 
     Ok(menu)
