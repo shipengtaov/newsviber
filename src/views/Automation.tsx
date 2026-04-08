@@ -214,8 +214,8 @@ function formatProjectRecentActivitySummary(project: AutomationProject): string 
         return i18n.t("automation:generated", { date: formatTimestamp(project.last_auto_generated_at) });
     }
 
-    if (project.last_auto_checked_at) {
-        return i18n.t("automation:checked", { date: formatTimestamp(project.last_auto_checked_at) });
+    if (project.last_auto_attempted_at) {
+        return i18n.t("automation:checked", { date: formatTimestamp(project.last_auto_attempted_at) });
     }
 
     return i18n.t("automation:noRecentActivity");
@@ -1791,8 +1791,12 @@ export default function Automation() {
                                         value={formatProjectScope(activeProject, sources)}
                                     />
                                     <ProjectOverviewItem
-                                        label={t("lastChecked")}
-                                        value={formatTimestamp(activeProject.last_auto_checked_at)}
+                                        label={t("lastAttempted")}
+                                        value={formatTimestamp(activeProject.last_auto_attempted_at)}
+                                    />
+                                    <ProjectOverviewItem
+                                        label={t("lastConsumed")}
+                                        value={formatTimestamp(activeProject.last_auto_consumed_at)}
                                     />
                                     <ProjectOverviewItem
                                         label={t("lastGenerated")}

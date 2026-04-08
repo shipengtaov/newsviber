@@ -64,6 +64,8 @@
     "notScheduled": "未スケジュール",
     "automation": "自動化",
     "checkInterval": "チェック間隔",
+    "lastAttempted": "最終チェック試行",
+    "lastConsumed": "最終消費カーソル",
     "lastChecked": "最終チェック",
     "lastGenerated": "最終生成",
     "unreadReports": "未読レポート",

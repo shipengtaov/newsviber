@@ -64,6 +64,8 @@
     "notScheduled": "未排程",
     "automation": "自動化",
     "checkInterval": "檢查間隔",
+    "lastAttempted": "上次嘗試檢查",
+    "lastConsumed": "上次消費游標",
     "lastChecked": "上次檢查",
     "lastGenerated": "上次產生",
     "unreadReports": "未讀報告",

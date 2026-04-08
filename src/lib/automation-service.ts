@@ -23,7 +23,8 @@ export type AutomationProject = {
     max_articles_per_report: number;
     min_articles_per_report: number;
     web_search_enabled: boolean;
-    last_auto_checked_at: string | null;
+    last_auto_attempted_at: string | null;
+    last_auto_consumed_at: string | null;
     last_auto_generated_at: string | null;
     source_ids: number[];
     unread_report_count: number;
@@ -143,7 +144,8 @@ type AutomationProjectRow = {
     max_articles_per_report: number;
     min_articles_per_report: number;
     web_search_enabled: number | boolean;
-    last_auto_checked_at: string | null;
+    last_auto_attempted_at: string | null;
+    last_auto_consumed_at: string | null;
     last_auto_generated_at: string | null;
     source_ids_csv: string | null;
     unread_report_count: number | null;
@@ -244,7 +246,8 @@ const PROJECT_SELECT_BASE_SQL = `
         p.max_articles_per_report,
         p.min_articles_per_report,
         p.web_search_enabled,
-        p.last_auto_checked_at,
+        p.last_auto_attempted_at,
+        p.last_auto_consumed_at,
         p.last_auto_generated_at,
         (
             SELECT COUNT(*)
@@ -308,7 +311,8 @@ function normalizeAutomationProject(row: AutomationProjectRow): AutomationProjec
         max_articles_per_report: normalizePositiveInteger(row.max_articles_per_report, DEFAULT_MAX_ARTICLES_PER_REPORT),
         min_articles_per_report: normalizePositiveInteger(row.min_articles_per_report, DEFAULT_MIN_ARTICLES_PER_REPORT),
         web_search_enabled: normalizeBoolean(row.web_search_enabled),
-        last_auto_checked_at: row.last_auto_checked_at ?? null,
+        last_auto_attempted_at: row.last_auto_attempted_at ?? null,
+        last_auto_consumed_at: row.last_auto_consumed_at ?? null,
         last_auto_generated_at: row.last_auto_generated_at ?? null,
         source_ids: parseCsvNumbers(row.source_ids_csv),
         unread_report_count: Math.max(0, Number(row.unread_report_count) || 0),
@@ -964,11 +968,26 @@ async function performReportGeneration(
     return savedReport;
 }
 
-async function updateAutoCheckTimestamp(projectId: number, checkedAt: string) {
+async function updateAutoAttemptTimestamp(projectId: number, attemptedAt: string) {
     const db = await getDb();
     await db.execute(
-        "UPDATE automation_projects SET last_auto_checked_at = $1 WHERE id = $2",
-        [checkedAt, projectId],
+        "UPDATE automation_projects SET last_auto_attempted_at = $1 WHERE id = $2",
+        [attemptedAt, projectId],
+    );
+    dispatchAutomationSyncEvent();
+}
+
+async function updateAutoAttemptAndConsumedTimestamps(projectId: number, attemptedAt: string) {
+    const db = await getDb();
+    await db.execute(
+        `
+            UPDATE automation_projects
+            SET
+                last_auto_attempted_at = $1,
+                last_auto_consumed_at = $1
+            WHERE id = $2
+        `,
+        [attemptedAt, projectId],
     );
     dispatchAutomationSyncEvent();
 }
@@ -977,22 +996,22 @@ function isProjectGenerationInFlight(projectId: number): boolean {
     return inFlightProjectGenerations.has(projectId);
 }
 
-export function isAutomationProjectDueForAutoRun(project: Pick<AutomationProject, "auto_enabled" | "auto_interval_minutes" | "last_auto_checked_at">, now: Date = new Date()): boolean {
+export function isAutomationProjectDueForAutoRun(project: Pick<AutomationProject, "auto_enabled" | "auto_interval_minutes" | "last_auto_attempted_at">, now: Date = new Date()): boolean {
     if (!project.auto_enabled) {
         return false;
     }
 
-    if (!project.last_auto_checked_at) {
+    if (!project.last_auto_attempted_at) {
         return true;
     }
 
-    const lastCheckedAt = new Date(project.last_auto_checked_at).getTime();
-    if (!Number.isFinite(lastCheckedAt)) {
+    const lastAttemptedAt = new Date(project.last_auto_attempted_at).getTime();
+    if (!Number.isFinite(lastAttemptedAt)) {
         return true;
     }
 
     const intervalMinutes = normalizePositiveInteger(project.auto_interval_minutes, DEFAULT_AUTO_INTERVAL_MINUTES);
-    return now.getTime() >= lastCheckedAt + intervalMinutes * 60 * 1000;
+    return now.getTime() >= lastAttemptedAt + intervalMinutes * 60 * 1000;
 }
 
 export async function listAutomationProjects(): Promise<AutomationProject[]> {
@@ -1273,16 +1292,18 @@ async function runAutoGenerationForProject(project: AutomationProject, checkedAt
 
     const candidates = await listProjectCandidateArticles(project.id, {
         limit: project.max_articles_per_report,
-        insertedAfter: project.last_auto_checked_at,
+        insertedAfter: project.last_auto_consumed_at,
     });
 
     if (candidates.length === 0) {
-        await updateAutoCheckTimestamp(project.id, checkedAt);
+        await updateAutoAttemptAndConsumedTimestamps(project.id, checkedAt);
         return null;
     }
 
     if (candidates.length < project.min_articles_per_report) {
-        await updateAutoCheckTimestamp(project.id, checkedAt);
+        // Keep the current auto-check cursor so the next run can accumulate
+        // this partial batch instead of dropping it.
+        await updateAutoAttemptTimestamp(project.id, checkedAt);
         return null;
     }
 
@@ -1318,7 +1339,7 @@ export async function runDueAutomations(now: Date = new Date()): Promise<number>
             try {
                 return await runAutoGenerationForProject(project, checkedAt);
             } catch (error) {
-                await updateAutoCheckTimestamp(project.id, checkedAt);
+                await updateAutoAttemptTimestamp(project.id, checkedAt);
                 throw error;
             }
         })();

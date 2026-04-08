@@ -260,11 +260,13 @@ pub async fn persist_automation_report_cmd(
                 "
                     UPDATE automation_projects
                     SET
-                        last_auto_checked_at = ?,
+                        last_auto_attempted_at = ?,
+                        last_auto_consumed_at = ?,
                         last_auto_generated_at = ?
                     WHERE id = ?
                 ",
             )
+            .bind(&checked_at)
             .bind(&checked_at)
             .bind(&checked_at)
             .bind(project_id)

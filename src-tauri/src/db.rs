@@ -492,6 +492,21 @@ pub fn get_migrations() -> Vec<Migration> {
                 ALTER TABLE automation_projects RENAME COLUMN min_articles_per_card TO min_articles_per_report;
             ",
             kind: MigrationKind::Up,
+        },
+        Migration {
+            version: 15,
+            description: "split_automation_auto_check_state",
+            sql: "
+                ALTER TABLE automation_projects ADD COLUMN last_auto_attempted_at DATETIME;
+                ALTER TABLE automation_projects ADD COLUMN last_auto_consumed_at DATETIME;
+
+                UPDATE automation_projects
+                SET
+                    last_auto_attempted_at = last_auto_checked_at,
+                    last_auto_consumed_at = last_auto_checked_at
+                WHERE last_auto_checked_at IS NOT NULL;
+            ",
+            kind: MigrationKind::Up,
         }
     ]
 }

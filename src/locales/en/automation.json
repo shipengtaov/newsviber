@@ -67,6 +67,8 @@
     "automation": "Automation",
     "webSearch": "Web Search",
     "checkInterval": "Check Interval",
+    "lastAttempted": "Last Attempted",
+    "lastConsumed": "Last Consumed",
     "lastChecked": "Last Checked",
     "lastGenerated": "Last Generated",
     "unreadReports": "Unread Reports",

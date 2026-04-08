@@ -44,6 +44,7 @@ import {
     listAutomationProjects,
     markAllAutomationReportsAsRead,
     markAutomationReportAsRead,
+    runDueAutomations,
     saveAutomationProject,
     setAutomationReportFavorite,
     summarizeArticleContextText,
@@ -59,7 +60,8 @@ const baseAutomationProject = {
     max_articles_per_report: 12,
     min_articles_per_report: 1,
     web_search_enabled: false,
-    last_auto_checked_at: null,
+    last_auto_attempted_at: null,
+    last_auto_consumed_at: null,
     last_auto_generated_at: null,
     source_ids: [],
     unread_report_count: 0,
@@ -192,7 +194,8 @@ describe("automation service context helpers", () => {
                     max_articles_per_report: 12,
                     min_articles_per_report: 1,
                     web_search_enabled: 0,
-                    last_auto_checked_at: null,
+                    last_auto_attempted_at: null,
+                    last_auto_consumed_at: null,
                     last_auto_generated_at: null,
                     source_ids_csv: null,
                     unread_report_count: 0,
@@ -297,7 +300,8 @@ describe("automation service context helpers", () => {
                     max_articles_per_report: 200,
                     min_articles_per_report: 1,
                     web_search_enabled: 1,
-                    last_auto_checked_at: null,
+                    last_auto_attempted_at: null,
+                    last_auto_consumed_at: null,
                     last_auto_generated_at: null,
                     source_ids_csv: null,
                     unread_report_count: 0,
@@ -510,6 +514,137 @@ describe("automation candidate article listing", () => {
     });
 });
 
+describe("automation auto generation", () => {
+    it("keeps partial candidate batches for the next auto run until the minimum is met", async () => {
+        const checkedCursor = "2026-03-13T00:00:00Z";
+        const firstBatch = Array.from({ length: 5 }, (_, index) => ({
+            id: index + 1,
+            source_id: 2,
+            source_name: "HN",
+            title: `Early signal ${index + 1}`,
+            summary: "Useful summary",
+            published_at: `2026-03-13T00:${10 + index}:00Z`,
+            inserted_at: `2026-03-13T00:${10 + index}:00Z`,
+            is_consumed: 0,
+        }));
+        const secondBatch = Array.from({ length: 15 }, (_, index) => ({
+            id: index + 6,
+            source_id: 2,
+            source_name: "HN",
+            title: `Later signal ${index + 6}`,
+            summary: "Useful summary",
+            published_at: `2026-03-13T01:${10 + index}:00Z`,
+            inserted_at: `2026-03-13T01:${10 + index}:00Z`,
+            is_consumed: 0,
+        }));
+        const allCandidates = [...secondBatch, ...firstBatch];
+        const allArticles = allCandidates.map((article) => ({
+            ...article,
+            content: `Body for ${article.title}`,
+            article_url: `https://example.com/article-${article.id}`,
+        }));
+        const projectRow = {
+            ...baseAutomationProject,
+            id: 11,
+            name: "Accumulating auto reports",
+            auto_enabled: 1,
+            auto_interval_minutes: 60,
+            max_articles_per_report: 50,
+            min_articles_per_report: 20,
+            last_auto_attempted_at: checkedCursor,
+            last_auto_consumed_at: checkedCursor,
+        };
+
+        let listedProjectRuns = 0;
+        const executeMock = vi.fn(async (query: string, params?: unknown[]) => {
+            if (query.includes("last_auto_attempted_at = $1 WHERE id = $2")) {
+                projectRow.last_auto_attempted_at = String(params?.[0] ?? null);
+                return;
+            }
+
+            throw new Error(`Unexpected execute query: ${query} with params ${JSON.stringify(params ?? [])}`);
+        });
+        const selectMock = vi.fn(async (query: string, params?: unknown[]) => {
+            if (query.includes("ORDER BY p.id DESC")) {
+                listedProjectRuns += 1;
+                return [projectRow];
+            }
+
+            if (query.includes("WHERE p.id = $1")) {
+                return [projectRow];
+            }
+
+            if (query.includes("SELECT COUNT(*) AS cnt") && query.includes("candidate_articles")) {
+                return [{ cnt: listedProjectRuns === 1 ? firstBatch.length : allCandidates.length }];
+            }
+
+            if (query.includes("SELECT *") && query.includes("candidate_articles")) {
+                return listedProjectRuns === 1 ? firstBatch : allCandidates;
+            }
+
+            if (query.includes("FROM articles a")) {
+                return allArticles;
+            }
+
+            if (query.includes("FROM automation_reports")) {
+                return [{
+                    id: 91,
+                    project_id: 11,
+                    title: "Accumulated report",
+                    full_report: "## Summary\n- Combined signals",
+                    generation_mode: "auto",
+                    used_article_count: allCandidates.length,
+                    is_read: 0,
+                    is_favorite: 0,
+                    created_at: "2026-03-13T02:00:00Z",
+                }];
+            }
+
+            throw new Error(`Unexpected select query: ${query} with params ${JSON.stringify(params ?? [])}`);
+        });
+
+        getDbMock.mockResolvedValue({
+            select: selectMock,
+            execute: executeMock,
+        });
+        generateAutomationReportDraftMock.mockResolvedValue({
+            title: "Accumulated report",
+            markdown: "## Summary\n- Combined signals\n",
+        });
+        invokeMock.mockResolvedValue({ reportId: 91 });
+
+        await expect(runDueAutomations(new Date("2026-03-13T01:00:00Z"))).resolves.toBe(0);
+        expect(invokeMock).not.toHaveBeenCalled();
+        expect(executeMock).toHaveBeenCalledTimes(1);
+        expect(executeMock).toHaveBeenCalledWith(
+            "UPDATE automation_projects SET last_auto_attempted_at = $1 WHERE id = $2",
+            ["2026-03-13T01:00:00.000Z", 11],
+        );
+
+        await expect(runDueAutomations(new Date("2026-03-13T02:00:00Z"))).resolves.toBe(1);
+
+        const candidateQueryCalls = selectMock.mock.calls.filter(([query]) =>
+            typeof query === "string" && query.includes("candidate_articles"),
+        );
+        expect(candidateQueryCalls).toHaveLength(4);
+        expect(candidateQueryCalls[0]?.[1]).toEqual([11, 11, 11, checkedCursor]);
+        expect(candidateQueryCalls[1]?.[1]).toEqual([11, 11, 11, checkedCursor, 50]);
+        expect(candidateQueryCalls[2]?.[1]).toEqual([11, 11, 11, checkedCursor]);
+        expect(candidateQueryCalls[3]?.[1]).toEqual([11, 11, 11, checkedCursor, 50]);
+
+        expect(invokeMock).toHaveBeenCalledTimes(1);
+        expect(invokeMock).toHaveBeenCalledWith("persist_automation_report_cmd", {
+            input: expect.objectContaining({
+                projectId: 11,
+                generationMode: "auto",
+                usedArticleCount: 20,
+                checkedAt: "2026-03-13T02:00:00.000Z",
+                articleIds: expect.arrayContaining(firstBatch.map((article) => article.id)),
+            }),
+        });
+    });
+});
+
 describe("automation service unread state", () => {
     it("maps unread project counts from project queries", async () => {
         getDbMock.mockResolvedValue({
@@ -523,7 +658,8 @@ describe("automation service unread state", () => {
                 max_articles_per_report: 9,
                 min_articles_per_report: 1,
                 web_search_enabled: 1,
-                last_auto_checked_at: "2026-03-13T00:00:00Z",
+                last_auto_attempted_at: "2026-03-13T00:00:00Z",
+                last_auto_consumed_at: "2026-03-13T00:00:00Z",
                 last_auto_generated_at: "2026-03-13T01:00:00Z",
                 source_ids_csv: "1,2",
                 unread_report_count: 4,
@@ -670,7 +806,8 @@ describe("automation service unread state", () => {
                     max_articles_per_report: 200,
                     min_articles_per_report: 10,
                     web_search_enabled: 0,
-                    last_auto_checked_at: null,
+                    last_auto_attempted_at: null,
+                    last_auto_consumed_at: null,
                     last_auto_generated_at: null,
                     source_ids_csv: null,
                     unread_report_count: 0,

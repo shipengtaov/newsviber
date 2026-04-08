@@ -67,6 +67,8 @@
     "automation": "自动化",
     "webSearch": "Web Search",
     "checkInterval": "检查间隔",
+    "lastAttempted": "上次尝试检查",
+    "lastConsumed": "上次消费游标",
     "lastChecked": "上次检查",
     "lastGenerated": "上次生成",
     "unreadReports": "未读报告",

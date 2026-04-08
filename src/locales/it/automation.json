@@ -64,6 +64,8 @@
     "notScheduled": "Non programmato",
     "automation": "Automazione",
     "checkInterval": "Intervallo controllo",
+    "lastAttempted": "Ultimo tentativo",
+    "lastConsumed": "Ultimo cursore consumato",
     "lastChecked": "Ultimo controllo",
     "lastGenerated": "Ultima generazione",
     "unreadReports": "Report non letti",
